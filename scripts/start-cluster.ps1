@@ -1,5 +1,5 @@
 # PrediSched start-cluster
-# Starts scheduler-1 and worker-1 as detached background processes, logs in logs/.
+# Starts scheduler-1 and worker-1..3 as detached background processes, logs in logs/.
 #
 # Nodes are launched through Win32_Process.Create rather than Start-Process. Start-Process hands the
 # child the caller's console handles, so a coding agent that runs this script waits for the long-lived
@@ -71,4 +71,6 @@ function Start-Node($jar, $config, $name) {
 
 Start-Node "$root\predisched-scheduler\target\predisched-scheduler.jar" "$root\configs\local\scheduler-1.yaml" "scheduler-1"
 Start-Node "$root\predisched-worker\target\predisched-worker.jar" "$root\configs\local\worker-1.yaml" "worker-1"
+Start-Node "$root\predisched-worker\target\predisched-worker.jar" "$root\configs\local\worker-2.yaml" "worker-2"
+Start-Node "$root\predisched-worker\target\predisched-worker.jar" "$root\configs\local\worker-3.yaml" "worker-3"
 Write-Output "Cluster up. Logs in logs/. Stop with scripts\stop-cluster.ps1"

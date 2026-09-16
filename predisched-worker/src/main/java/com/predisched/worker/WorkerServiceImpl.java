@@ -7,25 +7,73 @@ import com.predisched.proto.WorkerServiceGrpc;
 import io.grpc.stub.StreamObserver;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Executes tasks synchronously on the calling gRPC thread (Prompt 02 makes it async
- * with a thread pool). A thrown exception becomes {@code success=false}, never a gRPC error.
+ * Executes tasks on a bounded pool, completing each gRPC call asynchronously when
+ * the pool finishes, so gRPC threads never block on task work.
+ *
+ * <p>A saturated pool returns {@code success=false} with {@code "worker saturated"}
+ * (the scheduler requeues the task). A thrown exception becomes {@code success=false}
+ * with the message, never a gRPC error and never a hung call.
  */
 public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
 
   private static final Logger log = LoggerFactory.getLogger(WorkerServiceImpl.class);
 
+  /** Output marker telling the scheduler to requeue instead of failing the task. */
+  public static final String SATURATED = "worker saturated";
+
   private final Map<TaskType, TaskExecutor> executors = new EnumMap<>(TaskType.class);
   private final String workerId;
+  private final ThreadPoolExecutor pool;
+  private final WorkerMetrics metrics;
+  private final double cpuLimitFactor;
+  private final Set<String> executedIds = ConcurrentHashMap.newKeySet();
 
-  public WorkerServiceImpl(String workerId) {
+  public WorkerServiceImpl(
+      String workerId,
+      int poolSize,
+      int queueCapacity,
+      double cpuLimitFactor,
+      WorkerMetrics metrics) {
     this.workerId = workerId;
+    this.cpuLimitFactor = cpuLimitFactor;
+    this.metrics = metrics;
+    AtomicInteger seq = new AtomicInteger(1);
+    ThreadFactory factory =
+        task -> {
+          Thread thread = new Thread(task);
+          thread.setName("worker-" + workerId + "-exec-" + seq.getAndIncrement());
+          thread.setDaemon(true);
+          return thread;
+        };
+    this.pool =
+        new ThreadPoolExecutor(
+            poolSize,
+            poolSize,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(queueCapacity),
+            factory,
+            new ThreadPoolExecutor.AbortPolicy());
     register(new CpuTaskExecutor());
     register(new MatrixTaskExecutor());
     register(new SleepTaskExecutor());
+  }
+
+  /** Defaults for tests: pool of 4, queue of 100, no slowdown. */
+  public WorkerServiceImpl(String workerId) {
+    this(workerId, 4, 100, 1.0, new WorkerMetrics());
   }
 
   void register(TaskExecutor executor) {
@@ -36,7 +84,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
   public void executeTask(ExecuteRequest req, StreamObserver<ExecuteResult> obs) {
     String taskId = req.getTask().getTaskId();
     TaskExecutor executor = executors.get(req.getTask().getType());
-    long start = System.nanoTime();
+    long acceptedAt = System.currentTimeMillis();
     if (executor == null) {
       obs.onNext(
           ExecuteResult.newBuilder()
@@ -47,28 +95,107 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
       obs.onCompleted();
       return;
     }
+    String input = req.getTask().getInput();
     try {
-      String output = executor.execute(req.getTask().getInput());
-      long execMs = (System.nanoTime() - start) / 1_000_000;
-      log.info("task {} done in {} ms", taskId, execMs);
-      obs.onNext(
-          ExecuteResult.newBuilder()
-              .setTaskId(taskId)
-              .setSuccess(true)
-              .setOutput(output)
-              .setExecTimeMs(execMs)
-              .build());
-    } catch (Exception e) {
-      long execMs = (System.nanoTime() - start) / 1_000_000;
-      log.warn("task {} failed: {}", taskId, e.toString());
+      pool.execute(() -> runTask(taskId, executor, input, acceptedAt, obs));
+    } catch (RejectedExecutionException e) {
+      log.warn("saturated, rejecting {}", taskId);
       obs.onNext(
           ExecuteResult.newBuilder()
               .setTaskId(taskId)
               .setSuccess(false)
-              .setOutput(e.toString())
-              .setExecTimeMs(execMs)
+              .setOutput(SATURATED)
               .build());
+      obs.onCompleted();
     }
+  }
+
+  private void runTask(
+      String taskId, TaskExecutor executor, String input, long acceptedAt, StreamObserver<ExecuteResult> obs) {
+    long startedAt = System.currentTimeMillis();
+    metrics.taskStarted();
+    try {
+      long begin = System.nanoTime();
+      String output;
+      try {
+        output = executor.execute(input);
+      } catch (Exception e) {
+        log.warn("task {} failed: {}", taskId, e.toString());
+        respond(obs, taskId, false, e.toString(), elapsedMs(begin), startedAt - acceptedAt);
+        return;
+      }
+      long execMs = elapsedMs(begin);
+      if (cpuLimitFactor > 0 && cpuLimitFactor != 1.0) {
+        // Simulate slower hardware: stretch the genuine execution time.
+        long extra = (long) (execMs * (1.0 / cpuLimitFactor - 1.0));
+        if (extra > 0) {
+          try {
+            Thread.sleep(extra);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            respond(obs, taskId, false, "interrupted: " + e, execMs, startedAt - acceptedAt);
+            return;
+          }
+          execMs += extra;
+        }
+      }
+      metrics.recordCompletion(execMs);
+      executedIds.add(taskId);
+      log.info("task {} done in {} ms on {}", taskId, execMs, Thread.currentThread().getName());
+      respond(obs, taskId, true, output, execMs, startedAt - acceptedAt);
+    } catch (Throwable t) {
+      // Guarantee the gRPC call always completes.
+      try {
+        respond(obs, taskId, false, t.toString(), 0, startedAt - acceptedAt);
+      } catch (Throwable ignored) {
+        log.warn("could not respond for task {}", taskId, t);
+      }
+    } finally {
+      metrics.taskFinished();
+    }
+  }
+
+  private static long elapsedMs(long beginNanos) {
+    return (System.nanoTime() - beginNanos) / 1_000_000;
+  }
+
+  private static void respond(
+      StreamObserver<ExecuteResult> obs,
+      String taskId,
+      boolean success,
+      String output,
+      long execMs,
+      long waitMs) {
+    obs.onNext(
+        ExecuteResult.newBuilder()
+            .setTaskId(taskId)
+            .setSuccess(success)
+            .setOutput(output)
+            .setExecTimeMs(execMs)
+            .setWaitTimeMs(Math.max(0, waitMs))
+            .build());
     obs.onCompleted();
+  }
+
+  public String workerId() {
+    return workerId;
+  }
+
+  public WorkerMetrics metrics() {
+    return metrics;
+  }
+
+  public ThreadPoolExecutor pool() {
+    return pool;
+  }
+
+  /** Ids this worker has executed; used by tests to detect duplicate execution. */
+  public Set<String> executedIds() {
+    return executedIds;
+  }
+
+  /** Shut the pool down; called when the node stops. */
+  public void shutdown() {
+    pool.shutdownNow();
   }
 }

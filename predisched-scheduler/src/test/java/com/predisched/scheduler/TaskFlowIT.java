@@ -5,23 +5,23 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.predisched.common.grpc.Channels;
-import com.predisched.common.model.WorkerInfo;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
+import com.predisched.proto.RegisterRequest;
 import com.predisched.proto.SchedulerServiceGrpc;
 import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusRequest;
 import com.predisched.proto.TaskStatusResponse;
 import com.predisched.proto.TaskType;
-import com.predisched.scheduler.strategy.FirstWorkerStrategy;
+import com.predisched.scheduler.strategy.RotatingStrategy;
+import com.predisched.worker.WorkerMetrics;
 import com.predisched.worker.WorkerServiceImpl;
 import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,22 +41,31 @@ class TaskFlowIT {
   @BeforeEach
   void setUp() throws Exception {
     // Real worker on an ephemeral port.
-    workerServer =
-        ServerBuilder.forPort(0).addService(new WorkerServiceImpl("worker-it")).build().start();
+    WorkerServiceImpl workerService =
+        new WorkerServiceImpl("worker-it", 4, 100, 1.0, new WorkerMetrics());
+    workerServer = ServerBuilder.forPort(0).addService(workerService).build().start();
     int workerPort = workerServer.getPort();
 
     store = new InMemoryTaskStore();
     queue = new TaskQueue();
     channels = new Channels();
-    List<WorkerInfo> workers =
-        List.of(new WorkerInfo("worker-it", "localhost", workerPort, 4, 4096, 4));
-    dispatcher = new Dispatcher(store, queue, new FirstWorkerStrategy(), workers, channels);
+    WorkerRegistry registry = new WorkerRegistry(60_000);
+    registry.register(
+        RegisterRequest.newBuilder()
+            .setWorkerId("worker-it")
+            .setHost("localhost")
+            .setPort(workerPort)
+            .setCores(4)
+            .setMemoryMb(4096)
+            .setPoolSize(4)
+            .build());
+    dispatcher = new Dispatcher(store, queue, new RotatingStrategy(), registry, channels);
     dispatcher.start();
 
     String name = "sched-" + UUID.randomUUID();
     schedulerServer =
         InProcessServerBuilder.forName(name)
-            .addService(new SchedulerServiceImpl(store, queue))
+            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate()))
             .directExecutor()
             .build()
             .start();
@@ -165,12 +174,12 @@ class TaskFlowIT {
     TaskQueue q2 = new TaskQueue();
     Channels ch2 = new Channels();
     Dispatcher d2 =
-        new Dispatcher(s2, q2, new FirstWorkerStrategy(), List.of(), ch2);
+        new Dispatcher(s2, q2, new RotatingStrategy(), new WorkerRegistry(60_000), ch2);
     d2.start();
     String name = "sched-cancel-" + UUID.randomUUID();
     Server srv =
         InProcessServerBuilder.forName(name)
-            .addService(new SchedulerServiceImpl(s2, q2))
+            .addService(new SchedulerServiceImpl(s2, q2, new ArrivalRate()))
             .directExecutor()
             .build()
             .start();

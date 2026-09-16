@@ -10,38 +10,60 @@ import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.WorkerServiceGrpc;
 import com.predisched.scheduler.strategy.SchedulingStrategy;
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Takes tasks from the queue and sends each to the worker chosen by the strategy. */
+/**
+ * Takes tasks from the queue and sends each to the worker chosen by the strategy.
+ *
+ * <p>The queue thread only marks tasks RUNNING; the blocking worker call runs on a
+ * sender pool so many tasks are in flight at once and worker thread pools actually
+ * fill up. Saturation and transport failures requeue the task.
+ */
 public class Dispatcher implements AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(Dispatcher.class);
 
+  /**
+   * Matches the worker's saturation marker over the wire. Kept as a literal on purpose:
+   * the scheduler never imports worker classes (module ownership), they talk gRPC only.
+   */
+  static final String WORKER_SATURATED = "worker saturated";
+
   private final TaskStore store;
   private final TaskQueue queue;
   private final SchedulingStrategy strategy;
-  private final List<WorkerInfo> workers;
+  private final WorkerRegistry registry;
   private final Channels channels;
   private final Thread thread;
+  private final ExecutorService inflight;
   private volatile boolean running = true;
 
   public Dispatcher(
       TaskStore store,
       TaskQueue queue,
       SchedulingStrategy strategy,
-      List<WorkerInfo> workers,
+      WorkerRegistry registry,
       Channels channels) {
     this.store = store;
     this.queue = queue;
     this.strategy = strategy;
-    this.workers = new CopyOnWriteArrayList<>(workers);
+    this.registry = registry;
     this.channels = channels;
     this.thread = new Thread(this::loop, "dispatcher");
     this.thread.setDaemon(true);
+    AtomicInteger seq = new AtomicInteger(1);
+    this.inflight =
+        Executors.newCachedThreadPool(
+            task -> {
+              Thread sender = new Thread(task, "dispatcher-send-" + seq.getAndIncrement());
+              sender.setDaemon(true);
+              return sender;
+            });
   }
 
   public void start() {
@@ -52,7 +74,7 @@ public class Dispatcher implements AutoCloseable {
     while (running) {
       try {
         TaskRecord record = queue.take();
-        var chosen = strategy.select(record, List.copyOf(workers));
+        var chosen = strategy.select(record, registry.alive());
         if (chosen.isEmpty()) {
           log.warn("no workers available, requeueing {}", record.id());
           queue.offer(record);
@@ -60,7 +82,9 @@ public class Dispatcher implements AutoCloseable {
           continue;
         }
         WorkerInfo w = chosen.get();
-        dispatch(record, w);
+        if (markRunning(record, w)) {
+          inflight.execute(() -> send(record, w));
+        }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
@@ -68,21 +92,26 @@ public class Dispatcher implements AutoCloseable {
     }
   }
 
-  private void dispatch(TaskRecord record, WorkerInfo worker) {
+  /** Transition QUEUED → RUNNING and stamp the worker; false if the task moved on. */
+  private boolean markRunning(TaskRecord record, WorkerInfo worker) {
     synchronized (record) {
       if (record.status() != TaskStatus.QUEUED) {
-        return;
+        return false;
       }
       try {
         store.transition(record.id(), TaskStatus.RUNNING);
       } catch (IllegalStateException e) {
         log.warn("skip dispatch of {}: {}", record.id(), e.getMessage());
-        return;
+        return false;
       }
       record.workerId(worker.workerId());
       record.startedAt(System.currentTimeMillis());
       record.waitTimeMs(Math.max(0, record.startedAt() - record.submittedAt()));
+      return true;
     }
+  }
+
+  private void send(TaskRecord record, WorkerInfo worker) {
     TaskRequest taskProto =
         TaskRequest.newBuilder()
             .setTaskId(record.id())
@@ -100,6 +129,10 @@ public class Dispatcher implements AutoCloseable {
         record.execTimeMs(res.getExecTimeMs());
         record.completedAt(System.currentTimeMillis());
         record.result(res.getOutput());
+        if (!res.getSuccess() && res.getOutput().contains(WORKER_SATURATED)) {
+          requeue(record, "worker saturated");
+          return;
+        }
         try {
           store.transition(
               record.id(), res.getSuccess() ? TaskStatus.COMPLETED : TaskStatus.FAILED);
@@ -116,22 +149,35 @@ public class Dispatcher implements AutoCloseable {
           res.getExecTimeMs());
     } catch (Exception e) {
       log.warn("dispatch of {} to {} failed, requeueing: {}", record.id(), worker.workerId(), e);
-      synchronized (record) {
-        try {
-          store.transition(record.id(), TaskStatus.QUEUED);
-        } catch (IllegalStateException ex) {
-          log.warn("cannot requeue {}: {}", record.id(), ex.getMessage());
-          return;
-        }
-        record.workerId("");
-      }
-      queue.offer(record);
+      requeue(record, "dispatch failure");
     }
+  }
+
+  private void requeue(TaskRecord record, String reason) {
+    synchronized (record) {
+      try {
+        store.transition(record.id(), TaskStatus.QUEUED);
+      } catch (IllegalStateException ex) {
+        log.warn("cannot requeue {}: {}", record.id(), ex.getMessage());
+        return;
+      }
+      record.workerId("");
+    }
+    // Brief pause on the sender thread so a full worker is not hot-looped against.
+    // (The queue thread is unaffected and keeps admitting other tasks.)
+    try {
+      Thread.sleep(50);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    log.info("requeued {} ({})", record.id(), reason);
+    queue.offer(record);
   }
 
   @Override
   public void close() {
     running = false;
     thread.interrupt();
+    inflight.shutdownNow();
   }
 }

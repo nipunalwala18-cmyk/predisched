@@ -22,10 +22,12 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
 
   private final TaskStore store;
   private final TaskQueue queue;
+  private final ArrivalRate arrivals;
 
-  public SchedulerServiceImpl(TaskStore store, TaskQueue queue) {
+  public SchedulerServiceImpl(TaskStore store, TaskQueue queue, ArrivalRate arrivals) {
     this.store = store;
     this.queue = queue;
+    this.arrivals = arrivals;
   }
 
   @Override
@@ -58,6 +60,7 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
       return;
     }
     queue.offer(record);
+    arrivals.mark();
     log.info("accepted task {}", req.getTaskId());
     obs.onNext(
         TaskResponse.newBuilder()

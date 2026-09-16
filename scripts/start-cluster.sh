@@ -18,4 +18,6 @@ start_node() {
 start_node "$ROOT/predisched-scheduler/target/predisched-scheduler.jar" "$ROOT/configs/local/scheduler-1.yaml" "scheduler-1"
 sleep 3
 start_node "$ROOT/predisched-worker/target/predisched-worker.jar" "$ROOT/configs/local/worker-1.yaml" "worker-1"
+start_node "$ROOT/predisched-worker/target/predisched-worker.jar" "$ROOT/configs/local/worker-2.yaml" "worker-2"
+start_node "$ROOT/predisched-worker/target/predisched-worker.jar" "$ROOT/configs/local/worker-3.yaml" "worker-3"
 echo "Cluster up. Logs in logs/."
