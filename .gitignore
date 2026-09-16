@@ -1,0 +1,30 @@
+# Java / Maven
+target/
+*.class
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+ml/generated/
+spark-warehouse/
+metastore_db/
+
+# Node
+node_modules/
+dashboard/dist/
+
+# Data and results produced by runs (commit summaries, not raw dumps)
+ml/data/raw/
+results/raw/
+
+# Local secrets
+.env
