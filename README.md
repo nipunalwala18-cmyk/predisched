@@ -17,7 +17,7 @@ tolerance, MPI collectives and MPI matrix multiplication. See [docs/LAB-COVERAGE
 > [`prompts/`](prompts/README.md). The earlier prototype (Experiments 1–3) is preserved in git history
 > at commit `741a022`.
 
-Build status: `mvn -q verify` green (Prompt 00, 2026-09-16).
+Build status: `mvn -q verify` green (Prompt 01, 2026-09-16).
 
 ## Architecture
 
@@ -66,7 +66,7 @@ Docker Compose.
 | # | Component | Done |
 | --- | --- | --- |
 | 00 | Foundation | ☑ |
-| 01 | Task API and execution | ☐ |
+| 01 | Task API and execution | ☑ |
 | 02 | Concurrent workers and membership | ☐ |
 | 03 | Scheduling strategies | ☐ |
 | 04 | Time and event ordering | ☐ |

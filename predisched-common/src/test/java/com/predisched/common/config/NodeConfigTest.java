@@ -53,7 +53,7 @@ class NodeConfigTest {
   @Test
   void rejectsFileWithoutNodeId() throws Exception {
     Path cfg = tmp.resolve("bad.yaml");
-    Files.writeString(cfg, "role: WORKER\nport: 50061\n");
+    Files.writeString(cfg, "role: WORKER\nport: 50261\n");
     IllegalArgumentException e =
         assertThrows(IllegalArgumentException.class, () -> NodeConfig.load(cfg));
     assertTrue(e.getMessage().contains("nodeId"));

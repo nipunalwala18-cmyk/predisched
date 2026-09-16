@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package predisched;
+
+import "task.proto";
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+message ExecuteRequest {
+  TaskRequest task = 1;
+}
+
+message ExecuteResult {
+  string task_id = 1;
+  bool success = 2;
+  string output = 3;
+  int64 exec_time_ms = 4;
+  int64 wait_time_ms = 5;
+  int64 lamport_time = 6;
+}
+
+service WorkerService {
+  rpc ExecuteTask(ExecuteRequest) returns (ExecuteResult);
+}
