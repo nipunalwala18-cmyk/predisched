@@ -8,16 +8,16 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Temporary rotation over the alive list sorted by id, so worker churn does not
- * skip or repeat workers. Replaced by the real strategies in Prompt 03.
+ * Cycles over the alive list sorted by id. Sorting per call means worker churn
+ * cannot skip or repeat a worker: the cursor is always modulo the current list.
  */
-public class RotatingStrategy implements SchedulingStrategy {
+public class RoundRobinStrategy implements SchedulingStrategy {
 
   private final AtomicInteger cursor = new AtomicInteger();
 
   @Override
   public String name() {
-    return "rotating";
+    return "round-robin";
   }
 
   @Override

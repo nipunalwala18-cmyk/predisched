@@ -36,11 +36,13 @@ public class Dispatcher implements AutoCloseable {
 
   private final TaskStore store;
   private final TaskQueue queue;
-  private final SchedulingStrategy strategy;
+  private volatile SchedulingStrategy strategy;
   private final WorkerRegistry registry;
+  private final InFlight inflight = new InFlight();
+  private final DecisionLog decisions = new DecisionLog(1000);
   private final Channels channels;
   private final Thread thread;
-  private final ExecutorService inflight;
+  private final ExecutorService inflightPool;
   private volatile boolean running = true;
 
   public Dispatcher(
@@ -57,13 +59,27 @@ public class Dispatcher implements AutoCloseable {
     this.thread = new Thread(this::loop, "dispatcher");
     this.thread.setDaemon(true);
     AtomicInteger seq = new AtomicInteger(1);
-    this.inflight =
+    this.inflightPool =
         Executors.newCachedThreadPool(
             task -> {
               Thread sender = new Thread(task, "dispatcher-send-" + seq.getAndIncrement());
               sender.setDaemon(true);
               return sender;
             });
+  }
+
+  /** Switch the placement policy at runtime (admin RPC, benchmark). */
+  public void setStrategy(SchedulingStrategy strategy) {
+    this.strategy = strategy;
+  }
+
+  public String strategyName() {
+    return strategy.name();
+  }
+
+  /** Recent placement decisions, oldest first. */
+  public java.util.List<SchedulingDecision> decisions() {
+    return decisions.snapshot();
   }
 
   public void start() {
@@ -74,22 +90,46 @@ public class Dispatcher implements AutoCloseable {
     while (running) {
       try {
         TaskRecord record = queue.take();
-        var chosen = strategy.select(record, registry.alive());
+        SchedulingStrategy current = strategy;
+        long begin = System.nanoTime();
+        var chosen = current.select(record, adjustedAlive());
+        long micros = (System.nanoTime() - begin) / 1_000;
         if (chosen.isEmpty()) {
+          decisions.add(
+              new SchedulingDecision(record.id(), current.name(), "", 0, micros));
           log.warn("no workers available, requeueing {}", record.id());
           queue.offer(record);
           Thread.sleep(200);
           continue;
         }
         WorkerInfo w = chosen.get();
+        decisions.add(
+            new SchedulingDecision(
+                record.id(), current.name(), w.workerId(), registry.alive().size(), micros));
         if (markRunning(record, w)) {
-          inflight.execute(() -> send(record, w));
+          inflight.increment(w.workerId());
+          inflightPool.execute(() -> send(record, w));
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
       }
     }
+  }
+
+  /**
+   * Alive workers with the local in-flight count folded into {@code queueLen}, so
+   * load-based strategies see dispatched-but-unacknowledged tasks that heartbeats
+   * cannot show yet.
+   */
+  private java.util.List<WorkerInfo> adjustedAlive() {
+    java.util.List<WorkerInfo> adjusted = new java.util.ArrayList<>();
+    for (WorkerInfo w : registry.alive()) {
+      WorkerInfo copy = new WorkerInfo(w);
+      copy.queueLen(copy.queueLen() + inflight.get(copy.workerId()));
+      adjusted.add(copy);
+    }
+    return adjusted;
   }
 
   /** Transition QUEUED → RUNNING and stamp the worker; false if the task moved on. */
@@ -150,6 +190,8 @@ public class Dispatcher implements AutoCloseable {
     } catch (Exception e) {
       log.warn("dispatch of {} to {} failed, requeueing: {}", record.id(), worker.workerId(), e);
       requeue(record, "dispatch failure");
+    } finally {
+      inflight.decrement(worker.workerId());
     }
   }
 
@@ -178,6 +220,6 @@ public class Dispatcher implements AutoCloseable {
   public void close() {
     running = false;
     thread.interrupt();
-    inflight.shutdownNow();
+    inflightPool.shutdownNow();
   }
 }

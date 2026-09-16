@@ -12,7 +12,7 @@ import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusRequest;
 import com.predisched.proto.TaskType;
-import com.predisched.scheduler.strategy.RotatingStrategy;
+import com.predisched.scheduler.strategy.RoundRobinStrategy;
 import com.predisched.worker.WorkerMetrics;
 import com.predisched.worker.WorkerServiceImpl;
 import io.grpc.ManagedChannel;
@@ -76,7 +76,7 @@ class ConcurrentSubmitIT {
     store = new InMemoryTaskStore();
     queue = new TaskQueue();
     channels = new Channels();
-    dispatcher = new Dispatcher(store, queue, new RotatingStrategy(), registry, channels);
+    dispatcher = new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels);
     dispatcher.start();
 
     String name = "concurrent-sched-" + UUID.randomUUID();

@@ -14,7 +14,7 @@ import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusRequest;
 import com.predisched.proto.TaskStatusResponse;
 import com.predisched.proto.TaskType;
-import com.predisched.scheduler.strategy.RotatingStrategy;
+import com.predisched.scheduler.strategy.RoundRobinStrategy;
 import com.predisched.worker.WorkerMetrics;
 import com.predisched.worker.WorkerServiceImpl;
 import io.grpc.ManagedChannel;
@@ -59,7 +59,7 @@ class TaskFlowIT {
             .setMemoryMb(4096)
             .setPoolSize(4)
             .build());
-    dispatcher = new Dispatcher(store, queue, new RotatingStrategy(), registry, channels);
+    dispatcher = new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels);
     dispatcher.start();
 
     String name = "sched-" + UUID.randomUUID();
@@ -174,7 +174,7 @@ class TaskFlowIT {
     TaskQueue q2 = new TaskQueue();
     Channels ch2 = new Channels();
     Dispatcher d2 =
-        new Dispatcher(s2, q2, new RotatingStrategy(), new WorkerRegistry(60_000), ch2);
+        new Dispatcher(s2, q2, new RoundRobinStrategy(), new WorkerRegistry(60_000), ch2);
     d2.start();
     String name = "sched-cancel-" + UUID.randomUUID();
     Server srv =

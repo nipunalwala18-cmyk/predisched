@@ -4,9 +4,11 @@ import com.predisched.common.config.NodeConfig;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
-import com.predisched.scheduler.strategy.RotatingStrategy;
+import com.predisched.scheduler.strategy.SchedulingStrategy;
+import com.predisched.scheduler.strategy.StrategyFactory;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,20 +29,42 @@ public class SchedulerNode {
   }
 
   public void start() throws Exception {
-    Object timeout = config.settings().get("workerTimeoutMs");
+    Map<String, Object> settings = config.settings();
+    Object timeout = settings.get("workerTimeoutMs");
     long aliveTimeoutMs = timeout == null ? 5000 : Long.parseLong(String.valueOf(timeout));
+    StrategyFactory factory =
+        new StrategyFactory(
+            config.seed(),
+            doubleSetting(settings, "wCpu", 0.4),
+            doubleSetting(settings, "wMem", 0.2),
+            doubleSetting(settings, "wQueue", 0.4));
+    Object strategyName = settings.get("strategy");
+    SchedulingStrategy initial;
+    try {
+      initial = factory.create(strategyName == null ? "round-robin" : strategyName.toString());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException("refusing to start: " + e.getMessage(), e);
+    }
     WorkerRegistry registry = new WorkerRegistry(aliveTimeoutMs);
     ArrivalRate arrivals = new ArrivalRate();
-    dispatcher = new Dispatcher(store, queue, new RotatingStrategy(), registry, channels);
+    dispatcher = new Dispatcher(store, queue, initial, registry, channels);
     dispatcher.start();
     server =
         ServerBuilder.forPort(config.port())
             .addService(new SchedulerServiceImpl(store, queue, arrivals))
             .addService(new RegistryServiceImpl(registry))
+            .addService(new AdminServiceImpl(dispatcher, factory))
             .build()
             .start();
-    log.info("scheduler {} listening on {}:{}", config.nodeId(), config.host(), config.port());
+    log.info(
+        "scheduler {} listening on {}:{} (strategy={})",
+        config.nodeId(), config.host(), config.port(), initial.name());
     Runtime.getRuntime().addShutdownHook(new Thread(this::stop, "scheduler-shutdown"));
+  }
+
+  static double doubleSetting(Map<String, Object> settings, String name, double def) {
+    Object value = settings.get(name);
+    return value == null ? def : Double.parseDouble(String.valueOf(value));
   }
 
   public void blockUntilShutdown() throws InterruptedException {

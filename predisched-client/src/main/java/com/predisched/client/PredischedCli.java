@@ -8,7 +8,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-/** {@code predisched} CLI: submit, status, cancel, watch. */
+/** {@code predisched} CLI: submit, status, cancel, watch, admin. */
 @Command(
     name = "predisched",
     mixinStandardHelpOptions = true,
@@ -17,7 +17,8 @@ import picocli.CommandLine.Parameters;
       PredischedCli.Submit.class,
       PredischedCli.Status.class,
       PredischedCli.Cancel.class,
-      PredischedCli.Watch.class
+      PredischedCli.Watch.class,
+      PredischedCli.Admin.class
     })
 public class PredischedCli implements Callable<Integer> {
 
@@ -118,5 +119,35 @@ public class PredischedCli implements Callable<Integer> {
 
   public static void main(String[] args) {
     System.exit(new CommandLine(new PredischedCli()).execute(args));
+  }
+
+  @Command(
+      name = "admin",
+      description = "Operator commands",
+      subcommands = {PredischedCli.AdminStrategy.class})
+  static class Admin implements Callable<Integer> {
+    @Override
+    public Integer call() {
+      CommandLine.usage(this, System.out);
+      return 0;
+    }
+  }
+
+  @Command(name = "strategy", description = "Switch the scheduling strategy without a restart")
+  static class AdminStrategy implements Callable<Integer> {
+    @Parameters(index = "0", description = "round-robin, random, least-loaded, resource-aware")
+    String name;
+
+    @Option(names = "--scheduler", defaultValue = "localhost:50051")
+    String scheduler;
+
+    @Override
+    public Integer call() {
+      try (SchedulerClient c = client(scheduler)) {
+        var res = c.setStrategy(name);
+        System.out.println("ok=" + res.getOk() + " " + res.getMessage());
+        return res.getOk() ? 0 : 1;
+      }
+    }
   }
 }

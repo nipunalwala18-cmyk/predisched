@@ -1,6 +1,9 @@
 package com.predisched.client;
 
+import com.predisched.proto.AdminServiceGrpc;
+import com.predisched.proto.Ack;
 import com.predisched.proto.SchedulerServiceGrpc;
+import com.predisched.proto.SetStrategyRequest;
 import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskResponse;
 import com.predisched.proto.TaskStatus;
@@ -51,6 +54,12 @@ public class SchedulerClient implements AutoCloseable {
 
   public TaskResponse cancel(String taskId) {
     return stub.cancelTask(TaskStatusRequest.newBuilder().setTaskId(taskId).build());
+  }
+
+  /** Switch the scheduler's placement strategy without a restart. */
+  public Ack setStrategy(String name) {
+    var admin = AdminServiceGrpc.newBlockingStub(channel).withDeadlineAfter(10, TimeUnit.SECONDS);
+    return admin.setStrategy(SetStrategyRequest.newBuilder().setName(name).build());
   }
 
   /** Polls until the task reaches a terminal state. */

@@ -15,7 +15,7 @@ import com.predisched.scheduler.RegistryServiceImpl;
 import com.predisched.scheduler.SchedulerServiceImpl;
 import com.predisched.scheduler.TaskQueue;
 import com.predisched.scheduler.WorkerRegistry;
-import com.predisched.scheduler.strategy.RotatingStrategy;
+import com.predisched.scheduler.strategy.RoundRobinStrategy;
 import com.predisched.worker.WorkerMetrics;
 import com.predisched.worker.WorkerServiceImpl;
 import io.grpc.ManagedChannel;
@@ -144,7 +144,7 @@ public class PoolScaling {
     TaskQueue queue = new TaskQueue();
     Channels channels = new Channels();
     Dispatcher dispatcher =
-        new Dispatcher(store, queue, new RotatingStrategy(), registry, channels);
+        new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels);
     dispatcher.start();
 
     String schedName = "bench-sched-" + UUID.randomUUID();

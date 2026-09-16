@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package predisched;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+message SetStrategyRequest {
+  string name = 1;
+}
+
+service AdminService {
+  rpc SetStrategy(SetStrategyRequest) returns (Ack);
+}

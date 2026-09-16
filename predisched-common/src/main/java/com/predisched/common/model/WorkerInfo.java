@@ -35,6 +35,20 @@ public class WorkerInfo {
     this.lastSeen = System.currentTimeMillis();
   }
 
+  /** Copy, including the latest snapshot. */
+  public WorkerInfo(WorkerInfo other) {
+    this(
+        other.workerId, other.host, other.port, other.cores, other.memoryMb,
+        other.poolSize);
+    this.cpuPct = other.cpuPct;
+    this.memPct = other.memPct;
+    this.activeThreads = other.activeThreads;
+    this.queueLen = other.queueLen;
+    this.tasksCompleted = other.tasksCompleted;
+    this.avgExecMs = other.avgExecMs;
+    this.lastSeen = other.lastSeen;
+  }
+
   public String workerId() {
     return workerId;
   }
