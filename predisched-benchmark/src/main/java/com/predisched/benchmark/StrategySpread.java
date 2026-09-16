@@ -1,5 +1,9 @@
 package com.predisched.benchmark;
 
+import com.predisched.common.clock.NodeClock;
+import com.predisched.common.clock.EventLog;
+import com.predisched.common.clock.LamportClock;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
@@ -48,6 +52,8 @@ public class StrategySpread {
   static final List<String> STRATEGIES =
       List.of("round-robin", "random", "least-loaded", "resource-aware");
   static final int TASKS = 300;
+
+  private static final NodeClock WALL = new NodeClock(0, 0);
 
   record BatchTask(String id, TaskType type, String input) {}
 
@@ -103,10 +109,11 @@ public class StrategySpread {
     // Static snapshots: w1 idle, w2 warm, w3 hot (no heartbeats in-process).
     double[] cpu = {10, 50, 80};
     double[] mem = {20, 40, 70};
-    WorkerRegistry registry = new WorkerRegistry(300_000);
+    NodeContext ctx = new NodeContext("bench", new LamportClock(), WALL, new EventLog());
+    WorkerRegistry registry = new WorkerRegistry(300_000, ctx.wall());
     for (int w = 1; w <= 3; w++) {
       WorkerServiceImpl service =
-          new WorkerServiceImpl("spread-w" + w, 4, 1000, 1.0, new WorkerMetrics());
+          new WorkerServiceImpl("spread-w" + w, 4, 1000, 1.0, new WorkerMetrics(), ctx);
       Server server = ServerBuilder.forPort(0).addService(service).build();
       server.start();
       services.add(service);
@@ -128,17 +135,17 @@ public class StrategySpread {
 
     TaskStore store = new InMemoryTaskStore();
     TaskQueue queue = new TaskQueue();
-    Channels channels = new Channels();
+    Channels channels = new Channels("bench", ctx.lamport());
     StrategyFactory factory = new StrategyFactory(42, 0.4, 0.2, 0.4);
     Dispatcher dispatcher =
-        new Dispatcher(store, queue, factory.create(strategyName), registry, channels);
+        new Dispatcher(store, queue, factory.create(strategyName), registry, channels, ctx);
     dispatcher.start();
 
     String schedName = "spread-sched-" + UUID.randomUUID();
     Server schedulerServer =
         InProcessServerBuilder.forName(schedName)
-            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate()))
-            .addService(new RegistryServiceImpl(registry))
+            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate(ctx.wall()), ctx))
+            .addService(new RegistryServiceImpl(registry, ctx))
             .directExecutor()
             .build()
             .start();
@@ -147,7 +154,7 @@ public class StrategySpread {
       var stub = SchedulerServiceGrpc.newBlockingStub(channel);
       Map<String, Long> submittedAt = new HashMap<>();
       for (BatchTask task : batch) {
-        long now = System.currentTimeMillis();
+        long now = WALL.now();
         var res =
             stub.submitTask(
                 TaskRequest.newBuilder()
@@ -163,9 +170,9 @@ public class StrategySpread {
       }
       Map<String, Long> completedAt = new HashMap<>();
       Map<String, String> workerOf = new HashMap<>();
-      long deadline = System.currentTimeMillis() + 300_000;
+      long deadline = WALL.now() + 300_000;
       while (completedAt.size() < batch.size()) {
-        if (System.currentTimeMillis() > deadline) {
+        if (WALL.now() > deadline) {
           throw new IllegalStateException("timed out waiting for batch completion");
         }
         for (BatchTask task : batch) {
@@ -177,7 +184,7 @@ public class StrategySpread {
           if (status.getStatus() == TaskStatus.COMPLETED
               || status.getStatus() == TaskStatus.FAILED
               || status.getStatus() == TaskStatus.CANCELLED) {
-            completedAt.put(task.id(), System.currentTimeMillis());
+            completedAt.put(task.id(), WALL.now());
             workerOf.put(task.id(), status.getWorkerId());
           }
         }

@@ -1,5 +1,7 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.clock.EventType;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.proto.Ack;
 import com.predisched.proto.Heartbeat;
 import com.predisched.proto.RegisterRequest;
@@ -10,14 +12,20 @@ import io.grpc.stub.StreamObserver;
 public class RegistryServiceImpl extends RegistryServiceGrpc.RegistryServiceImplBase {
 
   private final WorkerRegistry registry;
+  private final NodeContext ctx;
 
-  public RegistryServiceImpl(WorkerRegistry registry) {
+  public RegistryServiceImpl(WorkerRegistry registry, NodeContext ctx) {
     this.registry = registry;
+    this.ctx = ctx;
   }
 
   @Override
   public void register(RegisterRequest req, StreamObserver<Ack> obs) {
-    obs.onNext(registry.register(req));
+    Ack ack = registry.register(req);
+    if (ack.getOk()) {
+      ctx.emit(EventType.REGISTER, "", "worker=" + req.getWorkerId());
+    }
+    obs.onNext(ack);
     obs.onCompleted();
   }
 

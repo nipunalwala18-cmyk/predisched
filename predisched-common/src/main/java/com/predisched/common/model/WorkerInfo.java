@@ -32,7 +32,8 @@ public class WorkerInfo {
     this.cores = cores;
     this.memoryMb = memoryMb;
     this.poolSize = poolSize;
-    this.lastSeen = System.currentTimeMillis();
+    // Never registered: not alive until the registry stamps lastSeen from its NodeClock.
+    this.lastSeen = 0;
   }
 
   /** Copy, including the latest snapshot. */

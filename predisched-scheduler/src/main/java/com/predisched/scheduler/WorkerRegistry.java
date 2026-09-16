@@ -1,5 +1,6 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.clock.NodeClock;
 import com.predisched.common.model.WorkerInfo;
 import com.predisched.proto.Ack;
 import com.predisched.proto.Heartbeat;
@@ -20,9 +21,11 @@ public class WorkerRegistry {
 
   private final ConcurrentHashMap<String, WorkerInfo> workers = new ConcurrentHashMap<>();
   private final long aliveTimeoutMs;
+  private final NodeClock wall;
 
-  public WorkerRegistry(long aliveTimeoutMs) {
+  public WorkerRegistry(long aliveTimeoutMs, NodeClock wall) {
     this.aliveTimeoutMs = aliveTimeoutMs;
+    this.wall = wall;
   }
 
   public Ack register(RegisterRequest req) {
@@ -38,7 +41,7 @@ public class WorkerRegistry {
                   : new WorkerInfo(
                       id, req.getHost(), req.getPort(), req.getCores(), req.getMemoryMb(),
                       req.getPoolSize());
-          info.lastSeen(System.currentTimeMillis());
+          info.lastSeen(wall.now());
           return info;
         });
     return Ack.newBuilder().setOk(true).setMessage("registered").build();
@@ -55,13 +58,13 @@ public class WorkerRegistry {
     info.queueLen(hb.getQueueLen());
     info.tasksCompleted(hb.getTasksCompleted());
     info.avgExecMs(hb.getAvgExecMs());
-    info.lastSeen(System.currentTimeMillis());
+    info.lastSeen(wall.now());
     return Ack.newBuilder().setOk(true).setMessage("ok").build();
   }
 
   /** Snapshot of currently alive workers, sorted by id. */
   public List<WorkerInfo> alive() {
-    long now = System.currentTimeMillis();
+    long now = wall.now();
     return workers.values().stream()
         .filter(w -> now - w.lastSeen() <= aliveTimeoutMs)
         .sorted(Comparator.comparing(WorkerInfo::workerId))

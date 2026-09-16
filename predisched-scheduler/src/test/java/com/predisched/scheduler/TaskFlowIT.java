@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.predisched.common.clock.EventLog;
+import com.predisched.common.clock.LamportClock;
+import com.predisched.common.clock.NodeClock;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
@@ -41,15 +45,16 @@ class TaskFlowIT {
   @BeforeEach
   void setUp() throws Exception {
     // Real worker on an ephemeral port.
+    NodeContext ctx = new NodeContext("test", new LamportClock(), new NodeClock(0, 0), new EventLog());
     WorkerServiceImpl workerService =
-        new WorkerServiceImpl("worker-it", 4, 100, 1.0, new WorkerMetrics());
+        new WorkerServiceImpl("worker-it", 4, 100, 1.0, new WorkerMetrics(), ctx);
     workerServer = ServerBuilder.forPort(0).addService(workerService).build().start();
     int workerPort = workerServer.getPort();
 
     store = new InMemoryTaskStore();
     queue = new TaskQueue();
-    channels = new Channels();
-    WorkerRegistry registry = new WorkerRegistry(60_000);
+    channels = new Channels("test", ctx.lamport());
+    WorkerRegistry registry = new WorkerRegistry(60_000, ctx.wall());
     registry.register(
         RegisterRequest.newBuilder()
             .setWorkerId("worker-it")
@@ -59,13 +64,13 @@ class TaskFlowIT {
             .setMemoryMb(4096)
             .setPoolSize(4)
             .build());
-    dispatcher = new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels);
+    dispatcher = new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels, ctx);
     dispatcher.start();
 
     String name = "sched-" + UUID.randomUUID();
     schedulerServer =
         InProcessServerBuilder.forName(name)
-            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate()))
+            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate(ctx.wall()), ctx))
             .directExecutor()
             .build()
             .start();
@@ -170,16 +175,17 @@ class TaskFlowIT {
   @Test
   void cancelQueuedTask() throws Exception {
     // Scheduler with no workers: tasks stay QUEUED so cancel succeeds.
+    NodeContext ctx2 = new NodeContext("test", new LamportClock(), new NodeClock(0, 0), new EventLog());
     TaskStore s2 = new InMemoryTaskStore();
     TaskQueue q2 = new TaskQueue();
-    Channels ch2 = new Channels();
+    Channels ch2 = new Channels("test", ctx2.lamport());
     Dispatcher d2 =
-        new Dispatcher(s2, q2, new RoundRobinStrategy(), new WorkerRegistry(60_000), ch2);
+        new Dispatcher(s2, q2, new RoundRobinStrategy(), new WorkerRegistry(60_000, ctx2.wall()), ch2, ctx2);
     d2.start();
     String name = "sched-cancel-" + UUID.randomUUID();
     Server srv =
         InProcessServerBuilder.forName(name)
-            .addService(new SchedulerServiceImpl(s2, q2, new ArrivalRate()))
+            .addService(new SchedulerServiceImpl(s2, q2, new ArrivalRate(ctx2.wall()), ctx2))
             .directExecutor()
             .build()
             .start();

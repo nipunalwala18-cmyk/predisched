@@ -17,4 +17,5 @@ settings:
   poolSize: 4
   queueCapacity: 100
   heartbeatMs: 1000
+  simulatedOffsetMs: -300
 

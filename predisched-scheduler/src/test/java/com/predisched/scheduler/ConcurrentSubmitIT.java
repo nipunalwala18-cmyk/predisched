@@ -3,6 +3,10 @@ package com.predisched.scheduler;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.predisched.common.clock.EventLog;
+import com.predisched.common.clock.LamportClock;
+import com.predisched.common.clock.NodeClock;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
@@ -54,10 +58,11 @@ class ConcurrentSubmitIT {
 
   @BeforeEach
   void setUp() throws Exception {
-    WorkerRegistry registry = new WorkerRegistry(300_000);
+    NodeContext ctx = new NodeContext("test", new LamportClock(), new NodeClock(0, 0), new EventLog());
+    WorkerRegistry registry = new WorkerRegistry(300_000, ctx.wall());
     for (int w = 1; w <= 3; w++) {
       WorkerServiceImpl service =
-          new WorkerServiceImpl("concurrent-w" + w, 8, 2000, 1.0, new WorkerMetrics());
+          new WorkerServiceImpl("concurrent-w" + w, 8, 2000, 1.0, new WorkerMetrics(), ctx);
       Server server = ServerBuilder.forPort(0).addService(service).build();
       server.start();
       workerServers.add(server);
@@ -75,14 +80,14 @@ class ConcurrentSubmitIT {
 
     store = new InMemoryTaskStore();
     queue = new TaskQueue();
-    channels = new Channels();
-    dispatcher = new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels);
+    channels = new Channels("test", ctx.lamport());
+    dispatcher = new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels, ctx);
     dispatcher.start();
 
     String name = "concurrent-sched-" + UUID.randomUUID();
     schedulerServer =
         InProcessServerBuilder.forName(name)
-            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate()))
+            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate(ctx.wall()), ctx))
             .directExecutor()
             .build()
             .start();

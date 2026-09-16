@@ -83,6 +83,7 @@ public class RegistrationClient implements AutoCloseable {
   }
 
   private void registerUntilSuccess() {
+    org.slf4j.MDC.put("node", workerId);
     long backoffMs = 500;
     while (running && !registered) {
       try {
@@ -122,6 +123,7 @@ public class RegistrationClient implements AutoCloseable {
     if (!running) {
       return;
     }
+    org.slf4j.MDC.put("node", workerId);
     try {
       var ack =
           stub()

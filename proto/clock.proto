@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package predisched;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+message TimeRequest {
+  int64 requester_time_ms = 1;
+}
+
+message TimeResponse {
+  int64 node_time_ms = 1;
+}
+
+message ClockAdjust {
+  int64 offset_ms = 1;
+}
+
+service ClockService {
+  rpc GetTime(TimeRequest) returns (TimeResponse);
+  rpc Adjust(ClockAdjust) returns (Ack);
+}

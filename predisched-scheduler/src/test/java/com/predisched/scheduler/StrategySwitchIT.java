@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.predisched.common.clock.EventLog;
+import com.predisched.common.clock.LamportClock;
+import com.predisched.common.clock.NodeClock;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
@@ -42,11 +46,12 @@ class StrategySwitchIT {
 
   @BeforeEach
   void setUp() throws Exception {
-    workerService = new WorkerServiceImpl("switch-w", 4, 100, 1.0, new WorkerMetrics());
+    NodeContext ctx = new NodeContext("test", new LamportClock(), new NodeClock(0, 0), new EventLog());
+    workerService = new WorkerServiceImpl("switch-w", 4, 100, 1.0, new WorkerMetrics(), ctx);
     workerServer = ServerBuilder.forPort(0).addService(workerService).build();
     workerServer.start();
 
-    WorkerRegistry registry = new WorkerRegistry(60_000);
+    WorkerRegistry registry = new WorkerRegistry(60_000, ctx.wall());
     registry.register(
         RegisterRequest.newBuilder()
             .setWorkerId("switch-w")
@@ -59,16 +64,16 @@ class StrategySwitchIT {
 
     TaskStore store = new InMemoryTaskStore();
     TaskQueue queue = new TaskQueue();
-    channels = new Channels();
+    channels = new Channels("test", ctx.lamport());
     StrategyFactory factory = new StrategyFactory(42, 0.4, 0.2, 0.4);
-    dispatcher = new Dispatcher(store, queue, factory.create("round-robin"), registry, channels);
+    dispatcher = new Dispatcher(store, queue, factory.create("round-robin"), registry, channels, ctx);
     dispatcher.start();
 
     String name = "switch-sched-" + UUID.randomUUID();
     schedulerServer =
         InProcessServerBuilder.forName(name)
-            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate()))
-            .addService(new AdminServiceImpl(dispatcher, factory))
+            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate(ctx.wall()), ctx))
+            .addService(new AdminServiceImpl(dispatcher, factory, java.util.List::of, ctx))
             .directExecutor()
             .build()
             .start();

@@ -1,5 +1,6 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.clock.NodeClock;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
@@ -14,17 +15,22 @@ public class ArrivalRate {
   static final long WINDOW_MS = 10_000;
 
   private final Deque<Long> arrivals = new ArrayDeque<>();
+  private final NodeClock wall;
+
+  public ArrivalRate(NodeClock wall) {
+    this.wall = wall;
+  }
 
   /** Record one arrival at the current time. */
   public synchronized void mark() {
-    long now = System.currentTimeMillis();
+    long now = wall.now();
     arrivals.addLast(now);
     evict(now);
   }
 
   /** Tasks per second over the window ending now. */
   public synchronized double ratePerSecond() {
-    evict(System.currentTimeMillis());
+    evict(wall.now());
     return (double) arrivals.size() / (WINDOW_MS / 1000.0);
   }
 

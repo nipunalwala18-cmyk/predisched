@@ -4,6 +4,8 @@ import com.predisched.proto.ExecuteRequest;
 import com.predisched.proto.ExecuteResult;
 import com.predisched.proto.TaskType;
 import com.predisched.proto.WorkerServiceGrpc;
+import com.predisched.common.clock.EventType;
+import com.predisched.common.clock.NodeContext;
 import io.grpc.stub.StreamObserver;
 import java.util.EnumMap;
 import java.util.Map;
@@ -38,6 +40,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
   private final ThreadPoolExecutor pool;
   private final WorkerMetrics metrics;
   private final double cpuLimitFactor;
+  private final NodeContext ctx;
   private final Set<String> executedIds = ConcurrentHashMap.newKeySet();
 
   public WorkerServiceImpl(
@@ -45,10 +48,12 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
       int poolSize,
       int queueCapacity,
       double cpuLimitFactor,
-      WorkerMetrics metrics) {
+      WorkerMetrics metrics,
+      NodeContext ctx) {
     this.workerId = workerId;
     this.cpuLimitFactor = cpuLimitFactor;
     this.metrics = metrics;
+    this.ctx = ctx;
     AtomicInteger seq = new AtomicInteger(1);
     ThreadFactory factory =
         task -> {
@@ -72,8 +77,8 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
   }
 
   /** Defaults for tests: pool of 4, queue of 100, no slowdown. */
-  public WorkerServiceImpl(String workerId) {
-    this(workerId, 4, 100, 1.0, new WorkerMetrics());
+  public WorkerServiceImpl(String workerId, NodeContext ctx) {
+    this(workerId, 4, 100, 1.0, new WorkerMetrics(), ctx);
   }
 
   void register(TaskExecutor executor) {
@@ -84,13 +89,14 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
   public void executeTask(ExecuteRequest req, StreamObserver<ExecuteResult> obs) {
     String taskId = req.getTask().getTaskId();
     TaskExecutor executor = executors.get(req.getTask().getType());
-    long acceptedAt = System.currentTimeMillis();
+    long acceptedAt = ctx.wall().now();
     if (executor == null) {
       obs.onNext(
           ExecuteResult.newBuilder()
               .setTaskId(taskId)
               .setSuccess(false)
               .setOutput("unsupported task type: " + req.getTask().getType())
+              .setLamportTime(ctx.lamport().tick())
               .build());
       obs.onCompleted();
       return;
@@ -105,6 +111,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
               .setTaskId(taskId)
               .setSuccess(false)
               .setOutput(SATURATED)
+              .setLamportTime(ctx.lamport().tick())
               .build());
       obs.onCompleted();
     }
@@ -112,8 +119,13 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
 
   private void runTask(
       String taskId, TaskExecutor executor, String input, long acceptedAt, StreamObserver<ExecuteResult> obs) {
-    long startedAt = System.currentTimeMillis();
+    // Pool threads carry no RPC context: set ours (node + current tick), restore after.
+    java.util.Map<String, String> previous = org.slf4j.MDC.getCopyOfContextMap();
+    org.slf4j.MDC.put("node", workerId);
+    org.slf4j.MDC.put("lamport", Long.toString(ctx.lamport().current()));
+    long startedAt = ctx.wall().now();
     metrics.taskStarted();
+    ctx.emit(EventType.START, taskId, "");
     try {
       long begin = System.nanoTime();
       String output;
@@ -121,6 +133,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
         output = executor.execute(input);
       } catch (Exception e) {
         log.warn("task {} failed: {}", taskId, e.toString());
+        ctx.emit(EventType.FAIL, taskId, e.toString());
         respond(obs, taskId, false, e.toString(), elapsedMs(begin), startedAt - acceptedAt);
         return;
       }
@@ -133,6 +146,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
             Thread.sleep(extra);
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            ctx.emit(EventType.FAIL, taskId, "interrupted");
             respond(obs, taskId, false, "interrupted: " + e, execMs, startedAt - acceptedAt);
             return;
           }
@@ -142,6 +156,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
       metrics.recordCompletion(execMs);
       executedIds.add(taskId);
       log.info("task {} done in {} ms on {}", taskId, execMs, Thread.currentThread().getName());
+      ctx.emit(EventType.COMPLETE, taskId, "execMs=" + execMs);
       respond(obs, taskId, true, output, execMs, startedAt - acceptedAt);
     } catch (Throwable t) {
       // Guarantee the gRPC call always completes.
@@ -152,6 +167,11 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
       }
     } finally {
       metrics.taskFinished();
+      if (previous == null) {
+        org.slf4j.MDC.clear();
+      } else {
+        org.slf4j.MDC.setContextMap(previous);
+      }
     }
   }
 
@@ -159,7 +179,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     return (System.nanoTime() - beginNanos) / 1_000_000;
   }
 
-  private static void respond(
+  private void respond(
       StreamObserver<ExecuteResult> obs,
       String taskId,
       boolean success,
@@ -173,6 +193,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
             .setOutput(output)
             .setExecTimeMs(execMs)
             .setWaitTimeMs(Math.max(0, waitMs))
+            .setLamportTime(ctx.lamport().tick())
             .build());
     obs.onCompleted();
   }

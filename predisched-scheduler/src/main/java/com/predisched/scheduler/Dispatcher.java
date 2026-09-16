@@ -1,5 +1,7 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.clock.EventType;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.model.TaskRecord;
 import com.predisched.common.model.WorkerInfo;
@@ -41,6 +43,7 @@ public class Dispatcher implements AutoCloseable {
   private final InFlight inflight = new InFlight();
   private final DecisionLog decisions = new DecisionLog(1000);
   private final Channels channels;
+  private final NodeContext ctx;
   private final Thread thread;
   private final ExecutorService inflightPool;
   private volatile boolean running = true;
@@ -50,12 +53,14 @@ public class Dispatcher implements AutoCloseable {
       TaskQueue queue,
       SchedulingStrategy strategy,
       WorkerRegistry registry,
-      Channels channels) {
+      Channels channels,
+      NodeContext ctx) {
     this.store = store;
     this.queue = queue;
     this.strategy = strategy;
     this.registry = registry;
     this.channels = channels;
+    this.ctx = ctx;
     this.thread = new Thread(this::loop, "dispatcher");
     this.thread.setDaemon(true);
     AtomicInteger seq = new AtomicInteger(1);
@@ -87,6 +92,7 @@ public class Dispatcher implements AutoCloseable {
   }
 
   private void loop() {
+    org.slf4j.MDC.put("node", ctx.nodeId());
     while (running) {
       try {
         TaskRecord record = queue.take();
@@ -145,19 +151,25 @@ public class Dispatcher implements AutoCloseable {
         return false;
       }
       record.workerId(worker.workerId());
-      record.startedAt(System.currentTimeMillis());
+      record.startedAt(ctx.wall().now());
       record.waitTimeMs(Math.max(0, record.startedAt() - record.submittedAt()));
+      ctx.emit(EventType.DISPATCH, record.id(), "worker=" + worker.workerId());
       return true;
     }
   }
 
   private void send(TaskRecord record, WorkerInfo worker) {
+    // Sender pool threads carry no RPC context: set ours, restore after.
+    java.util.Map<String, String> previous = org.slf4j.MDC.getCopyOfContextMap();
+    org.slf4j.MDC.put("node", ctx.nodeId());
+    org.slf4j.MDC.put("lamport", Long.toString(ctx.lamport().current()));
     TaskRequest taskProto =
         TaskRequest.newBuilder()
             .setTaskId(record.id())
             .setType(record.type())
             .setInput(record.input())
             .setPriority(record.priority())
+            .setLamportTime(ctx.lamport().tick())
             .build();
     try {
       var channel = channels.get(worker.host(), worker.port());
@@ -167,7 +179,7 @@ public class Dispatcher implements AutoCloseable {
           stub.executeTask(ExecuteRequest.newBuilder().setTask(taskProto).build());
       synchronized (record) {
         record.execTimeMs(res.getExecTimeMs());
-        record.completedAt(System.currentTimeMillis());
+        record.completedAt(ctx.wall().now());
         record.result(res.getOutput());
         if (!res.getSuccess() && res.getOutput().contains(WORKER_SATURATED)) {
           requeue(record, "worker saturated");
@@ -179,6 +191,10 @@ public class Dispatcher implements AutoCloseable {
         } catch (IllegalStateException e) {
           log.warn("cannot mark {} terminal: {}", record.id(), e.getMessage());
         }
+        ctx.emit(
+            res.getSuccess() ? EventType.COMPLETE : EventType.FAIL,
+            record.id(),
+            "worker=" + worker.workerId() + " execMs=" + res.getExecTimeMs());
       }
       strategy.onOutcome(record, worker, res.getExecTimeMs());
       log.info(
@@ -192,6 +208,11 @@ public class Dispatcher implements AutoCloseable {
       requeue(record, "dispatch failure");
     } finally {
       inflight.decrement(worker.workerId());
+      if (previous == null) {
+        org.slf4j.MDC.clear();
+      } else {
+        org.slf4j.MDC.setContextMap(previous);
+      }
     }
   }
 

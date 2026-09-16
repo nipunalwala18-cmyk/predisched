@@ -8,7 +8,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-/** {@code predisched} CLI: submit, status, cancel, watch, admin. */
+/** {@code predisched} CLI: submit, status, cancel, watch, admin, events. */
 @Command(
     name = "predisched",
     mixinStandardHelpOptions = true,
@@ -18,7 +18,8 @@ import picocli.CommandLine.Parameters;
       PredischedCli.Status.class,
       PredischedCli.Cancel.class,
       PredischedCli.Watch.class,
-      PredischedCli.Admin.class
+      PredischedCli.Admin.class,
+      PredischedCli.Events.class
     })
 public class PredischedCli implements Callable<Integer> {
 
@@ -118,13 +119,14 @@ public class PredischedCli implements Callable<Integer> {
   }
 
   public static void main(String[] args) {
+    org.slf4j.MDC.put("node", "client");
     System.exit(new CommandLine(new PredischedCli()).execute(args));
   }
 
   @Command(
       name = "admin",
       description = "Operator commands",
-      subcommands = {PredischedCli.AdminStrategy.class})
+      subcommands = {PredischedCli.AdminStrategy.class, PredischedCli.AdminClocks.class})
   static class Admin implements Callable<Integer> {
     @Override
     public Integer call() {
@@ -147,6 +149,56 @@ public class PredischedCli implements Callable<Integer> {
         var res = c.setStrategy(name);
         System.out.println("ok=" + res.getOk() + " " + res.getMessage());
         return res.getOk() ? 0 : 1;
+      }
+    }
+  }
+
+  @Command(name = "clocks", description = "Show each node's clock offset from the Berkeley daemon")
+  static class AdminClocks implements Callable<Integer> {
+    @Option(names = "--scheduler", defaultValue = "localhost:50051")
+    String scheduler;
+
+    @Override
+    public Integer call() {
+      try (SchedulerClient c = client(scheduler)) {
+        var res = c.clocks();
+        if (res.getOffsetsCount() == 0) {
+          System.out.println("no sync round yet");
+          return 0;
+        }
+        System.out.println("node | offset_ms | round_ts");
+        for (var offset : res.getOffsetsList()) {
+          System.out.println(
+              offset.getNodeId() + " | " + offset.getOffsetMs() + " | " + offset.getRoundTs());
+        }
+        return 0;
+      }
+    }
+  }
+
+  @Command(name = "events", description = "Print cluster events merged by (Lamport time, node id)")
+  static class Events implements Callable<Integer> {
+    @Option(names = "--task", description = "Only events for this task id")
+    String task;
+
+    @Option(names = "--scheduler", defaultValue = "localhost:50051")
+    String scheduler;
+
+    @Override
+    public Integer call() {
+      try (SchedulerClient c = client(scheduler)) {
+        var res = c.events(task);
+        if (res.getEventsCount() == 0) {
+          System.out.println("no events" + (task != null ? " for task " + task : ""));
+          return 0;
+        }
+        System.out.println("lamport | node | type | task | details");
+        for (var e : res.getEventsList()) {
+          System.out.println(
+              e.getLamport() + " | " + e.getNodeId() + " | " + e.getType() + " | "
+                  + e.getTaskId() + " | " + e.getDetails());
+        }
+        return 0;
       }
     }
   }

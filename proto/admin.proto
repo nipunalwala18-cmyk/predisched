@@ -11,6 +11,37 @@ message SetStrategyRequest {
   string name = 1;
 }
 
+message EmptyMsg {}
+
+message ClockOffset {
+  string node_id = 1;
+  int64 offset_ms = 2;
+  int64 round_ts = 3;
+}
+
+message ClockOffsets {
+  repeated ClockOffset offsets = 1;
+}
+
+message EventProto {
+  string node_id = 1;
+  int64 lamport = 2;
+  int64 wall_time_ms = 3;
+  string type = 4;
+  string task_id = 5;
+  string details = 6;
+}
+
+message EventsRequest {
+  string task_id = 1;
+}
+
+message EventsResponse {
+  repeated EventProto events = 1;
+}
+
 service AdminService {
   rpc SetStrategy(SetStrategyRequest) returns (Ack);
+  rpc GetClocks(EmptyMsg) returns (ClockOffsets);
+  rpc GetEvents(EventsRequest) returns (EventsResponse);
 }

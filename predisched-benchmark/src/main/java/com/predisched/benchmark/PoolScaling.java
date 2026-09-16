@@ -1,5 +1,9 @@
 package com.predisched.benchmark;
 
+import com.predisched.common.clock.NodeClock;
+import com.predisched.common.clock.EventLog;
+import com.predisched.common.clock.LamportClock;
+import com.predisched.common.clock.NodeContext;
 import com.predisched.common.grpc.Channels;
 import com.predisched.common.store.InMemoryTaskStore;
 import com.predisched.common.store.TaskStore;
@@ -43,6 +47,8 @@ public class PoolScaling {
 
   static final int[] POOL_SIZES = {1, 2, 4, 8};
   static final int REPS = 3;
+
+  private static final NodeClock WALL = new NodeClock(0, 0);
 
   record Row(
       int pool,
@@ -123,13 +129,14 @@ public class PoolScaling {
   record Submitted(long atMs, TaskType type) {}
 
   private static Row runOnce(int poolSize, int rep) throws Exception {
+    NodeContext ctx = new NodeContext("bench", new LamportClock(), WALL, new EventLog());
     WorkerServiceImpl worker =
-        new WorkerServiceImpl("bench-w", poolSize, 1000, 1.0, new WorkerMetrics());
+        new WorkerServiceImpl("bench-w", poolSize, 1000, 1.0, new WorkerMetrics(), ctx);
     Server workerServer = ServerBuilder.forPort(0).addService(worker).build();
     workerServer.start();
     int workerPort = workerServer.getPort();
 
-    WorkerRegistry registry = new WorkerRegistry(60_000);
+    WorkerRegistry registry = new WorkerRegistry(60_000, ctx.wall());
     registry.register(
         RegisterRequest.newBuilder()
             .setWorkerId("bench-w")
@@ -142,16 +149,16 @@ public class PoolScaling {
 
     TaskStore store = new InMemoryTaskStore();
     TaskQueue queue = new TaskQueue();
-    Channels channels = new Channels();
+    Channels channels = new Channels("bench", ctx.lamport());
     Dispatcher dispatcher =
-        new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels);
+        new Dispatcher(store, queue, new RoundRobinStrategy(), registry, channels, ctx);
     dispatcher.start();
 
     String schedName = "bench-sched-" + UUID.randomUUID();
     Server schedulerServer =
         InProcessServerBuilder.forName(schedName)
-            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate()))
-            .addService(new RegistryServiceImpl(registry))
+            .addService(new SchedulerServiceImpl(store, queue, new ArrivalRate(ctx.wall()), ctx))
+            .addService(new RegistryServiceImpl(registry, ctx))
             .directExecutor()
             .build()
             .start();
@@ -215,7 +222,7 @@ public class PoolScaling {
       TaskType type,
       String input,
       Map<String, Submitted> submitted) {
-    long now = System.currentTimeMillis();
+    long now = WALL.now();
     submitted.put(submit(stub, type, input), new Submitted(now, type));
   }
 
@@ -223,9 +230,9 @@ public class PoolScaling {
       SchedulerServiceGrpc.SchedulerServiceBlockingStub stub, java.util.Set<String> ids)
       throws InterruptedException {
     Map<String, Long> completedAt = new HashMap<>();
-    long deadline = System.currentTimeMillis() + 300_000;
+    long deadline = WALL.now() + 300_000;
     while (completedAt.size() < ids.size()) {
-      if (System.currentTimeMillis() > deadline) {
+      if (WALL.now() > deadline) {
         throw new IllegalStateException("timed out waiting for batch completion");
       }
       for (String id : ids) {
@@ -236,7 +243,7 @@ public class PoolScaling {
         if (status.getStatus() == TaskStatus.COMPLETED
             || status.getStatus() == TaskStatus.FAILED
             || status.getStatus() == TaskStatus.CANCELLED) {
-          completedAt.put(id, System.currentTimeMillis());
+          completedAt.put(id, WALL.now());
         }
       }
       if (completedAt.size() < ids.size()) {

@@ -12,3 +12,13 @@ peers:
     port: 50052
 settings:
   strategy: round-robin
+  timePeers:
+    - id: worker-1
+      host: localhost
+      port: 50261
+    - id: worker-2
+      host: localhost
+      port: 50262
+    - id: worker-3
+      host: localhost
+      port: 50263

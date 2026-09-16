@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.predisched.proto.Heartbeat;
+import com.predisched.common.clock.NodeClock;
 import com.predisched.proto.RegisterRequest;
 import org.junit.jupiter.api.Test;
 
 class WorkerRegistryTest {
+
+  private static final NodeClock WALL = new NodeClock(0, 0);
 
   private static RegisterRequest register(String id) {
     return RegisterRequest.newBuilder()
@@ -35,7 +38,7 @@ class WorkerRegistryTest {
 
   @Test
   void registerThenHeartbeatUpdatesSnapshot() {
-    WorkerRegistry registry = new WorkerRegistry(5000);
+    WorkerRegistry registry = new WorkerRegistry(5000, WALL);
     var ack = registry.register(register("w-1"));
     assertTrue(ack.getOk());
     assertEquals(1, registry.alive().size());
@@ -53,7 +56,7 @@ class WorkerRegistryTest {
 
   @Test
   void unknownWorkerHeartbeatIsRejected() {
-    WorkerRegistry registry = new WorkerRegistry(5000);
+    WorkerRegistry registry = new WorkerRegistry(5000, WALL);
     var ack = registry.heartbeat(heartbeat("ghost"));
     assertFalse(ack.getOk());
     assertTrue(registry.alive().isEmpty());
@@ -61,7 +64,7 @@ class WorkerRegistryTest {
 
   @Test
   void blankIdRegistrationIsRejected() {
-    WorkerRegistry registry = new WorkerRegistry(5000);
+    WorkerRegistry registry = new WorkerRegistry(5000, WALL);
     var ack = registry.register(RegisterRequest.newBuilder().setWorkerId("").build());
     assertFalse(ack.getOk());
     assertEquals(0, registry.size());
@@ -69,7 +72,7 @@ class WorkerRegistryTest {
 
   @Test
   void staleWorkersLeaveAlive() throws Exception {
-    WorkerRegistry registry = new WorkerRegistry(50);
+    WorkerRegistry registry = new WorkerRegistry(50, WALL);
     registry.register(register("w-1"));
     assertEquals(1, registry.alive().size());
     Thread.sleep(150);

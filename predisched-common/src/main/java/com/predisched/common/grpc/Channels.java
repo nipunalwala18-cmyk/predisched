@@ -1,5 +1,7 @@
 package com.predisched.common.grpc;
 
+import com.predisched.common.clock.LamportClientInterceptor;
+import com.predisched.common.clock.LamportClock;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
@@ -8,14 +10,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * Small cache holding one {@link ManagedChannel} per {@code host:port}.
  *
- * <p>Channels are shut down via {@link #shutdown()} (also registered as a JVM shutdown hook).
+ * <p>Every channel carries the Lamport client interceptor, so no service code
+ * handles clocks by hand. Channels are shut down via {@link #shutdown()} (also
+ * registered as a JVM shutdown hook).
  */
 public final class Channels implements AutoCloseable {
 
   private final ConcurrentHashMap<String, ManagedChannel> channels = new ConcurrentHashMap<>();
+  private final LamportClientInterceptor interceptor;
   private volatile boolean closed;
 
-  public Channels() {
+  public Channels(String nodeId, LamportClock clock) {
+    this.interceptor = new LamportClientInterceptor(nodeId, clock);
     Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown, "channels-shutdown"));
   }
 
@@ -31,6 +37,7 @@ public final class Channels implements AutoCloseable {
             ManagedChannelBuilder.forAddress(host, port)
                 .usePlaintext()
                 .keepAliveTime(30, TimeUnit.SECONDS)
+                .intercept(interceptor)
                 .build());
   }
 
