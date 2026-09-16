@@ -45,7 +45,7 @@ Create the skeleton the whole product grows into. No feature code yet.
 6. Top-level folders with a one-line `README.md` each: `ml/`, `spark/`, `mpi/`, `dashboard/`,
    `docker/`, `configs/`, `scripts/`, `docs/components/`, `results/`, `workloads/`.
 7. `configs/local/`: `scheduler-1.yaml` … `scheduler-3.yaml` (ports 50051–50053, each listing the
-   others as peers) and `worker-1.yaml` … `worker-3.yaml` (50061–50063, scheduler peers listed).
+   others as peers) and `worker-1.yaml` … `worker-3.yaml` (50261–50263, scheduler peers listed).
 8. `docs/LAB-COVERAGE.md` already exists (planned locations). Leave its structure; later prompts fill
    in the evidence columns.
 9. Root `README.md` already exists. Add a "Build status" line and keep the progress table; tick

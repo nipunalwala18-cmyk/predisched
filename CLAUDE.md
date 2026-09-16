@@ -58,7 +58,7 @@ Change a version only when a prompt says so, and update this table in the same c
 
 ## Ports (spec §14)
 
-Schedulers 50051–50055 (ids 1–5) · Workers 50061–50063 · Prediction 50070 · Spark UI 4040 ·
+Schedulers 50051–50055 (ids 1–5) · Workers 50261–50263 · Prediction 50070 · Spark UI 4040 ·
 Dashboard API 8080 · React dev 5173 · PostgreSQL 5432.
 
 ## Definition of done for every prompt

@@ -1,7 +1,7 @@
 nodeId: worker-3
 role: WORKER
 host: localhost
-port: 50063
+port: 50263
 seed: 42
 peers:
   - id: scheduler-1

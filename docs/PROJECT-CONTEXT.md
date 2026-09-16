@@ -689,7 +689,7 @@ Early experiments (1–4) use in-memory maps only; the database is added from Ex
 
 ```
 Scheduler nodes: 50051–50055   (IDs 1–5)
-Workers:         50061–50063
+Workers:         50261–50263
 Prediction:      50070
 Spark UI:        4040
 Dashboard API:   8080

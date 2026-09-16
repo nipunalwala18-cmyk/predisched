@@ -16,7 +16,7 @@ Skeleton the whole product grows into (Prompt 00). No feature code yet.
 - `common/grpc/Channels`: one cached `ManagedChannel` per `host:port`.
 - `logback.xml` pattern `%d{HH:mm:ss.SSS} [%X{node}] [L=%X{lamport}] %-5level %logger{20} - %msg%n`
   (MDC filled from Prompt 04).
-- `configs/local/`: 3 schedulers (50051-50053) + 3 workers (50061-50063).
+- `configs/local/`: 3 schedulers (50051-50053) + 3 workers (50261-50263).
 - `requirements.txt`, `scripts/gen-python-protos.(ps1|sh)`, CI workflow.
 
 ## How to verify

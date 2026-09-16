@@ -28,3 +28,9 @@ results/raw/
 
 # Local secrets
 .env
+
+# Local cluster runs
+logs/
+
+# maven-shade-plugin output
+dependency-reduced-pom.xml
