@@ -1,0 +1,15 @@
+nodeId: scheduler-3
+role: SCHEDULER
+host: localhost
+port: 50053
+seed: 42
+peers:
+  - id: scheduler-1
+    host: localhost
+    port: 50051
+  - id: scheduler-2
+    host: localhost
+    port: 50052
+settings:
+  strategy: round-robin
+

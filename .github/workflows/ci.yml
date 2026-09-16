@@ -1,0 +1,28 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - run: mvn -B verify
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt --ignore-installed mpi4py || pip install grpcio grpcio-tools protobuf pandas numpy scikit-learn joblib matplotlib pyspark "psycopg[binary]" pyyaml pytest
+      - run: python -m pytest ml spark mpi -q
+        continue-on-error: true

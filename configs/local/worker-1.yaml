@@ -1,0 +1,20 @@
+nodeId: worker-1
+role: WORKER
+host: localhost
+port: 50061
+seed: 42
+peers:
+  - id: scheduler-1
+    host: localhost
+    port: 50051
+  - id: scheduler-2
+    host: localhost
+    port: 50052
+  - id: scheduler-3
+    host: localhost
+    port: 50053
+settings:
+  poolSize: 4
+  queueCapacity: 100
+  heartbeatMs: 1000
+
