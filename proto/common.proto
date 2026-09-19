@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package predisched;
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+message Ack {
+  bool ok = 1;
+  string message = 2;
+}

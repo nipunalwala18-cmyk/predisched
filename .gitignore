@@ -1,0 +1,38 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.eclipse
+.settings/
+.classpath
+.project
+
+# Logs
+logs/
+*.log
+
+# ML
+ml/data/raw/
+ml/models/*.joblib
+
+# Misc
+.DS_Store
+Thumbs.db
