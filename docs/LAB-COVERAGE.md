@@ -3,7 +3,7 @@
 | Exp | Topic | Code | Demo command | Measured result |
 | --- | --- | --- | --- | --- |
 | 1 | Client-server communication using RPC / RMI | `proto/task.proto`, `proto/worker.proto`, `predisched-scheduler/src/main/java/com/predisched/scheduler/`, `predisched-worker/src/main/java/com/predisched/worker/`, `predisched-client/src/main/java/com/predisched/client/` | `java -jar predisched-client/target/predisched-client.jar submit --type CPU_TASK --input n=2000000 --priority 5` then `watch <id>` (scheduler on 51051, worker on 51061) | `CPU_TASK n=2000000` COMPLETED on worker-1 in 19 ms; `MATRIX_TASK size=200` in 45 ms; invalid submit rejected with every validation error |
-| 2 | Multithreading in a distributed system | not started | not started | not started |
+| 2 | Multithreading in a distributed system | `predisched-worker/src/main/java/com/predisched/worker/ExecutionEngine.java`, `WorkerMetrics.java`, `RegistrationClient.java`, `predisched-scheduler/src/main/java/com/predisched/scheduler/WorkerRegistry.java`, `Dispatcher.java` | `java -jar predisched-benchmark/target/predisched-benchmark.jar pool-size`; or run a worker with `--pool-size 4` and submit 8 sleep tasks at once | Median of 3 reps, 40 x CPU_TASK n=20000000, 8 cores: pool 1 = 5.68 tasks/s, pool 2 = 6.42 (1.13x), pool 4 = 8.22 (1.45x), pool 8 = 8.35 (1.47x); `results/exp2-pool-size.csv` |
 | 3 | Clock synchronization (logical / physical) | not started | not started | not started |
 | 4 | Bully and Ring election | not started | not started | not started |
 | 5 | Data consistency and replication models | not started | not started | not started |

@@ -48,6 +48,42 @@ public class NodeConfig {
         private String id = "scheduler-1";
         private String host = "localhost";
         private int port = 51051;
+        private int dispatchThreads = 4;
+        private long workerStaleAfterMs = 5000;
+        private long noWorkerRetryMs = 200;
+        private long clusterReportIntervalMs = 5000;
+
+        public long getClusterReportIntervalMs() {
+            return clusterReportIntervalMs;
+        }
+
+        public void setClusterReportIntervalMs(long clusterReportIntervalMs) {
+            this.clusterReportIntervalMs = clusterReportIntervalMs;
+        }
+
+        public int getDispatchThreads() {
+            return dispatchThreads;
+        }
+
+        public void setDispatchThreads(int dispatchThreads) {
+            this.dispatchThreads = dispatchThreads;
+        }
+
+        public long getWorkerStaleAfterMs() {
+            return workerStaleAfterMs;
+        }
+
+        public void setWorkerStaleAfterMs(long workerStaleAfterMs) {
+            this.workerStaleAfterMs = workerStaleAfterMs;
+        }
+
+        public long getNoWorkerRetryMs() {
+            return noWorkerRetryMs;
+        }
+
+        public void setNoWorkerRetryMs(long noWorkerRetryMs) {
+            this.noWorkerRetryMs = noWorkerRetryMs;
+        }
 
         public String getId() {
             return id;
@@ -78,6 +114,33 @@ public class NodeConfig {
         private String id = "worker-1";
         private String host = "localhost";
         private int port = 51061;
+        private int poolSize = 4;
+        private int queueCapacity = 100;
+        private long heartbeatIntervalMs = 1000;
+
+        public int getPoolSize() {
+            return poolSize;
+        }
+
+        public void setPoolSize(int poolSize) {
+            this.poolSize = poolSize;
+        }
+
+        public int getQueueCapacity() {
+            return queueCapacity;
+        }
+
+        public void setQueueCapacity(int queueCapacity) {
+            this.queueCapacity = queueCapacity;
+        }
+
+        public long getHeartbeatIntervalMs() {
+            return heartbeatIntervalMs;
+        }
+
+        public void setHeartbeatIntervalMs(long heartbeatIntervalMs) {
+            this.heartbeatIntervalMs = heartbeatIntervalMs;
+        }
 
         public String getId() {
             return id;

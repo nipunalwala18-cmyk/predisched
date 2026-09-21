@@ -4,9 +4,6 @@ import com.predisched.common.InMemoryTaskStore;
 import com.predisched.common.NodeConfig;
 import com.predisched.common.TaskStore;
 import com.predisched.common.TaskValidator;
-import com.predisched.proto.WorkerServiceGrpc;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import java.nio.file.Paths;
@@ -34,22 +31,31 @@ public class SchedulerMain {
         TaskValidator validator = new TaskValidator(config.getValidation().getMaxInputChars());
         BlockingQueue<String> queue = new LinkedBlockingQueue<>();
 
-        ManagedChannel channel = ManagedChannelBuilder
-                .forAddress(config.getWorker().getHost(), config.getWorker().getPort())
-                .usePlaintext()
-                .build();
-        WorkerServiceGrpc.WorkerServiceBlockingStub workerStub =
-                WorkerServiceGrpc.newBlockingStub(channel);
-        Dispatcher dispatcher = new Dispatcher(store, queue, workerStub, config.getWorker().getId());
+        WorkerRegistry workers = new WorkerRegistry(config.getScheduler().getWorkerStaleAfterMs());
+        WorkerClients clients = new WorkerClients();
+        Dispatcher dispatcher = new Dispatcher(
+                store, queue, workers, clients,
+                config.getScheduler().getDispatchThreads(),
+                config.getScheduler().getNoWorkerRetryMs());
         dispatcher.start();
+        ClusterReporter reporter = new ClusterReporter(
+                workers, config.getScheduler().getClusterReportIntervalMs());
+        reporter.start();
 
         Server server = ServerBuilder.forPort(port)
                 .addService(new SchedulerServiceImpl(store, validator, queue))
+                .addService(new RegistryServiceImpl(workers))
                 .build()
                 .start();
-        log.info("Scheduler {} listening on {}", id, port);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            reporter.close();
+            dispatcher.close();
+            clients.close();
+        }));
+        log.info("Scheduler {} listening on {} (dispatch threads {})",
+                id, port, config.getScheduler().getDispatchThreads());
         System.out.println("Scheduler " + id + " listening on " + port
-                + " (worker " + config.getWorker().getHost() + ":" + config.getWorker().getPort() + ")");
+                + ", waiting for workers to register");
         server.awaitTermination();
     }
 

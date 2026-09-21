@@ -58,7 +58,7 @@ illegal move throws instead of silently corrupting a record.
 | --- | --- | --- | --- |
 | `CPU_TASK` | `n=2..100000000` | Counts primes below n (sieve) | `primes_below_<n>=<count>` |
 | `SLEEP_TASK` | `ms=0..60000` | Sleeps, interruptibly | `slept_ms=<ms>` |
-| `MATRIX_TASK` | `size=1..1000` | Multiplies two seeded matrices | `size=<n> checksum=<sum>` |
+| `MATRIX_TASK` | `size=1..1000`, optional `threads=1..64` | Multiplies two seeded matrices | `size=<n> threads=<k> checksum=<sum>` |
 
 The rest of the catalogue (spec §7.2) arrives in prompt 05.
 
@@ -103,8 +103,10 @@ Matrix task:
 
 ```
 accepted=true task_id=task-53ebf0e7 message='queued'
-task_id=task-53ebf0e7 status=COMPLETED worker=worker-1 exec_ms=45 result='size=200 checksum=1997209.445178'
+task_id=task-53ebf0e7 status=COMPLETED worker=worker-1 exec_ms=45 result='size=200 threads=1 checksum=1997209.445178'
 ```
+
+(The output gained its `threads=` field in prompt 02, which added the parallel matrix mode.)
 
 Both validation errors reported from one submit (`--input ms=abc --priority 11`):
 
@@ -128,13 +130,11 @@ accepted=false task_id=task-843786fc message='only QUEUED tasks can be cancelled
 
 ## Tests
 
-`mvn -q verify` runs 30 tests: validator rules (10), state machine transitions (4), input spec (7),
+At the end of prompt 01, `mvn -q verify` ran 30 tests: validator rules (10), state machine transitions (4), input spec (7),
 executors (5), the generated-proto smoke test (1), and an in-process gRPC integration test (3) that
 submits one task of each type, cancels a queued task and rejects a duplicate id.
 
 ## Known limits, resolved later
 
-- One configured worker, chosen without a strategy (prompt 08).
-- Execution is synchronous on the worker, one task at a time (prompt 02).
-- No registration, heartbeats or metrics yet (prompt 02).
+- Workers are chosen without a strategy: the first healthy one (prompt 08).
 - gRPC's default logging is noisy on the console; Logback configuration lands in prompt 03.

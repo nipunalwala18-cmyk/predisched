@@ -2,9 +2,19 @@ scheduler:
   id: "scheduler-1"
   host: "localhost"
   port: 51051
+  # gRPC calls to workers run on this pool, so one slow task cannot block the queue.
+  dispatchThreads: 4
+  # A worker that has not sent a heartbeat within this long is not dispatched to.
+  workerStaleAfterMs: 5000
+  noWorkerRetryMs: 200
+  # One log line per worker per interval with its latest heartbeat metrics; 0 turns it off.
+  clusterReportIntervalMs: 5000
 worker:
   id: "worker-1"
   host: "localhost"
   port: 51061
+  poolSize: 4
+  queueCapacity: 100
+  heartbeatIntervalMs: 1000
 validation:
   maxInputChars: 4096

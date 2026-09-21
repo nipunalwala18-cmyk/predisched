@@ -37,7 +37,22 @@ public class ExecutorTest {
         ExecutionResult second = executor.execute("size=5");
         assertTrue(first.success());
         assertEquals(first.output(), second.output());
-        assertTrue(first.output().startsWith("size=5 checksum="));
+        assertTrue(first.output().startsWith("size=5 threads=1 checksum="));
+    }
+
+    @Test
+    public void matrixChecksumIsTheSameHoweverManyThreadsRun() {
+        String sequential = MatrixTaskExecutor.checksumOf(
+                new MatrixTaskExecutor().execute("size=40").output());
+        String parallel = MatrixTaskExecutor.checksumOf(
+                new MatrixTaskExecutor().execute("size=40, threads=4").output());
+        assertEquals(sequential, parallel);
+    }
+
+    @Test
+    public void matrixRejectsAnUnusableThreadCount() {
+        assertFalse(new MatrixTaskExecutor().execute("size=10, threads=0").success());
+        assertFalse(new MatrixTaskExecutor().execute("size=10, threads=abc").success());
     }
 
     @Test

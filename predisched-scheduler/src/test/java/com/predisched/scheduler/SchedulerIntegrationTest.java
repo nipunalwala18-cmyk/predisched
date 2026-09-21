@@ -78,7 +78,17 @@ public class SchedulerIntegrationTest {
         workerChannel = InProcessChannelBuilder.forName(workerName).directExecutor().build();
         WorkerServiceGrpc.WorkerServiceBlockingStub workerStub =
                 WorkerServiceGrpc.newBlockingStub(workerChannel);
-        dispatcher = new Dispatcher(store, queue, workerStub, "worker-1");
+
+        WorkerRegistry workers = new WorkerRegistry(60_000);
+        workers.register(com.predisched.proto.RegisterRequest.newBuilder()
+                .setWorkerId("worker-1")
+                .setHost("in-process")
+                .setPort(0)
+                .setCores(4)
+                .setMemoryMb(512)
+                .setPoolSize(4)
+                .build());
+        dispatcher = new Dispatcher(store, queue, workers, worker -> workerStub, 2, 50);
         dispatcher.start();
 
         SchedulerServiceImpl service = new SchedulerServiceImpl(store, validator, queue);

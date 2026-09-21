@@ -1,6 +1,9 @@
 package com.predisched.worker;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.proto.RegistryServiceGrpc;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import java.nio.charset.StandardCharsets;
@@ -25,13 +28,44 @@ public class WorkerMain {
         int port = Integer.parseInt(opts.getOrDefault("--port",
                 String.valueOf(config.getWorker().getPort())));
 
+        NodeConfig.WorkerConfig workerConfig = config.getWorker();
+        int poolSize = Integer.parseInt(opts.getOrDefault("--pool-size",
+                String.valueOf(workerConfig.getPoolSize())));
+
         ExecutorRegistry registry = new ExecutorRegistry();
+        WorkerMetrics metrics = new WorkerMetrics();
+        ExecutionEngine engine = new ExecutionEngine(
+                registry, metrics, id, poolSize, workerConfig.getQueueCapacity());
+
         Server server = ServerBuilder.forPort(port)
-                .addService(new WorkerServiceImpl(registry, id))
+                .addService(new WorkerServiceImpl(engine, id))
                 .build()
                 .start();
-        log.info("Worker {} listening on {}", id, port);
-        System.out.println("Worker " + id + " listening on " + port);
+
+        ManagedChannel schedulerChannel = ManagedChannelBuilder
+                .forAddress(config.getScheduler().getHost(), config.getScheduler().getPort())
+                .usePlaintext()
+                .build();
+        RegistrationClient registration = new RegistrationClient(
+                RegistryServiceGrpc.newBlockingStub(schedulerChannel),
+                engine,
+                metrics,
+                id,
+                opts.getOrDefault("--host", workerConfig.getHost()),
+                port,
+                workerConfig.getHeartbeatIntervalMs());
+        registration.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            registration.close();
+            engine.close();
+            schedulerChannel.shutdownNow();
+        }));
+
+        log.info("Worker {} listening on {} (pool {}, queue {})",
+                id, port, poolSize, workerConfig.getQueueCapacity());
+        System.out.println("Worker " + id + " listening on " + port
+                + " (pool " + poolSize + ", registering with "
+                + config.getScheduler().getHost() + ":" + config.getScheduler().getPort() + ")");
         Path done = Paths.get(opts.getOrDefault("--ready-file", ""));
         if (!done.toString().isEmpty()) {
             try {

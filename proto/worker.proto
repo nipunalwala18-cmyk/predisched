@@ -3,6 +3,7 @@ syntax = "proto3";
 package predisched;
 
 import "task.proto";
+import "common.proto";
 
 option java_multiple_files = true;
 option java_package = "com.predisched.proto";
@@ -18,8 +19,37 @@ message ExecuteResult {
   int64 exec_time_ms = 4;
   int64 wait_time_ms = 5;
   int64 lamport_time = 6;
+  // True when the worker's pool queue was full and nothing ran, so the
+  // scheduler may place the task elsewhere instead of failing it.
+  bool rejected = 7;
+}
+
+message RegisterRequest {
+  string worker_id = 1;
+  string host = 2;
+  int32 port = 3;
+  int32 cores = 4;
+  int64 memory_mb = 5;
+  int32 pool_size = 6;
+}
+
+message Heartbeat {
+  string worker_id = 1;
+  double cpu_pct = 2;
+  double mem_pct = 3;
+  int32 active_threads = 4;
+  int32 queue_len = 5;
+  int64 tasks_completed = 6;
+  double avg_exec_ms = 7;
+  int64 lamport_time = 8;
 }
 
 service WorkerService {
   rpc ExecuteTask (ExecuteRequest) returns (ExecuteResult);
+}
+
+// Served by the scheduler: workers announce themselves and report metrics.
+service RegistryService {
+  rpc Register      (RegisterRequest) returns (Ack);
+  rpc SendHeartbeat (Heartbeat)       returns (Ack);
 }

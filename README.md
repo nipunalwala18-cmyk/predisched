@@ -18,7 +18,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | --- | --- | --- |
 | 00 | Bootstrap | [x] |
 | 01 | Task API over gRPC | [x] |
-| 02 | Workers and thread pools | [ ] |
+| 02 | Workers and thread pools | [x] |
 | 03 | Clocks and tracing | [ ] |
 | 04 | Queue discipline | [ ] |
 | 05 | Task catalogue and workload generator | [ ] |

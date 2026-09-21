@@ -22,11 +22,14 @@ public final class TaskInputSpec {
     public record NumericKey(String key, long min, long max) {}
 
     private static final Map<TaskType, List<NumericKey>> REQUIRED = new LinkedHashMap<>();
+    private static final Map<TaskType, List<NumericKey>> OPTIONAL = new LinkedHashMap<>();
 
     static {
         REQUIRED.put(TaskType.CPU_TASK, List.of(new NumericKey("n", 2, 100_000_000L)));
         REQUIRED.put(TaskType.SLEEP_TASK, List.of(new NumericKey("ms", 0, 60_000L)));
         REQUIRED.put(TaskType.MATRIX_TASK, List.of(new NumericKey("size", 1, 1_000L)));
+        // Optional keys are only range-checked when present.
+        OPTIONAL.put(TaskType.MATRIX_TASK, List.of(new NumericKey("threads", 1, 64)));
     }
 
     private TaskInputSpec() {}
@@ -54,25 +57,34 @@ public final class TaskInputSpec {
             errors.add("input must be well-formed key=value[, key=value]: " + e.getMessage());
             return errors;
         }
+        for (NumericKey optional : OPTIONAL.getOrDefault(type, List.of())) {
+            if (params.containsKey(optional.key())) {
+                checkNumeric(params.get(optional.key()), optional, errors);
+            }
+        }
         for (NumericKey required : REQUIRED.getOrDefault(type, List.of())) {
             String raw = params.get(required.key());
             if (raw == null || raw.isEmpty()) {
                 errors.add(type + " requires '" + required.key() + "=<number>'");
                 continue;
             }
-            final long value;
-            try {
-                value = Long.parseLong(raw);
-            } catch (NumberFormatException e) {
-                errors.add(required.key() + " must be a number (got '" + raw + "')");
-                continue;
-            }
-            if (value < required.min() || value > required.max()) {
-                errors.add(required.key() + " must be between " + required.min() + " and "
-                        + required.max() + " (got " + value + ")");
-            }
+            checkNumeric(raw, required, errors);
         }
         return errors;
+    }
+
+    private static void checkNumeric(String raw, NumericKey key, List<String> errors) {
+        final long value;
+        try {
+            value = Long.parseLong(raw);
+        } catch (NumberFormatException e) {
+            errors.add(key.key() + " must be a number (got '" + raw + "')");
+            return;
+        }
+        if (value < key.min() || value > key.max()) {
+            errors.add(key.key() + " must be between " + key.min() + " and " + key.max()
+                    + " (got " + value + ")");
+        }
     }
 
     /** The same rules as a single message, for executors that fail fast. Null when valid. */
