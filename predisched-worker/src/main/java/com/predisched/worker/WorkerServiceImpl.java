@@ -22,7 +22,8 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
     @Override
     public void executeTask(ExecuteRequest request, StreamObserver<ExecuteResult> observer) {
         String taskId = request.getTask().getTaskId();
-        engine.submit(taskId, request.getTask().getType(), request.getTask().getInput())
+        engine.submit(taskId, request.getTask().getType(), request.getTask().getInput(),
+                        request.getTask().getTraceId())
                 .thenAccept(outcome -> {
                     observer.onNext(ExecuteResult.newBuilder()
                             .setTaskId(taskId)
@@ -31,7 +32,7 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
                             .setExecTimeMs(outcome.execMs())
                             .setWaitTimeMs(outcome.waitMs())
                             .setRejected(outcome.rejected())
-                            .setLamportTime(0L)
+                            .setLamportTime(com.predisched.common.time.Clocks.lamport().current())
                             .build());
                     observer.onCompleted();
                 });

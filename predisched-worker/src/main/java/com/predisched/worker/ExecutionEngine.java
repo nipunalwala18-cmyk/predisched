@@ -1,7 +1,11 @@
 package com.predisched.worker;
 
 import com.predisched.common.ExecutionResult;
+import com.predisched.common.obs.EventLog;
+import com.predisched.common.obs.LamportInterceptors;
+import com.predisched.common.obs.TraceContext;
 import com.predisched.proto.TaskType;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -66,12 +70,24 @@ public class ExecutionEngine implements AutoCloseable {
      * {@code rejected=true}, never an exception across the gRPC boundary.
      */
     public CompletableFuture<Outcome> submit(String taskId, TaskType type, String input) {
+        return submit(taskId, type, input, TraceContext.current());
+    }
+
+    /** Runs the task with a trace id in scope, so the worker's log lines join the client's. */
+    public CompletableFuture<Outcome> submit(
+            String taskId, TaskType type, String input, String traceId) {
         CompletableFuture<Outcome> future = new CompletableFuture<>();
         long queuedAtNanos = System.nanoTime();
         try {
             pool.execute(() -> {
+                TraceContext.set(traceId);
+                LamportInterceptors.applyMdc();
                 long startNanos = System.nanoTime();
                 long waitMs = (startNanos - queuedAtNanos) / 1_000_000L;
+                EventLog.get().event(EventLog.EXECUTE_START, taskId, Map.of(
+                        "task_type", type.name(),
+                        "thread", Thread.currentThread().getName(),
+                        "wait_ms", String.valueOf(waitMs)));
                 ExecutionResult result = registry.execute(type, input);
                 long execMs = (System.nanoTime() - startNanos) / 1_000_000L;
                 if (result.success()) {
@@ -84,6 +100,10 @@ public class ExecutionEngine implements AutoCloseable {
                         : "error: " + result.errorMessage();
                 log.info("Executed {} type={} on {} in {} ms (waited {} ms)",
                         taskId, type, Thread.currentThread().getName(), execMs, waitMs);
+                EventLog.get().event(EventLog.EXECUTE_END, taskId, Map.of(
+                        "success", String.valueOf(result.success()),
+                        "exec_ms", String.valueOf(execMs)));
+                TraceContext.clear();
                 future.complete(new Outcome(result.success(), output, execMs, waitMs, false));
             });
         } catch (RejectedExecutionException e) {

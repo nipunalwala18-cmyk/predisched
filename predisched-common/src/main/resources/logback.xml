@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Every log line carries the node id and Lamport time (rule 6), plus the trace id when one is in
+  scope. The node name comes from the -Dpredisched.node property set by each node's main.
+-->
+<configuration>
+    <property name="NODE" value="${predisched.node:-predisched}"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%X{node:-?} L=%X{lamport:-0} %X{trace:-}] %logger{20} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>logs/${NODE}.log</file>
+        <append>true</append>
+        <encoder>
+            <pattern>%d{ISO8601} %-5level [%X{node:-?} L=%X{lamport:-0} %X{trace:-}] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- gRPC and Netty are chatty at DEBUG and drown out the system's own lines. -->
+    <logger name="io.grpc" level="INFO"/>
+    <logger name="io.netty" level="INFO"/>
+    <logger name="io.grpc.netty" level="INFO"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

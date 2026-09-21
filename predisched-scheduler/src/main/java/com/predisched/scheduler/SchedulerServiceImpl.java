@@ -3,6 +3,9 @@ package com.predisched.scheduler;
 import com.predisched.common.TaskRecord;
 import com.predisched.common.TaskStore;
 import com.predisched.common.TaskValidator;
+import com.predisched.common.obs.EventLog;
+import com.predisched.common.obs.TraceContext;
+import com.predisched.common.time.Clocks;
 import com.predisched.proto.SchedulerServiceGrpc;
 import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskResponse;
@@ -12,13 +15,18 @@ import com.predisched.proto.TaskStatusResponse;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Validates, stores as QUEUED and hands tasks to the {@link Dispatcher}.
  * Invalid requests get {@code accepted=false} with every validation message.
  */
 public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceImplBase {
+
+    private static final Logger log = LoggerFactory.getLogger(SchedulerServiceImpl.class);
 
     private final TaskStore store;
     private final TaskValidator validator;
@@ -43,8 +51,13 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
             observer.onCompleted();
             return;
         }
+        String traceId = request.getTraceId().isEmpty()
+                ? TraceContext.newTraceId()
+                : request.getTraceId();
+        TraceContext.set(traceId);
         TaskRecord record = TaskRecord.createQueued(
-                request.getTaskId(), request.getType(), request.getInput(), request.getPriority());
+                request.getTaskId(), request.getType(), request.getInput(), request.getPriority(),
+                traceId);
         try {
             store.put(record);
         } catch (IllegalStateException e) {
@@ -57,12 +70,18 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
             observer.onCompleted();
             return;
         }
+        EventLog.get().event(EventLog.SUBMIT, record.id(), Map.of(
+                "task_type", record.type().name(),
+                "priority", String.valueOf(record.priority())));
         dispatchQueue.offer(record.id());
+        EventLog.get().event(EventLog.ENQUEUE, record.id(),
+                Map.of("queue_len", String.valueOf(dispatchQueue.size())));
+        log.info("Accepted {} ({}) and queued it", record.id(), record.type());
         observer.onNext(TaskResponse.newBuilder()
                 .setTaskId(record.id())
                 .setAccepted(true)
                 .setMessage("queued")
-                .setLamportTime(0L)
+                .setLamportTime(Clocks.lamport().current())
                 .build());
         observer.onCompleted();
     }
@@ -82,6 +101,8 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                 .setResult(record.result())
                 .setWorkerId(record.workerId())
                 .setExecTimeMs(record.execTimeMs())
+                .setTraceId(record.traceId())
+                .setLamportTime(Clocks.lamport().current())
                 .build());
         observer.onCompleted();
     }
@@ -126,7 +147,7 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                 .setTaskId(request.getTaskId())
                 .setAccepted(true)
                 .setMessage("cancelled")
-                .setLamportTime(0L)
+                .setLamportTime(Clocks.lamport().current())
                 .build());
         observer.onCompleted();
     }

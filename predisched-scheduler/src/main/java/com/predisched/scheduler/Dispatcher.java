@@ -2,12 +2,16 @@ package com.predisched.scheduler;
 
 import com.predisched.common.TaskRecord;
 import com.predisched.common.TaskStore;
+import com.predisched.common.obs.EventLog;
+import com.predisched.common.obs.TraceContext;
+import com.predisched.common.time.Clocks;
 import com.predisched.proto.ExecuteRequest;
 import com.predisched.proto.ExecuteResult;
 import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.WorkerServiceGrpc;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -103,6 +107,7 @@ public class Dispatcher implements AutoCloseable {
     }
 
     void process(String taskId, WorkerInfo worker) {
+        com.predisched.common.obs.LamportInterceptors.applyMdc();
         TaskRecord current = store.get(taskId);
         if (current == null || current.status() != TaskStatus.QUEUED) {
             return;
@@ -114,15 +119,19 @@ public class Dispatcher implements AutoCloseable {
             return;
         }
         TaskRecord running = store.get(taskId);
+        TraceContext.set(running.traceId());
         ExecuteRequest execRequest = ExecuteRequest.newBuilder()
                 .setTask(TaskRequest.newBuilder()
                         .setTaskId(running.id())
                         .setType(running.type())
                         .setInput(running.input())
                         .setPriority(running.priority())
-                        .setLamportTime(0L)
+                        .setLamportTime(Clocks.lamport().current())
+                        .setTraceId(running.traceId())
                         .build())
                 .build();
+        EventLog.get().event(EventLog.DISPATCH, taskId, Map.of("worker", worker.id()));
+        log.info("Dispatching {} to {}", taskId, worker.id());
         try {
             WorkerServiceGrpc.WorkerServiceBlockingStub stub = clients.stubFor(worker);
             ExecuteResult result = stub.executeTask(execRequest);
@@ -136,6 +145,11 @@ public class Dispatcher implements AutoCloseable {
                     .withResult(result.getOutput())
                     .withExecTimeMs(result.getExecTimeMs())
                     .withStatus(result.getSuccess() ? TaskStatus.COMPLETED : TaskStatus.FAILED));
+            EventLog.get().event(EventLog.RESULT, taskId, Map.of(
+                    "worker", worker.id(),
+                    "success", String.valueOf(result.getSuccess()),
+                    "exec_ms", String.valueOf(result.getExecTimeMs()),
+                    "wait_ms", String.valueOf(result.getWaitTimeMs())));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
@@ -147,6 +161,8 @@ public class Dispatcher implements AutoCloseable {
             } catch (Exception inner) {
                 log.warn("Could not mark {} FAILED: {}", taskId, inner.getMessage());
             }
+        } finally {
+            TraceContext.clear();
         }
     }
 

@@ -1,0 +1,27 @@
+# Cristian's algorithm instead of Berkeley (lab Exp 3, the alternative).
+# The scheduler is the time server and never moves its own clock; each worker pulls the
+# scheduler's time and corrects itself. Berkeley is switched off here because the two are
+# alternatives: if the scheduler also pushed corrections, a worker would be moved twice.
+scheduler:
+  id: "scheduler-1"
+  host: "localhost"
+  port: 51051
+  dispatchThreads: 4
+  workerStaleAfterMs: 5000
+  noWorkerRetryMs: 200
+  clusterReportIntervalMs: 5000
+worker:
+  id: "worker-1"
+  host: "localhost"
+  port: 51061
+  poolSize: 4
+  queueCapacity: 100
+  heartbeatIntervalMs: 1000
+clock:
+  offsetMs: 0
+  driftPpm: 0
+  algorithm: "cristian"
+  syncIntervalMs: 5000
+  outlierMs: 1000
+validation:
+  maxInputChars: 4096

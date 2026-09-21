@@ -16,5 +16,15 @@ worker:
   poolSize: 4
   queueCapacity: 100
   heartbeatIntervalMs: 1000
+clock:
+  # Artificial skew so clock synchronisation has something to correct on one machine.
+  # Override per node with --clock-offset; drift is parts per million.
+  offsetMs: 0
+  driftPpm: 0
+  # berkeley: the scheduler polls and corrects everyone. cristian: this worker pulls the
+  # scheduler's time and corrects itself. none: no physical sync.
+  algorithm: "berkeley"
+  syncIntervalMs: 10000
+  outlierMs: 1000
 validation:
   maxInputChars: 4096

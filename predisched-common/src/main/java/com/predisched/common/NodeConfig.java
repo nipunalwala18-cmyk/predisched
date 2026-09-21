@@ -12,6 +12,15 @@ public class NodeConfig {
     private SchedulerConfig scheduler = new SchedulerConfig();
     private WorkerConfig worker = new WorkerConfig();
     private ValidationConfig validation = new ValidationConfig();
+    private ClockConfig clock = new ClockConfig();
+
+    public ClockConfig getClock() {
+        return clock;
+    }
+
+    public void setClock(ClockConfig clock) {
+        this.clock = clock;
+    }
 
     public SchedulerConfig getScheduler() {
         return scheduler;
@@ -164,6 +173,56 @@ public class NodeConfig {
 
         public void setPort(int port) {
             this.port = port;
+        }
+    }
+
+    /** Simulated clock skew and how it is corrected (spec section 11, Exp 3). */
+    public static class ClockConfig {
+        private long offsetMs = 0;
+        private double driftPpm = 0;
+        private String algorithm = "berkeley";
+        private long syncIntervalMs = 10000;
+        private long outlierMs = 1000;
+
+        public long getOffsetMs() {
+            return offsetMs;
+        }
+
+        public void setOffsetMs(long offsetMs) {
+            this.offsetMs = offsetMs;
+        }
+
+        public double getDriftPpm() {
+            return driftPpm;
+        }
+
+        public void setDriftPpm(double driftPpm) {
+            this.driftPpm = driftPpm;
+        }
+
+        /** berkeley (scheduler drives), cristian (worker pulls) or none. */
+        public String getAlgorithm() {
+            return algorithm;
+        }
+
+        public void setAlgorithm(String algorithm) {
+            this.algorithm = algorithm;
+        }
+
+        public long getSyncIntervalMs() {
+            return syncIntervalMs;
+        }
+
+        public void setSyncIntervalMs(long syncIntervalMs) {
+            this.syncIntervalMs = syncIntervalMs;
+        }
+
+        public long getOutlierMs() {
+            return outlierMs;
+        }
+
+        public void setOutlierMs(long outlierMs) {
+            this.outlierMs = outlierMs;
         }
     }
 

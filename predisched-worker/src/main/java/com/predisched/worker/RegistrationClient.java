@@ -1,5 +1,6 @@
 package com.predisched.worker;
 
+import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.proto.Ack;
 import com.predisched.proto.Heartbeat;
 import com.predisched.proto.RegisterRequest;
@@ -64,6 +65,7 @@ public class RegistrationClient implements AutoCloseable {
 
     /** Blocking single attempt, used by tests and by the backoff loop. */
     boolean register() {
+        LamportInterceptors.applyMdc();
         RegisterRequest request = RegisterRequest.newBuilder()
                 .setWorkerId(workerId)
                 .setHost(host)
@@ -100,6 +102,7 @@ public class RegistrationClient implements AutoCloseable {
     }
 
     void sendHeartbeat() {
+        LamportInterceptors.applyMdc();
         if (!registered.get() && !register()) {
             return;
         }

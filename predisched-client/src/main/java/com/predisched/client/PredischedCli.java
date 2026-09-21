@@ -79,6 +79,10 @@ public class PredischedCli implements Runnable {
         @Option(names = "--id", description = "Task id (default: generated)")
         String id;
 
+        @Option(names = "--trace",
+                description = "Trace id to follow this task across nodes (default: generated)")
+        String trace;
+
         @Override
         public Integer call() {
             TaskType taskType;
@@ -91,10 +95,16 @@ public class PredischedCli implements Runnable {
             String taskId = (id == null || id.isEmpty())
                     ? "task-" + UUID.randomUUID().toString().substring(0, 8)
                     : id;
+            String traceId = (trace == null || trace.isEmpty())
+                    ? com.predisched.common.obs.TraceContext.newTraceId()
+                    : trace;
             try (SchedulerClient client = parent.newClient()) {
-                TaskResponse response = client.submitTask(taskId, taskType, input, priority);
+                TaskResponse response =
+                        client.submitTask(taskId, taskType, input, priority, traceId);
                 System.out.println("accepted=" + response.getAccepted()
                         + " task_id=" + response.getTaskId()
+                        + " trace=" + traceId
+                        + " lamport=" + response.getLamportTime()
                         + " message='" + response.getMessage() + "'");
                 return response.getAccepted() ? 0 : 1;
             } catch (Exception e) {
@@ -120,6 +130,7 @@ public class PredischedCli implements Runnable {
                         + " status=" + response.getStatus()
                         + " worker=" + response.getWorkerId()
                         + " exec_ms=" + response.getExecTimeMs()
+                        + " trace=" + response.getTraceId()
                         + " result='" + response.getResult() + "'");
                 return 0;
             } catch (Exception e) {
@@ -180,6 +191,7 @@ public class PredischedCli implements Runnable {
                                 + " status=" + status
                                 + " worker=" + response.getWorkerId()
                                 + " exec_ms=" + response.getExecTimeMs()
+                                + " trace=" + response.getTraceId()
                                 + " result='" + response.getResult() + "'");
                         return 0;
                     }

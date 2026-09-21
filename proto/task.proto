@@ -37,6 +37,8 @@ message TaskRequest {
   string input = 3;
   int32 priority = 4;
   int64 lamport_time = 5;
+  // One id follows a task from client to scheduler to worker (F10).
+  string trace_id = 6;
 }
 
 message TaskResponse {
@@ -56,6 +58,8 @@ message TaskStatusResponse {
   string result = 3;
   string worker_id = 4;
   int64 exec_time_ms = 5;
+  string trace_id = 6;
+  int64 lamport_time = 7;
 }
 
 service SchedulerService {

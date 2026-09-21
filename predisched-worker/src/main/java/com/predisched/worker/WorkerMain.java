@@ -1,6 +1,14 @@
 package com.predisched.worker;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.common.obs.EventLog;
+import com.predisched.common.obs.LamportInterceptors;
+import com.predisched.common.time.ClockServiceImpl;
+import com.predisched.common.time.Clocks;
+import com.predisched.common.time.CristianClient;
+import com.predisched.common.time.LamportClock;
+import com.predisched.common.time.PhysicalClock;
+import com.predisched.proto.ClockServiceGrpc;
 import com.predisched.proto.RegistryServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -32,6 +40,16 @@ public class WorkerMain {
         int poolSize = Integer.parseInt(opts.getOrDefault("--pool-size",
                 String.valueOf(workerConfig.getPoolSize())));
 
+        NodeConfig.ClockConfig clockConfig = config.getClock();
+        long clockOffsetMs = Long.parseLong(opts.getOrDefault("--clock-offset",
+                String.valueOf(clockConfig.getOffsetMs())));
+        System.setProperty("predisched.node", id);
+        PhysicalClock physicalClock = new PhysicalClock(clockOffsetMs, clockConfig.getDriftPpm());
+        LamportClock lamportClock = new LamportClock();
+        Clocks.install(id, physicalClock, lamportClock);
+        LamportInterceptors.applyMdc(id, 0L, null);
+        EventLog events = EventLog.install(id);
+
         ExecutorRegistry registry = new ExecutorRegistry();
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
@@ -39,13 +57,30 @@ public class WorkerMain {
 
         Server server = ServerBuilder.forPort(port)
                 .addService(new WorkerServiceImpl(engine, id))
+                .addService(new ClockServiceImpl(id, physicalClock))
+                .intercept(LamportInterceptors.server(id, lamportClock))
                 .build()
                 .start();
 
         ManagedChannel schedulerChannel = ManagedChannelBuilder
                 .forAddress(config.getScheduler().getHost(), config.getScheduler().getPort())
                 .usePlaintext()
+                .intercept(LamportInterceptors.client(lamportClock))
                 .build();
+
+        // Cristian's algorithm is this worker pulling the scheduler's time; with Berkeley the
+        // scheduler pushes corrections instead and this side only serves ClockService.
+        String clockAlgorithm = opts.getOrDefault("--clock-algorithm", clockConfig.getAlgorithm());
+        CristianClient cristian = null;
+        if ("cristian".equalsIgnoreCase(clockAlgorithm)) {
+            cristian = new CristianClient(
+                    ClockServiceGrpc.newBlockingStub(schedulerChannel),
+                    physicalClock,
+                    id,
+                    clockConfig.getSyncIntervalMs());
+            cristian.start();
+        }
+        final CristianClient cristianClient = cristian;
         RegistrationClient registration = new RegistrationClient(
                 RegistryServiceGrpc.newBlockingStub(schedulerChannel),
                 engine,
@@ -56,15 +91,20 @@ public class WorkerMain {
                 workerConfig.getHeartbeatIntervalMs());
         registration.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (cristianClient != null) {
+                cristianClient.close();
+            }
             registration.close();
             engine.close();
             schedulerChannel.shutdownNow();
+            events.close();
         }));
 
         log.info("Worker {} listening on {} (pool {}, queue {})",
                 id, port, poolSize, workerConfig.getQueueCapacity());
         System.out.println("Worker " + id + " listening on " + port
-                + " (pool " + poolSize + ", registering with "
+                + " (pool " + poolSize + ", clock offset " + clockOffsetMs
+                + " ms, clock sync " + clockAlgorithm + ", registering with "
                 + config.getScheduler().getHost() + ":" + config.getScheduler().getPort() + ")");
         Path done = Paths.get(opts.getOrDefault("--ready-file", ""));
         if (!done.toString().isEmpty()) {

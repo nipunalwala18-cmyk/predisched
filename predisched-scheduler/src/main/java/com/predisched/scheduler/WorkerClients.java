@@ -1,5 +1,7 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.obs.LamportInterceptors;
+import com.predisched.common.time.Clocks;
 import com.predisched.proto.WorkerServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -19,6 +21,7 @@ public class WorkerClients implements WorkerStubs, AutoCloseable {
         ManagedChannel channel = channels.computeIfAbsent(worker.address(), address ->
                 ManagedChannelBuilder.forAddress(worker.host(), worker.port())
                         .usePlaintext()
+                        .intercept(LamportInterceptors.client(Clocks.lamport()))
                         .build());
         return WorkerServiceGrpc.newBlockingStub(channel);
     }

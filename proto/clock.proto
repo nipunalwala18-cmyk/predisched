@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package predisched;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+message TimeRequest {
+  int64 requester_time_ms = 1;
+}
+
+message TimeResponse {
+  int64 node_time_ms = 1;
+  string node_id = 2;
+}
+
+message ClockAdjust {
+  int64 offset_ms = 1;
+}
+
+// Served by every node: the scheduler polls workers for Berkeley rounds, and a
+// worker configured for Cristian's algorithm asks the scheduler for the time.
+service ClockService {
+  rpc GetTime (TimeRequest) returns (TimeResponse);  // Berkeley poll / Cristian request
+  rpc Adjust  (ClockAdjust) returns (Ack);           // Berkeley correction
+}

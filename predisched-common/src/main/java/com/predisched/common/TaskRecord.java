@@ -1,5 +1,6 @@
 package com.predisched.common;
 
+import com.predisched.common.time.Clocks;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskType;
 import java.util.Objects;
@@ -20,6 +21,7 @@ public final class TaskRecord {
     private final long startedAt;
     private final long completedAt;
     private final long execTimeMs;
+    private final String traceId;
 
     public TaskRecord(
             String id,
@@ -32,7 +34,8 @@ public final class TaskRecord {
             long submittedAt,
             long startedAt,
             long completedAt,
-            long execTimeMs) {
+            long execTimeMs,
+            String traceId) {
         this.id = Objects.requireNonNull(id, "id");
         this.type = Objects.requireNonNull(type, "type");
         this.input = input == null ? "" : input;
@@ -44,12 +47,23 @@ public final class TaskRecord {
         this.startedAt = startedAt;
         this.completedAt = completedAt;
         this.execTimeMs = execTimeMs;
+        this.traceId = traceId == null ? "" : traceId;
     }
 
     public static TaskRecord createQueued(String id, TaskType type, String input, int priority) {
+        return createQueued(id, type, input, priority, "");
+    }
+
+    public static TaskRecord createQueued(
+            String id, TaskType type, String input, int priority, String traceId) {
         return new TaskRecord(
                 id, type, input, priority, TaskStatus.QUEUED,
-                "", "", System.currentTimeMillis(), 0L, 0L, 0L);
+                "", "", Clocks.now(), 0L, 0L, 0L, traceId);
+    }
+
+    /** The id that follows this task across nodes (F10). Empty when the client sent none. */
+    public String traceId() {
+        return traceId;
     }
 
     public String id() {
@@ -99,7 +113,7 @@ public final class TaskRecord {
     /** Returns a copy with a new status after checking the transition. Timestamps are updated. */
     public TaskRecord withStatus(TaskStatus newStatus) {
         TaskStateMachine.checkTransition(this.status, newStatus);
-        long now = System.currentTimeMillis();
+        long now = Clocks.now();
         long started = this.startedAt;
         long completed = this.completedAt;
         if (newStatus == TaskStatus.RUNNING && started == 0L) {
@@ -115,29 +129,29 @@ public final class TaskRecord {
             // Re-queued after worker failure: clear worker binding, keep history otherwise.
             return new TaskRecord(
                     id, type, input, priority, newStatus, "", result,
-                    submittedAt, started, 0L, execTimeMs);
+                    submittedAt, started, 0L, execTimeMs, traceId);
         }
         return new TaskRecord(
                 id, type, input, priority, newStatus, workerId, result,
-                submittedAt, started, completed, execTimeMs);
+                submittedAt, started, completed, execTimeMs, traceId);
     }
 
     public TaskRecord withWorkerId(String newWorkerId) {
         return new TaskRecord(
                 id, type, input, priority, status, newWorkerId, result,
-                submittedAt, startedAt, completedAt, execTimeMs);
+                submittedAt, startedAt, completedAt, execTimeMs, traceId);
     }
 
     public TaskRecord withResult(String newResult) {
         return new TaskRecord(
                 id, type, input, priority, status, workerId, newResult,
-                submittedAt, startedAt, completedAt, execTimeMs);
+                submittedAt, startedAt, completedAt, execTimeMs, traceId);
     }
 
     public TaskRecord withExecTimeMs(long newExecTimeMs) {
         return new TaskRecord(
                 id, type, input, priority, status, workerId, result,
-                submittedAt, startedAt, completedAt, newExecTimeMs);
+                submittedAt, startedAt, completedAt, newExecTimeMs, traceId);
     }
 
     public boolean isTerminal() {

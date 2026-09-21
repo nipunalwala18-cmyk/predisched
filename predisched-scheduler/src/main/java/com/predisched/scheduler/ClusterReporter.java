@@ -1,5 +1,6 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.obs.LamportInterceptors;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Executors;
@@ -38,6 +39,7 @@ public class ClusterReporter implements AutoCloseable {
     }
 
     void report() {
+        LamportInterceptors.applyMdc();
         List<WorkerInfo> workers = registry.all();
         if (workers.isEmpty()) {
             log.info("Cluster: no workers registered");
