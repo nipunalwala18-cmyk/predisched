@@ -13,6 +13,15 @@ public class NodeConfig {
     private WorkerConfig worker = new WorkerConfig();
     private ValidationConfig validation = new ValidationConfig();
     private ClockConfig clock = new ClockConfig();
+    private QueueConfig queue = new QueueConfig();
+
+    public QueueConfig getQueue() {
+        return queue;
+    }
+
+    public void setQueue(QueueConfig queue) {
+        this.queue = queue;
+    }
 
     public ClockConfig getClock() {
         return clock;
@@ -60,6 +69,20 @@ public class NodeConfig {
         private int dispatchThreads = 4;
         private long workerStaleAfterMs = 5000;
         private long noWorkerRetryMs = 200;
+        private double outstandingPerWorkerFactor = 2.0;
+
+        /**
+         * How many tasks this scheduler will keep outstanding on one worker, as a multiple of that
+         * worker's pool size. Above 1 keeps the pool fed; too high empties the scheduler's queue
+         * into the worker's and makes priority ordering meaningless.
+         */
+        public double getOutstandingPerWorkerFactor() {
+            return outstandingPerWorkerFactor;
+        }
+
+        public void setOutstandingPerWorkerFactor(double outstandingPerWorkerFactor) {
+            this.outstandingPerWorkerFactor = outstandingPerWorkerFactor;
+        }
         private long clusterReportIntervalMs = 5000;
 
         public long getClusterReportIntervalMs() {
@@ -173,6 +196,93 @@ public class NodeConfig {
 
         public void setPort(int port) {
             this.port = port;
+        }
+    }
+
+    /** Queue discipline: ageing, retries with backoff, dead letters and timeouts (F2, F4, F5). */
+    public static class QueueConfig {
+        private double ageingPerSecond = 0.1;
+        private int maxPriority = 10;
+        private int maxRetries = 3;
+        private long retryBaseDelayMs = 200;
+        private long retryMaxDelayMs = 30000;
+        private double retryJitter = 0.2;
+        private long defaultTimeoutMs = 0;
+        private long timeoutCheckMs = 250;
+        private long seed = 42;
+
+        public double getAgeingPerSecond() {
+            return ageingPerSecond;
+        }
+
+        public void setAgeingPerSecond(double ageingPerSecond) {
+            this.ageingPerSecond = ageingPerSecond;
+        }
+
+        public int getMaxPriority() {
+            return maxPriority;
+        }
+
+        public void setMaxPriority(int maxPriority) {
+            this.maxPriority = maxPriority;
+        }
+
+        public int getMaxRetries() {
+            return maxRetries;
+        }
+
+        public void setMaxRetries(int maxRetries) {
+            this.maxRetries = maxRetries;
+        }
+
+        public long getRetryBaseDelayMs() {
+            return retryBaseDelayMs;
+        }
+
+        public void setRetryBaseDelayMs(long retryBaseDelayMs) {
+            this.retryBaseDelayMs = retryBaseDelayMs;
+        }
+
+        public long getRetryMaxDelayMs() {
+            return retryMaxDelayMs;
+        }
+
+        public void setRetryMaxDelayMs(long retryMaxDelayMs) {
+            this.retryMaxDelayMs = retryMaxDelayMs;
+        }
+
+        public double getRetryJitter() {
+            return retryJitter;
+        }
+
+        public void setRetryJitter(double retryJitter) {
+            this.retryJitter = retryJitter;
+        }
+
+        /** 0 disables timeouts unless a task asks for one. */
+        public long getDefaultTimeoutMs() {
+            return defaultTimeoutMs;
+        }
+
+        public void setDefaultTimeoutMs(long defaultTimeoutMs) {
+            this.defaultTimeoutMs = defaultTimeoutMs;
+        }
+
+        public long getTimeoutCheckMs() {
+            return timeoutCheckMs;
+        }
+
+        public void setTimeoutCheckMs(long timeoutCheckMs) {
+            this.timeoutCheckMs = timeoutCheckMs;
+        }
+
+        /** Seed for retry jitter, so a replayed workload retries at the same moments (rule 8). */
+        public long getSeed() {
+            return seed;
+        }
+
+        public void setSeed(long seed) {
+            this.seed = seed;
         }
     }
 

@@ -64,32 +64,11 @@ class ConcurrentSubmitTest {
 
     @Test
     void eightClientsSubmittingAtOnceLoseAndDuplicateNothing() throws Exception {
-        String workerName = "worker-" + UUID.randomUUID();
-        String schedulerName = "sched-" + UUID.randomUUID();
-        TaskStore store = new InMemoryTaskStore();
-        BlockingQueue<String> queue = new LinkedBlockingQueue<>();
         CountingWorkerService worker = new CountingWorkerService();
-
-        Server workerServer = InProcessServerBuilder.forName(workerName)
-                .addService(worker).build().start();
-        ManagedChannel workerChannel = InProcessChannelBuilder.forName(workerName).build();
-        WorkerServiceGrpc.WorkerServiceBlockingStub workerStub =
-                WorkerServiceGrpc.newBlockingStub(workerChannel);
-
-        WorkerRegistry registry = new WorkerRegistry(60_000);
-        registry.register(RegisterRequest.newBuilder()
-                .setWorkerId("worker-1").setHost("in-process").setPort(0)
-                .setCores(4).setMemoryMb(512).setPoolSize(4).build());
-
-        Server schedulerServer = InProcessServerBuilder.forName(schedulerName)
-                .addService(new SchedulerServiceImpl(store, new TaskValidator(4096), queue))
-                .build().start();
-        ManagedChannel schedulerChannel = InProcessChannelBuilder.forName(schedulerName).build();
-
         ExecutorService clients = Executors.newFixedThreadPool(CLIENT_THREADS);
-        try (Dispatcher dispatcher =
-                new Dispatcher(store, queue, registry, w -> workerStub, 4, 20)) {
-            dispatcher.start();
+        try (SchedulerHarness harness = new SchedulerHarness(worker)) {
+            TaskStore store = harness.store;
+            harness.start();
             CountDownLatch start = new CountDownLatch(1);
             CountDownLatch done = new CountDownLatch(CLIENT_THREADS);
             AtomicInteger accepted = new AtomicInteger();
@@ -97,8 +76,7 @@ class ConcurrentSubmitTest {
             for (int c = 0; c < CLIENT_THREADS; c++) {
                 final int client = c;
                 clients.execute(() -> {
-                    SchedulerServiceGrpc.SchedulerServiceBlockingStub stub =
-                            SchedulerServiceGrpc.newBlockingStub(schedulerChannel);
+                    SchedulerServiceGrpc.SchedulerServiceBlockingStub stub = harness.client;
                     try {
                         start.await();
                         for (int i = 0; i < TASKS_PER_CLIENT; i++) {
@@ -150,10 +128,6 @@ class ConcurrentSubmitTest {
                     assertEquals(1, count.get(), id + " was executed " + count.get() + " times"));
         } finally {
             clients.shutdownNow();
-            schedulerChannel.shutdownNow();
-            workerChannel.shutdownNow();
-            schedulerServer.shutdownNow();
-            workerServer.shutdownNow();
         }
     }
 }

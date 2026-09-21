@@ -1,12 +1,15 @@
 package com.predisched.client;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.proto.DeadLetterEntry;
+import com.predisched.proto.DeadLetterList;
 import com.predisched.proto.TaskResponse;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusResponse;
 import com.predisched.proto.TaskType;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import picocli.CommandLine;
@@ -22,7 +25,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Submit.class,
             PredischedCli.Status.class,
             PredischedCli.Cancel.class,
-            PredischedCli.Watch.class
+            PredischedCli.Watch.class,
+            PredischedCli.Dlq.class
         })
 public class PredischedCli implements Runnable {
 
@@ -83,6 +87,14 @@ public class PredischedCli implements Runnable {
                 description = "Trace id to follow this task across nodes (default: generated)")
         String trace;
 
+        @Option(names = "--timeout",
+                description = "Cancel the task after this many ms (default: scheduler setting)")
+        long timeoutMs = 0;
+
+        @Option(names = "--max-retries",
+                description = "Retries after a failure (default: scheduler setting)")
+        int maxRetries = -1;
+
         @Override
         public Integer call() {
             TaskType taskType;
@@ -99,8 +111,8 @@ public class PredischedCli implements Runnable {
                     ? com.predisched.common.obs.TraceContext.newTraceId()
                     : trace;
             try (SchedulerClient client = parent.newClient()) {
-                TaskResponse response =
-                        client.submitTask(taskId, taskType, input, priority, traceId);
+                TaskResponse response = client.submitTask(
+                        taskId, taskType, input, priority, traceId, timeoutMs, maxRetries);
                 System.out.println("accepted=" + response.getAccepted()
                         + " task_id=" + response.getTaskId()
                         + " trace=" + traceId
@@ -131,11 +143,80 @@ public class PredischedCli implements Runnable {
                         + " worker=" + response.getWorkerId()
                         + " exec_ms=" + response.getExecTimeMs()
                         + " trace=" + response.getTraceId()
+                        + " attempts=" + response.getAttempt()
                         + " result='" + response.getResult() + "'");
+                for (String attempt : response.getAttemptHistoryList()) {
+                    System.out.println("  attempt " + attempt);
+                }
                 return 0;
             } catch (Exception e) {
                 System.out.println("status failed: " + e.getMessage());
                 return 1;
+            }
+        }
+    }
+
+    @Command(name = "dlq", description = "Inspect and retry tasks that exhausted their retries.",
+            subcommands = {Dlq.ListEntries.class, Dlq.Retry.class})
+    static class Dlq implements Runnable {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Override
+        public void run() {
+            new CommandLine(this).usage(System.out);
+        }
+
+        @Command(name = "list", description = "Show parked tasks, newest first.")
+        static class ListEntries implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Dlq parent;
+
+            @Option(names = "--limit", description = "Rows to show (default: ${DEFAULT-VALUE})")
+            int limit = 20;
+
+            @Override
+            public Integer call() {
+                try (SchedulerClient client = parent.parent.newClient()) {
+                    DeadLetterList list = client.listDeadLetters(limit);
+                    if (list.getEntriesCount() == 0) {
+                        System.out.println("dead-letter queue is empty");
+                        return 0;
+                    }
+                    System.out.println("task_id                type          attempts  last_error");
+                    for (DeadLetterEntry entry : list.getEntriesList()) {
+                        System.out.printf(Locale.ROOT, "%-22s %-13s %-9d %s%n",
+                                entry.getTaskId(), entry.getType(), entry.getAttempts(),
+                                entry.getLastError());
+                    }
+                    return 0;
+                } catch (Exception e) {
+                    System.out.println("dlq list failed: " + e.getMessage());
+                    return 1;
+                }
+            }
+        }
+
+        @Command(name = "retry", description = "Put a parked task back in the queue.")
+        static class Retry implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Dlq parent;
+
+            @Parameters(index = "0", description = "Task id")
+            String id;
+
+            @Override
+            public Integer call() {
+                try (SchedulerClient client = parent.parent.newClient()) {
+                    TaskResponse response = client.retryDeadLetter(id);
+                    System.out.println("accepted=" + response.getAccepted()
+                            + " task_id=" + response.getTaskId()
+                            + " message='" + response.getMessage() + "'");
+                    return response.getAccepted() ? 0 : 1;
+                } catch (Exception e) {
+                    System.out.println("dlq retry failed: " + e.getMessage());
+                    return 1;
+                }
             }
         }
     }

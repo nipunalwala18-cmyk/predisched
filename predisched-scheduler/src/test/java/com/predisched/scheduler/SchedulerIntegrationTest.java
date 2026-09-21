@@ -21,9 +21,12 @@ import io.grpc.Server;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
+import com.predisched.scheduler.queue.AgeingPriorityQueue;
+import com.predisched.scheduler.queue.DeadLetterQueue;
+import com.predisched.scheduler.queue.RetryCoordinator;
+import com.predisched.scheduler.queue.RetryPolicy;
+import com.predisched.scheduler.queue.TaskQueue;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -53,70 +56,20 @@ public class SchedulerIntegrationTest {
         }
     }
 
-    private String workerName;
-    private String schedulerName;
-    private Server workerServer;
-    private Server schedulerServer;
-    private ManagedChannel workerChannel;
-    private ManagedChannel schedulerChannel;
+    private SchedulerHarness harness;
     private SchedulerServiceGrpc.SchedulerServiceBlockingStub client;
-    private Dispatcher dispatcher;
 
     @BeforeEach
     public void setUp() throws Exception {
-        workerName = "fake-worker-" + UUID.randomUUID();
-        schedulerName = "sched-" + UUID.randomUUID();
-        TaskStore store = new InMemoryTaskStore();
-        TaskValidator validator = new TaskValidator(4096);
-        BlockingQueue<String> queue = new LinkedBlockingQueue<>();
-
-        workerServer = InProcessServerBuilder.forName(workerName)
-                .addService(new FakeWorkerService())
-                .directExecutor()
-                .build()
-                .start();
-        workerChannel = InProcessChannelBuilder.forName(workerName).directExecutor().build();
-        WorkerServiceGrpc.WorkerServiceBlockingStub workerStub =
-                WorkerServiceGrpc.newBlockingStub(workerChannel);
-
-        WorkerRegistry workers = new WorkerRegistry(60_000);
-        workers.register(com.predisched.proto.RegisterRequest.newBuilder()
-                .setWorkerId("worker-1")
-                .setHost("in-process")
-                .setPort(0)
-                .setCores(4)
-                .setMemoryMb(512)
-                .setPoolSize(4)
-                .build());
-        dispatcher = new Dispatcher(store, queue, workers, worker -> workerStub, 2, 50);
-        dispatcher.start();
-
-        SchedulerServiceImpl service = new SchedulerServiceImpl(store, validator, queue);
-        schedulerServer = InProcessServerBuilder.forName(schedulerName)
-                .addService(service)
-                .directExecutor()
-                .build()
-                .start();
-        schedulerChannel = InProcessChannelBuilder.forName(schedulerName).directExecutor().build();
-        client = SchedulerServiceGrpc.newBlockingStub(schedulerChannel);
+        harness = new SchedulerHarness(new FakeWorkerService());
+        harness.start();
+        client = harness.client;
     }
 
     @AfterEach
     public void tearDown() {
-        if (dispatcher != null) {
-            dispatcher.stop();
-        }
-        if (schedulerServer != null) {
-            schedulerServer.shutdownNow();
-        }
-        if (workerServer != null) {
-            workerServer.shutdownNow();
-        }
-        if (schedulerChannel != null) {
-            schedulerChannel.shutdownNow();
-        }
-        if (workerChannel != null) {
-            workerChannel.shutdownNow();
+        if (harness != null) {
+            harness.close();
         }
     }
 
@@ -192,8 +145,11 @@ public class SchedulerIntegrationTest {
         // Separate service with no dispatcher running, so the task stays QUEUED.
         TaskStore store = new InMemoryTaskStore();
         TaskValidator validator = new TaskValidator(4096);
-        BlockingQueue<String> queue = new LinkedBlockingQueue<>();
-        SchedulerServiceImpl service = new SchedulerServiceImpl(store, validator, queue);
+        TaskQueue queue = new AgeingPriorityQueue(0.1, 10);
+        RetryCoordinator retries = new RetryCoordinator(
+                store, queue, new RetryPolicy(10, 100, 0, 3, 1), new DeadLetterQueue());
+        SchedulerServiceImpl service =
+                new SchedulerServiceImpl(store, validator, queue, retries);
         String name = "sched-cancel-" + UUID.randomUUID();
         Server server = InProcessServerBuilder.forName(name)
                 .addService(service).directExecutor().build().start();

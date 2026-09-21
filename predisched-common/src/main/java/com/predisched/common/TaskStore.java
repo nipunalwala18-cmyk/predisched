@@ -15,4 +15,11 @@ public interface TaskStore {
     List<TaskRecord> list();
 
     boolean contains(String taskId);
+
+    /**
+     * Replaces an existing record wholesale, ignoring the state machine. Only for restarting a
+     * task that ended in the dead-letter queue (F4), where a terminal record is deliberately
+     * replaced by a fresh QUEUED one.
+     */
+    void replace(TaskRecord record);
 }

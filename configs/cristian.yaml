@@ -17,6 +17,16 @@ worker:
   poolSize: 4
   queueCapacity: 100
   heartbeatIntervalMs: 1000
+queue:
+  ageingPerSecond: 0.1
+  maxPriority: 10
+  maxRetries: 3
+  retryBaseDelayMs: 200
+  retryMaxDelayMs: 30000
+  retryJitter: 0.2
+  defaultTimeoutMs: 0
+  timeoutCheckMs: 250
+  seed: 42
 clock:
   offsetMs: 0
   driftPpm: 0

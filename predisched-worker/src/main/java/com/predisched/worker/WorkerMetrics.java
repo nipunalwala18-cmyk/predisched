@@ -17,6 +17,7 @@ public class WorkerMetrics {
     private final AtomicLong tasksCompleted = new AtomicLong();
     private final AtomicLong tasksFailed = new AtomicLong();
     private final AtomicLong tasksRejected = new AtomicLong();
+    private final AtomicLong tasksCancelled = new AtomicLong();
 
     private final Object windowLock = new Object();
     private final long[] recentExecMs = new long[WINDOW];
@@ -56,6 +57,14 @@ public class WorkerMetrics {
 
     public long tasksRejected() {
         return tasksRejected.get();
+    }
+
+    public void recordCancelled() {
+        tasksCancelled.incrementAndGet();
+    }
+
+    public long tasksCancelled() {
+        return tasksCancelled.get();
     }
 
     /** Mean execution time over the last {@link #WINDOW} tasks, or 0 before any have run. */

@@ -46,6 +46,14 @@ message Heartbeat {
 
 service WorkerService {
   rpc ExecuteTask (ExecuteRequest) returns (ExecuteResult);
+  // Stops a running task: used for timeouts now (FR26) and for cancellation and
+  // speculative execution later.
+  rpc CancelExecution (CancelRequest) returns (Ack);
+}
+
+message CancelRequest {
+  string task_id = 1;
+  string reason = 2;
 }
 
 // Served by the scheduler: workers announce themselves and report metrics.

@@ -157,6 +157,7 @@ as it really is, which would have made pool size 1 look artificially bad.
 
 - One worker per scheduler in the default config; the registry already holds many, and prompt 06
   starts a real cluster.
-- Worker choice ignores load (prompt 08).
+- Worker choice ignores load beyond a capacity limit added in prompt 04 (prompt 08 adds real
+  strategies).
 - A dead worker's running tasks are not yet reassigned; failure detection is prompt 10.
 - Heartbeats carry `lamport_time = 0` until prompt 03.

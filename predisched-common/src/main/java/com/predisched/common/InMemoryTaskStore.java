@@ -20,6 +20,11 @@ public class InMemoryTaskStore implements TaskStore {
     }
 
     @Override
+    public void replace(TaskRecord record) {
+        map.put(record.id(), record);
+    }
+
+    @Override
     public TaskRecord get(String taskId) {
         return map.get(taskId);
     }

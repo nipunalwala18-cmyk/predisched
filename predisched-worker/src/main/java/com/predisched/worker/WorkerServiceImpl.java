@@ -1,5 +1,7 @@
 package com.predisched.worker;
 
+import com.predisched.proto.Ack;
+import com.predisched.proto.CancelRequest;
 import com.predisched.proto.ExecuteRequest;
 import com.predisched.proto.ExecuteResult;
 import com.predisched.proto.WorkerServiceGrpc;
@@ -36,6 +38,18 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
                             .build());
                     observer.onCompleted();
                 });
+    }
+
+    @Override
+    public void cancelExecution(CancelRequest request, StreamObserver<Ack> observer) {
+        boolean stopped = engine.cancel(request.getTaskId(), request.getReason());
+        observer.onNext(Ack.newBuilder()
+                .setOk(stopped)
+                .setMessage(stopped
+                        ? "cancelled " + request.getTaskId()
+                        : "not running: " + request.getTaskId())
+                .build());
+        observer.onCompleted();
     }
 
     public String workerId() {

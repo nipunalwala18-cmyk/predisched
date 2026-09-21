@@ -39,6 +39,10 @@ message TaskRequest {
   int64 lamport_time = 5;
   // One id follows a task from client to scheduler to worker (F10).
   string trace_id = 6;
+  // 0 means the scheduler's configured default (FR26).
+  int64 timeout_ms = 7;
+  // Negative means the scheduler's configured default (FR25).
+  int32 max_retries = 8;
 }
 
 message TaskResponse {
@@ -60,10 +64,34 @@ message TaskStatusResponse {
   int64 exec_time_ms = 5;
   string trace_id = 6;
   int64 lamport_time = 7;
+  // How many tries this task has had so far (F4).
+  int32 attempt = 8;
+  // One line per try, oldest first, for `status` and the dashboard.
+  repeated string attempt_history = 9;
+}
+
+message DeadLetterRequest {
+  int32 limit = 1;
+}
+
+message DeadLetterEntry {
+  string task_id = 1;
+  TaskType type = 2;
+  string input = 3;
+  int32 attempts = 4;
+  string last_error = 5;
+  int64 failed_at_ms = 6;
+}
+
+message DeadLetterList {
+  repeated DeadLetterEntry entries = 1;
 }
 
 service SchedulerService {
   rpc SubmitTask (TaskRequest) returns (TaskResponse);
   rpc GetTaskStatus (TaskStatusRequest) returns (TaskStatusResponse);
   rpc CancelTask (TaskStatusRequest) returns (TaskResponse);
+  // Dead-letter queue: tasks that exhausted their retries (F4).
+  rpc ListDeadLetters (DeadLetterRequest) returns (DeadLetterList);
+  rpc RetryDeadLetter (TaskStatusRequest) returns (TaskResponse);
 }

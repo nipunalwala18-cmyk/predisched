@@ -3,9 +3,23 @@ package com.predisched.scheduler;
 import com.predisched.common.TaskRecord;
 import com.predisched.common.TaskStore;
 import com.predisched.common.TaskValidator;
+import com.predisched.common.TaskAttempt;
+import com.predisched.common.TaskAttempt;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.TraceContext;
 import com.predisched.common.time.Clocks;
+import com.predisched.proto.DeadLetterEntry;
+import com.predisched.proto.DeadLetterList;
+import com.predisched.proto.DeadLetterRequest;
+import com.predisched.scheduler.queue.DeadLetterQueue;
+import com.predisched.scheduler.queue.RetryCoordinator;
+import com.predisched.scheduler.queue.TaskQueue;
+import com.predisched.proto.DeadLetterEntry;
+import com.predisched.proto.DeadLetterList;
+import com.predisched.proto.DeadLetterRequest;
+import com.predisched.scheduler.queue.DeadLetterQueue;
+import com.predisched.scheduler.queue.RetryCoordinator;
+import com.predisched.scheduler.queue.TaskQueue;
 import com.predisched.proto.SchedulerServiceGrpc;
 import com.predisched.proto.TaskRequest;
 import com.predisched.proto.TaskResponse;
@@ -16,7 +30,6 @@ import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,12 +43,18 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
 
     private final TaskStore store;
     private final TaskValidator validator;
-    private final BlockingQueue<String> dispatchQueue;
+    private final TaskQueue dispatchQueue;
+    private final RetryCoordinator retries;
 
-    public SchedulerServiceImpl(TaskStore store, TaskValidator validator, BlockingQueue<String> dispatchQueue) {
+    public SchedulerServiceImpl(
+            TaskStore store,
+            TaskValidator validator,
+            TaskQueue dispatchQueue,
+            RetryCoordinator retries) {
         this.store = store;
         this.validator = validator;
         this.dispatchQueue = dispatchQueue;
+        this.retries = retries;
     }
 
     @Override
@@ -57,7 +76,12 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
         TraceContext.set(traceId);
         TaskRecord record = TaskRecord.createQueued(
                 request.getTaskId(), request.getType(), request.getInput(), request.getPriority(),
-                traceId);
+                traceId,
+                request.getTimeoutMs(),
+                // proto3 cannot tell "0 retries" from "unset", so 0 means the default and a
+                // client that really wants no retries sends -1 through --max-retries 0 handling
+                // in the CLI.
+                request.getMaxRetries() == 0 ? -1 : request.getMaxRetries());
         try {
             store.put(record);
         } catch (IllegalStateException e) {
@@ -73,7 +97,7 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
         EventLog.get().event(EventLog.SUBMIT, record.id(), Map.of(
                 "task_type", record.type().name(),
                 "priority", String.valueOf(record.priority())));
-        dispatchQueue.offer(record.id());
+        dispatchQueue.add(record.id(), record.priority(), record.submittedAt());
         EventLog.get().event(EventLog.ENQUEUE, record.id(),
                 Map.of("queue_len", String.valueOf(dispatchQueue.size())));
         log.info("Accepted {} ({}) and queued it", record.id(), record.type());
@@ -102,6 +126,41 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                 .setWorkerId(record.workerId())
                 .setExecTimeMs(record.execTimeMs())
                 .setTraceId(record.traceId())
+                .setLamportTime(Clocks.lamport().current())
+                .setAttempt(record.attemptCount())
+                .addAllAttemptHistory(record.attempts().stream()
+                        .map(TaskAttempt::toString)
+                        .toList())
+                .build());
+        observer.onCompleted();
+    }
+
+    @Override
+    public void listDeadLetters(DeadLetterRequest request, StreamObserver<DeadLetterList> observer) {
+        DeadLetterList.Builder reply = DeadLetterList.newBuilder();
+        for (DeadLetterQueue.Entry entry : retries.deadLetters().list(request.getLimit())) {
+            reply.addEntries(DeadLetterEntry.newBuilder()
+                    .setTaskId(entry.record().id())
+                    .setType(entry.record().type())
+                    .setInput(entry.record().input())
+                    .setAttempts(entry.record().attemptCount())
+                    .setLastError(entry.lastError())
+                    .setFailedAtMs(entry.failedAtMs())
+                    .build());
+        }
+        observer.onNext(reply.build());
+        observer.onCompleted();
+    }
+
+    @Override
+    public void retryDeadLetter(TaskStatusRequest request, StreamObserver<TaskResponse> observer) {
+        boolean requeued = retries.retryDeadLetter(request.getTaskId());
+        observer.onNext(TaskResponse.newBuilder()
+                .setTaskId(request.getTaskId())
+                .setAccepted(requeued)
+                .setMessage(requeued
+                        ? "re-queued from the dead-letter queue"
+                        : "not in the dead-letter queue: " + request.getTaskId())
                 .setLamportTime(Clocks.lamport().current())
                 .build());
         observer.onCompleted();

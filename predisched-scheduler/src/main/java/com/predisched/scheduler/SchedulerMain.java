@@ -13,6 +13,12 @@ import com.predisched.common.time.Clocks;
 import com.predisched.common.time.LamportClock;
 import com.predisched.common.time.PhysicalClock;
 import com.predisched.proto.ClockServiceGrpc;
+import com.predisched.scheduler.queue.AgeingPriorityQueue;
+import com.predisched.scheduler.queue.DeadLetterQueue;
+import com.predisched.scheduler.queue.RetryCoordinator;
+import com.predisched.scheduler.queue.RetryPolicy;
+import com.predisched.scheduler.queue.RunningTasks;
+import com.predisched.scheduler.queue.TaskQueue;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
@@ -23,8 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,21 +58,41 @@ public class SchedulerMain {
 
         TaskStore store = new InMemoryTaskStore();
         TaskValidator validator = new TaskValidator(config.getValidation().getMaxInputChars());
-        BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+
+        NodeConfig.QueueConfig queueConfig = config.getQueue();
+        // --queue-ageing makes the starvation demo runnable in seconds instead of minutes.
+        double ageingPerSecond = Double.parseDouble(opts.getOrDefault("--queue-ageing",
+                String.valueOf(queueConfig.getAgeingPerSecond())));
+        TaskQueue queue = new AgeingPriorityQueue(
+                ageingPerSecond, queueConfig.getMaxPriority());
+        RetryPolicy retryPolicy = new RetryPolicy(
+                queueConfig.getRetryBaseDelayMs(),
+                queueConfig.getRetryMaxDelayMs(),
+                queueConfig.getRetryJitter(),
+                queueConfig.getMaxRetries(),
+                queueConfig.getSeed());
+        RetryCoordinator retries = new RetryCoordinator(
+                store, queue, retryPolicy, new DeadLetterQueue());
+        RunningTasks running = new RunningTasks();
 
         WorkerRegistry workers = new WorkerRegistry(config.getScheduler().getWorkerStaleAfterMs());
         WorkerClients clients = new WorkerClients();
         Dispatcher dispatcher = new Dispatcher(
-                store, queue, workers, clients,
+                store, queue, workers, clients, retries, running,
+                queueConfig.getDefaultTimeoutMs(),
+                config.getScheduler().getOutstandingPerWorkerFactor(),
                 config.getScheduler().getDispatchThreads(),
                 config.getScheduler().getNoWorkerRetryMs());
         dispatcher.start();
+        TimeoutWatcher timeouts = new TimeoutWatcher(
+                running, workers, clients, queueConfig.getTimeoutCheckMs());
+        timeouts.start();
         ClusterReporter reporter = new ClusterReporter(
                 workers, config.getScheduler().getClusterReportIntervalMs());
         reporter.start();
 
         Server server = ServerBuilder.forPort(port)
-                .addService(new SchedulerServiceImpl(store, validator, queue))
+                .addService(new SchedulerServiceImpl(store, validator, queue, retries))
                 .addService(new RegistryServiceImpl(workers))
                 .addService(new ClockServiceImpl(id, physicalClock))
                 .intercept(LamportInterceptors.server(id, lamportClock))
@@ -87,6 +111,8 @@ public class SchedulerMain {
                 clockConfig.getOutlierMs());
         berkeley.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            timeouts.close();
+            retries.close();
             berkeley.close();
             reporter.close();
             dispatcher.close();

@@ -7,6 +7,7 @@ import com.predisched.common.TaskInputSpec;
 import com.predisched.common.TaskExecutor;
 import com.predisched.proto.TaskType;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 
 /** Counts primes below {@code n}. Baseline CPU-bound load. */
 public class CpuTaskExecutor implements TaskExecutor {
@@ -36,6 +37,10 @@ public class CpuTaskExecutor implements TaskExecutor {
         boolean[] composite = new boolean[n];
         long count = 0;
         for (int i = 2; i < n; i++) {
+            // Checked every 65536 numbers so a cancelled or timed-out task actually stops (FR26).
+            if ((i & 0xFFFF) == 0 && Thread.currentThread().isInterrupted()) {
+                throw new CancellationException("interrupted after " + i);
+            }
             if (!composite[i]) {
                 count++;
                 if ((long) i * i < n) {

@@ -21,8 +21,12 @@ public final class TaskInputSpec {
     /** One required numeric key and the inclusive range its value must fall in. */
     public record NumericKey(String key, long min, long max) {}
 
+    /** An optional key whose value is a fraction, such as a failure rate. */
+    public record FractionKey(String key, double min, double max) {}
+
     private static final Map<TaskType, List<NumericKey>> REQUIRED = new LinkedHashMap<>();
     private static final Map<TaskType, List<NumericKey>> OPTIONAL = new LinkedHashMap<>();
+    private static final Map<TaskType, List<FractionKey>> FRACTIONS = new LinkedHashMap<>();
 
     static {
         REQUIRED.put(TaskType.CPU_TASK, List.of(new NumericKey("n", 2, 100_000_000L)));
@@ -30,6 +34,9 @@ public final class TaskInputSpec {
         REQUIRED.put(TaskType.MATRIX_TASK, List.of(new NumericKey("size", 1, 1_000L)));
         // Optional keys are only range-checked when present.
         OPTIONAL.put(TaskType.MATRIX_TASK, List.of(new NumericKey("threads", 1, 64)));
+        // Test hooks for the retry and dead-letter demos (F4): a reproducible failure rate.
+        FRACTIONS.put(TaskType.SLEEP_TASK, List.of(new FractionKey("failRate", 0.0, 1.0)));
+        OPTIONAL.put(TaskType.SLEEP_TASK, List.of(new NumericKey("seed", 0, Long.MAX_VALUE)));
     }
 
     private TaskInputSpec() {}
@@ -62,6 +69,11 @@ public final class TaskInputSpec {
                 checkNumeric(params.get(optional.key()), optional, errors);
             }
         }
+        for (FractionKey fraction : FRACTIONS.getOrDefault(type, List.of())) {
+            if (params.containsKey(fraction.key())) {
+                checkFraction(params.get(fraction.key()), fraction, errors);
+            }
+        }
         for (NumericKey required : REQUIRED.getOrDefault(type, List.of())) {
             String raw = params.get(required.key());
             if (raw == null || raw.isEmpty()) {
@@ -71,6 +83,20 @@ public final class TaskInputSpec {
             checkNumeric(raw, required, errors);
         }
         return errors;
+    }
+
+    private static void checkFraction(String raw, FractionKey key, List<String> errors) {
+        final double value;
+        try {
+            value = Double.parseDouble(raw);
+        } catch (NumberFormatException e) {
+            errors.add(key.key() + " must be a number (got '" + raw + "')");
+            return;
+        }
+        if (value < key.min() || value > key.max()) {
+            errors.add(key.key() + " must be between " + key.min() + " and " + key.max()
+                    + " (got " + value + ")");
+        }
     }
 
     private static void checkNumeric(String raw, NumericKey key, List<String> errors) {

@@ -13,6 +13,12 @@ import com.predisched.proto.WorkerServiceGrpc;
 import com.predisched.scheduler.Dispatcher;
 import com.predisched.scheduler.SchedulerServiceImpl;
 import com.predisched.scheduler.WorkerRegistry;
+import com.predisched.scheduler.queue.AgeingPriorityQueue;
+import com.predisched.scheduler.queue.DeadLetterQueue;
+import com.predisched.scheduler.queue.RetryCoordinator;
+import com.predisched.scheduler.queue.RetryPolicy;
+import com.predisched.scheduler.queue.RunningTasks;
+import com.predisched.scheduler.queue.TaskQueue;
 import com.predisched.worker.ExecutionEngine;
 import com.predisched.worker.ExecutorRegistry;
 import com.predisched.worker.WorkerMetrics;
@@ -30,11 +36,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -104,7 +108,12 @@ public class PoolSizeBenchmark {
         String workerName = "bench-worker-" + UUID.randomUUID();
         String schedulerName = "bench-sched-" + UUID.randomUUID();
         TaskStore store = new InMemoryTaskStore();
-        BlockingQueue<String> queue = new LinkedBlockingQueue<>();
+        TaskQueue queue = new AgeingPriorityQueue(0.1, 10);
+        // Retries would hide a saturated worker behind re-dispatches, so the benchmark runs with
+        // none: every task gets exactly one attempt.
+        RetryCoordinator retries = new RetryCoordinator(
+                store, queue, new RetryPolicy(10, 100, 0, 0, 42), new DeadLetterQueue());
+        RunningTasks running = new RunningTasks();
         WorkerMetrics metrics = new WorkerMetrics();
 
         try (ExecutionEngine engine = new ExecutionEngine(
@@ -128,7 +137,8 @@ public class PoolSizeBenchmark {
                     .build());
 
             Server schedulerServer = InProcessServerBuilder.forName(schedulerName)
-                    .addService(new SchedulerServiceImpl(store, new TaskValidator(4096), queue))
+                    .addService(new SchedulerServiceImpl(
+                            store, new TaskValidator(4096), queue, retries))
                     .build()
                     .start();
             ManagedChannel schedulerChannel =
@@ -136,7 +146,8 @@ public class PoolSizeBenchmark {
 
             ExecutorService clients = Executors.newFixedThreadPool(CLIENT_THREADS);
             try (Dispatcher dispatcher = new Dispatcher(
-                    store, queue, registry, worker -> workerStub, CLIENT_THREADS * 2, 20)) {
+                    store, queue, registry, worker -> workerStub, retries, running,
+                    0L, 2.0, CLIENT_THREADS * 2, 20)) {
                 dispatcher.start();
 
                 CountDownLatch start = new CountDownLatch(1);
@@ -187,6 +198,7 @@ public class PoolSizeBenchmark {
                 return new Run(poolSize, rep, latencies.size(), makespanMs, throughput, mean, p95,
                         metrics.avgExecMs());
             } finally {
+                retries.close();
                 clients.shutdownNow();
                 schedulerChannel.shutdownNow();
                 workerChannel.shutdownNow();
