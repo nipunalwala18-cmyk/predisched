@@ -1,0 +1,59 @@
+package com.predisched.worker;
+
+import com.predisched.common.NodeConfig;
+import io.grpc.Server;
+import io.grpc.ServerBuilder;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/** Starts a worker gRPC server exposing {@code WorkerService}. */
+public class WorkerMain {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkerMain.class);
+
+    public static void main(String[] args) throws Exception {
+        Map<String, String> opts = parseArgs(args);
+        String configPath = opts.getOrDefault("--config", "configs/local.yaml");
+        NodeConfig config = NodeConfig.load(Paths.get(configPath));
+        String id = opts.getOrDefault("--id", config.getWorker().getId());
+        int port = Integer.parseInt(opts.getOrDefault("--port",
+                String.valueOf(config.getWorker().getPort())));
+
+        ExecutorRegistry registry = new ExecutorRegistry();
+        Server server = ServerBuilder.forPort(port)
+                .addService(new WorkerServiceImpl(registry, id))
+                .build()
+                .start();
+        log.info("Worker {} listening on {}", id, port);
+        System.out.println("Worker " + id + " listening on " + port);
+        Path done = Paths.get(opts.getOrDefault("--ready-file", ""));
+        if (!done.toString().isEmpty()) {
+            try {
+                Files.write(done, ("ready " + port).getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                log.warn("Could not write ready file", e);
+            }
+        }
+        server.awaitTermination();
+    }
+
+    static Map<String, String> parseArgs(String[] args) {
+        Map<String, String> opts = new HashMap<>();
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+                opts.put(args[i], args[i + 1]);
+                i++;
+            } else if (args[i].contains("=") && args[i].startsWith("--")) {
+                String[] kv = args[i].split("=", 2);
+                opts.put(kv[0], kv[1]);
+            }
+        }
+        return opts;
+    }
+}

@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package predisched;
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+enum TaskType {
+  CPU_TASK = 0;
+  MATRIX_TASK = 1;
+  SLEEP_TASK = 2;
+  MAPREDUCE_TASK = 3;
+  SORT_TASK = 4;
+  HASH_TASK = 5;
+  COMPRESS_TASK = 6;
+  MONTE_CARLO_TASK = 7;
+  IMAGE_TASK = 8;
+  FILE_IO_TASK = 9;
+  HTTP_TASK = 10;
+  DB_QUERY_TASK = 11;
+  GRAPH_TASK = 12;
+  ML_INFER_TASK = 13;
+  WORKFLOW_TASK = 14;
+}
+
+enum TaskStatus {
+  QUEUED = 0;
+  RUNNING = 1;
+  COMPLETED = 2;
+  CANCELLED = 3;
+  FAILED = 4;
+}
+
+message TaskRequest {
+  string task_id = 1;
+  TaskType type = 2;
+  string input = 3;
+  int32 priority = 4;
+  int64 lamport_time = 5;
+}
+
+message TaskResponse {
+  string task_id = 1;
+  bool accepted = 2;
+  string message = 3;
+  int64 lamport_time = 4;
+}
+
+message TaskStatusRequest {
+  string task_id = 1;
+}
+
+message TaskStatusResponse {
+  string task_id = 1;
+  TaskStatus status = 2;
+  string result = 3;
+  string worker_id = 4;
+  int64 exec_time_ms = 5;
+}
+
+service SchedulerService {
+  rpc SubmitTask (TaskRequest) returns (TaskResponse);
+  rpc GetTaskStatus (TaskStatusRequest) returns (TaskStatusResponse);
+  rpc CancelTask (TaskStatusRequest) returns (TaskResponse);
+}

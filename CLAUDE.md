@@ -69,8 +69,11 @@ Change a version only when a prompt says so, and update this table in the same c
 
 ## Ports (spec §16)
 
-Schedulers 50051–50055 (ids 1–5) · Workers 50061–50063 · Prediction 50070 · Spark UI 4040 ·
+Schedulers 51051–51055 (ids 1–5) · Workers 51061–51063 · Prediction 51070 · Spark UI 4040 ·
 Dashboard API 8080 · React dev 5173 · PostgreSQL 5432.
+
+Moved +1000 from spec §16 (2026-09-20, prompt 01): Hyper-V excluded 50000–50159 on the
+dev machine, so the whole 500xx group moved to 510xx in `configs/`.
 
 On Windows, check `netsh interface ipv4 show excludedportrange protocol=tcp` before the first run.
 If Hyper-V reserves a range that covers one of these ports, move the whole group to a free range in

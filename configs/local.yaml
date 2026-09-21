@@ -1,0 +1,10 @@
+scheduler:
+  id: "scheduler-1"
+  host: "localhost"
+  port: 51051
+worker:
+  id: "worker-1"
+  host: "localhost"
+  port: 51061
+validation:
+  maxInputChars: 4096

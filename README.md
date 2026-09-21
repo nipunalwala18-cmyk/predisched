@@ -17,7 +17,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | # | Prompt | Status |
 | --- | --- | --- |
 | 00 | Bootstrap | [x] |
-| 01 | Task API over gRPC | [ ] |
+| 01 | Task API over gRPC | [x] |
 | 02 | Workers and thread pools | [ ] |
 | 03 | Clocks and tracing | [ ] |
 | 04 | Queue discipline | [ ] |
