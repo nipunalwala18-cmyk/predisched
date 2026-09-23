@@ -1,0 +1,89 @@
+# Reproducible workload profiles (prompt 05, spec section 7.3, feature F8).
+#
+# Each profile mixes task types by weight, with a size range per type. What "size" means
+# depends on the type's size knob (spec section 7.2):
+#   CPU_TASK n | HASH_TASK rounds | MONTE_CARLO_TASK samples | MATRIX_TASK size |
+#   SORT_TASK n | COMPRESS_TASK size_mb | GRAPH_TASK nodes | FILE_IO_TASK size_mb |
+#   HTTP_TASK mock delay ms | SLEEP_TASK ms
+# The generator draws enums (SORT type, GRAPH algo, FILE_IO mode, COMPRESS level) uniformly.
+# HTTP_TASK calls httpBaseUrl + "/delay?ms=<size>".
+#
+# priority: uniform [min, max], except highFraction draws uniform [highMin, 10].
+# timeout: fraction of tasks carrying a deadline, uniform [minMs, maxMs] ms (0 = none).
+
+httpBaseUrl: "http://localhost:8100"
+
+profiles:
+  cpu_heavy:
+    description: "Pure compute scheduling: 80% CPU / HASH / MONTE_CARLO."
+    tasks:
+      - {type: CPU_TASK, weight: 40, size: {min: 200000, max: 2000000}}
+      - {type: HASH_TASK, weight: 30, size: {min: 5000, max: 80000}}
+      - {type: MONTE_CARLO_TASK, weight: 20, size: {min: 200000, max: 3000000}}
+      - {type: MATRIX_TASK, weight: 10, size: {min: 80, max: 220}}
+    priority: {min: 1, max: 10, highFraction: 0.2, highMin: 8}
+    timeout: {fraction: 0.0, minMs: 0, maxMs: 0}
+
+  io_heavy:
+    description: "70% FILE_IO / HTTP / SLEEP: does the scheduler over-trust low CPU readings?"
+    tasks:
+      - {type: FILE_IO_TASK, weight: 35, size: {min: 1, max: 6}}
+      - {type: HTTP_TASK, weight: 25, size: {min: 20, max: 300}}
+      - {type: SLEEP_TASK, weight: 10, size: {min: 50, max: 800}}
+      - {type: SORT_TASK, weight: 10, size: {min: 100000, max: 1000000}}
+      - {type: CPU_TASK, weight: 10, size: {min: 200000, max: 2000000}}
+      - {type: COMPRESS_TASK, weight: 10, size: {min: 1, max: 6}}
+    priority: {min: 1, max: 10, highFraction: 0.2, highMin: 8}
+    timeout: {fraction: 0.0, minMs: 0, maxMs: 0}
+
+  mixed:
+    description: "Even spread across all ten executors: the realistic, hardest-to-predict case."
+    tasks:
+      - {type: CPU_TASK, weight: 10, size: {min: 200000, max: 2000000}}
+      - {type: HASH_TASK, weight: 10, size: {min: 5000, max: 80000}}
+      - {type: MONTE_CARLO_TASK, weight: 10, size: {min: 200000, max: 3000000}}
+      - {type: MATRIX_TASK, weight: 10, size: {min: 80, max: 220}}
+      - {type: SORT_TASK, weight: 10, size: {min: 100000, max: 1000000}}
+      - {type: COMPRESS_TASK, weight: 10, size: {min: 1, max: 6}}
+      - {type: GRAPH_TASK, weight: 10, size: {min: 10000, max: 150000}}
+      - {type: FILE_IO_TASK, weight: 10, size: {min: 1, max: 6}}
+      - {type: HTTP_TASK, weight: 10, size: {min: 20, max: 300}}
+      - {type: SLEEP_TASK, weight: 10, size: {min: 50, max: 800}}
+    priority: {min: 1, max: 10, highFraction: 0.2, highMin: 8}
+    timeout: {fraction: 0.0, minMs: 0, maxMs: 0}
+
+  bursty:
+    description: "A sudden flood of MATRIX and SORT tasks: spike handling."
+    tasks:
+      - {type: MATRIX_TASK, weight: 40, size: {min: 100, max: 280}}
+      - {type: SORT_TASK, weight: 30, size: {min: 200000, max: 1500000}}
+      - {type: CPU_TASK, weight: 15, size: {min: 200000, max: 2000000}}
+      - {type: SLEEP_TASK, weight: 15, size: {min: 50, max: 400}}
+    priority: {min: 1, max: 10, highFraction: 0.2, highMin: 8}
+    timeout: {fraction: 0.0, minMs: 0, maxMs: 0}
+
+  long_tail:
+    description: "Mostly short tasks with a few very long ones: straggler handling (F11)."
+    tasks:
+      - {type: SLEEP_TASK, weight: 40, size: {min: 50, max: 400}}
+      - {type: CPU_TASK, weight: 30, size: {min: 200000, max: 1000000}}
+      - {type: MATRIX_TASK, weight: 10, size: {min: 300, max: 500}}
+      - {type: SORT_TASK, weight: 10, size: {min: 2000000, max: 6000000}}
+      - {type: GRAPH_TASK, weight: 5, size: {min: 200000, max: 500000}}
+      - {type: COMPRESS_TASK, weight: 5, size: {min: 8, max: 32}}
+    priority: {min: 1, max: 10, highFraction: 0.2, highMin: 8}
+    timeout: {fraction: 0.0, minMs: 0, maxMs: 0}
+
+  deadline:
+    description: "Tight deadlines and mixed priorities: SLA compliance and priority ageing."
+    tasks:
+      - {type: CPU_TASK, weight: 20, size: {min: 200000, max: 2000000}}
+      - {type: SORT_TASK, weight: 15, size: {min: 100000, max: 1000000}}
+      - {type: MATRIX_TASK, weight: 10, size: {min: 80, max: 220}}
+      - {type: SLEEP_TASK, weight: 15, size: {min: 50, max: 800}}
+      - {type: HTTP_TASK, weight: 15, size: {min: 20, max: 300}}
+      - {type: FILE_IO_TASK, weight: 10, size: {min: 1, max: 6}}
+      - {type: HASH_TASK, weight: 10, size: {min: 5000, max: 80000}}
+      - {type: MONTE_CARLO_TASK, weight: 5, size: {min: 200000, max: 3000000}}
+    priority: {min: 1, max: 10, highFraction: 0.5, highMin: 8}
+    timeout: {fraction: 0.8, minMs: 2000, maxMs: 15000}

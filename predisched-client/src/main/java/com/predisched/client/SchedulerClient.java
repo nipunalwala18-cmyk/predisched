@@ -1,5 +1,6 @@
 package com.predisched.client;
 
+import com.predisched.client.workload.SchedulerGateway;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.obs.TraceContext;
 import com.predisched.common.time.Clocks;
@@ -14,7 +15,7 @@ import com.predisched.proto.TaskStatusResponse;
 import com.predisched.proto.TaskType;
 
 /** Thin wrapper over the scheduler blocking stub. */
-public class SchedulerClient implements AutoCloseable {
+public class SchedulerClient implements AutoCloseable, SchedulerGateway {
 
     private final io.grpc.ManagedChannel channel;
     private final SchedulerServiceGrpc.SchedulerServiceBlockingStub stub;
@@ -35,6 +36,19 @@ public class SchedulerClient implements AutoCloseable {
 
     public TaskResponse submitTask(String taskId, TaskType type, String input, int priority) {
         return submitTask(taskId, type, input, priority, TraceContext.newTraceId());
+    }
+
+    /** Replayer entry point: same submit through the {@link SchedulerGateway} interface. */
+    @Override
+    public TaskResponse submit(
+            String taskId,
+            TaskType type,
+            String input,
+            int priority,
+            String traceId,
+            long timeoutMs,
+            int maxRetries) {
+        return submitTask(taskId, type, input, priority, traceId, timeoutMs, maxRetries);
     }
 
     /** Submits with an explicit trace id, which follows the task to the worker (F10). */
@@ -84,6 +98,12 @@ public class SchedulerClient implements AutoCloseable {
 
     public TaskStatusResponse getStatus(String taskId) {
         return stub.getTaskStatus(TaskStatusRequest.newBuilder().setTaskId(taskId).build());
+    }
+
+    /** Replayer entry point: same status query through the {@link SchedulerGateway} interface. */
+    @Override
+    public TaskStatusResponse status(String taskId) {
+        return getStatus(taskId);
     }
 
     public TaskResponse cancelTask(String taskId) {

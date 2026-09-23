@@ -42,8 +42,12 @@ public class TaskValidator {
         if (type == null || type == com.predisched.proto.TaskType.UNRECOGNIZED) {
             errors.add("type must be a supported TaskType");
         } else if (!TaskInputSpec.isKnown(type)) {
-            errors.add("type " + type + " has no executor yet; supported types are "
-                    + TaskInputSpec.knownTypes());
+            String reason = TaskInputSpec.reservedReason(type);
+            errors.add(reason == null
+                    ? "type " + type + " has no executor yet; supported types are "
+                            + TaskInputSpec.knownTypes()
+                    : "type " + type + " is not executable yet (" + reason
+                            + "); supported types are " + TaskInputSpec.knownTypes());
         }
         String input = request.getInput();
         if (input == null || input.isEmpty()) {

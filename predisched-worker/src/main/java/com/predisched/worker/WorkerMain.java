@@ -50,7 +50,7 @@ public class WorkerMain {
         LamportInterceptors.applyMdc(id, 0L, null);
         EventLog events = EventLog.install(id);
 
-        ExecutorRegistry registry = new ExecutorRegistry();
+        ExecutorRegistry registry = new ExecutorRegistry(resolveFileIoDir(id, workerConfig));
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
                 registry, metrics, id, poolSize, workerConfig.getQueueCapacity());
@@ -117,8 +117,20 @@ public class WorkerMain {
         server.awaitTermination();
     }
 
-    static Map<String, String> parseArgs(String[] args) {
-        Map<String, String> opts = new HashMap<>();
+    /**
+     * Temp dir for {@code FILE_IO_TASK} files: the configured dir, or a per-worker dir under the
+     * JVM temp dir when nothing is configured. Created now so a bad path fails fast at startup.
+     */
+    static Path resolveFileIoDir(String id, NodeConfig.WorkerConfig workerConfig) throws Exception {
+        String configured = workerConfig.getFileIoDir();
+        Path dir = (configured == null || configured.isBlank())
+                ? Paths.get(System.getProperty("java.io.tmpdir"), "predisched-fileio-" + id)
+                : Paths.get(configured);
+        Files.createDirectories(dir);
+        return dir;
+    }
+
+    static Map<String, String> parseArgs(String[] args) {        Map<String, String> opts = new HashMap<>();
         for (int i = 0; i < args.length; i++) {
             if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
                 opts.put(args[i], args[i + 1]);

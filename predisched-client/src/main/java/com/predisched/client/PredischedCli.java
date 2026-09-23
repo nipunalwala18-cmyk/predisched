@@ -26,7 +26,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Status.class,
             PredischedCli.Cancel.class,
             PredischedCli.Watch.class,
-            PredischedCli.Dlq.class
+            PredischedCli.Dlq.class,
+            PredischedCli.Workload.class
         })
 public class PredischedCli implements Runnable {
 
@@ -215,6 +216,148 @@ public class PredischedCli implements Runnable {
                     return response.getAccepted() ? 0 : 1;
                 } catch (Exception e) {
                     System.out.println("dlq retry failed: " + e.getMessage());
+                    return 1;
+                }
+            }
+        }
+    }
+
+    @Command(name = "workload", description = "Generate and replay reproducible workloads.",
+            subcommands = {Workload.Generate.class, Workload.Replay.class})
+    static class Workload implements Runnable {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Override
+        public void run() {
+            new CommandLine(this).usage(System.out);
+        }
+
+        @Command(name = "generate", description = "Write a seeded trace file.")
+        static class Generate implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Workload parent;
+
+            @Option(names = "--profile", required = true,
+                    description = "Profile from configs/workloads.yaml, e.g. mixed")
+            String profile;
+
+            @Option(names = "--pattern", required = true,
+                    description = "Arrival process: steady|bursty|periodic")
+            String pattern;
+
+            @Option(names = "--tasks", required = true, description = "Task count")
+            int tasks;
+
+            @Option(names = "--seed", required = true, description = "Random seed")
+            long seed;
+
+            @Option(names = "--rate", description = "Base arrival rate/s (default: ${DEFAULT-VALUE})")
+            double rate = 5.0;
+
+            @Option(names = "--profiles", description = "Workload profiles YAML (default: ${DEFAULT-VALUE})")
+            String profiles = "configs/workloads.yaml";
+
+            @Option(names = "--output", description = "Trace file (default: workloads/<profile>-<pattern>-<seed>.jsonl)")
+            String output;
+
+            @Option(names = "--http-base-url",
+                    description = "Mock HTTP base URL for HTTP_TASK (default: from the profiles file)")
+            String httpBaseUrl;
+
+            @Override
+            public Integer call() throws Exception {
+                com.predisched.client.workload.ArrivalPattern arrival;
+                try {
+                    arrival = com.predisched.client.workload.ArrivalPattern.parse(pattern);
+                } catch (IllegalArgumentException e) {
+                    System.out.println(e.getMessage());
+                    return 2;
+                }
+                java.util.Map<String, com.predisched.client.workload.WorkloadProfile> all;
+                try {
+                    all = com.predisched.client.workload.WorkloadProfile.load(
+                            java.nio.file.Paths.get(profiles), httpBaseUrl);
+                } catch (Exception e) {
+                    System.out.println("cannot load profiles: " + e.getMessage());
+                    return 1;
+                }
+                com.predisched.client.workload.WorkloadProfile selected = all.get(profile);
+                if (selected == null) {
+                    System.out.println("unknown profile '" + profile + "', have: " + all.keySet());
+                    return 2;
+                }
+                java.util.List<com.predisched.client.workload.TraceEntry> entries;
+                try {
+                    entries = com.predisched.client.workload.WorkloadGenerator.generate(
+                            selected, arrival, tasks, seed, rate);
+                } catch (IllegalArgumentException e) {
+                    System.out.println(e.getMessage());
+                    return 2;
+                }
+                String out = output != null ? output
+                        : "workloads/" + profile + "-" + pattern.toLowerCase(Locale.ROOT)
+                                + "-" + seed + ".jsonl";
+                java.nio.file.Path path = java.nio.file.Paths.get(out);
+                if (path.getParent() != null) {
+                    java.nio.file.Files.createDirectories(path.getParent());
+                }
+                com.predisched.client.workload.TraceIo.writeTrace(path, entries);
+                java.util.Map<String, Integer> counts = new java.util.TreeMap<>();
+                for (com.predisched.client.workload.TraceEntry entry : entries) {
+                    counts.merge(entry.type().name(), 1, Integer::sum);
+                }
+                System.out.println("wrote " + entries.size() + " tasks to " + path
+                        + " (profile=" + profile + " pattern=" + arrival.name().toLowerCase(Locale.ROOT)
+                        + " seed=" + seed + " rate=" + rate + "/s)");
+                for (java.util.Map.Entry<String, Integer> count : counts.entrySet()) {
+                    System.out.println("  " + count.getKey() + ": " + count.getValue());
+                }
+                return 0;
+            }
+        }
+
+        @Command(name = "replay", description = "Submit a trace with its original timing.")
+        static class Replay implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Workload parent;
+
+            @Parameters(index = "0", description = "Trace file")
+            String trace;
+
+            @Option(names = "--speed", description = "Timing scale factor (default: ${DEFAULT-VALUE})")
+            double speed = 1.0;
+
+            @Option(names = "--output", description = "Results CSV (default: results/<trace>-replay.csv)")
+            String output;
+
+            @Option(names = "--poll-ms", description = "Status poll interval (default: ${DEFAULT-VALUE})")
+            long pollMs = 100;
+
+            @Option(names = "--timeout-ms", description = "Give up waiting after this long (default: ${DEFAULT-VALUE})")
+            long timeoutMs = 600_000;
+
+            @Override
+            public Integer call() throws Exception {
+                java.util.List<com.predisched.client.workload.TraceEntry> entries;
+                try {
+                    entries = com.predisched.client.workload.TraceIo.readTrace(
+                            java.nio.file.Paths.get(trace));
+                } catch (Exception e) {
+                    System.out.println("cannot read trace: " + e.getMessage());
+                    return 1;
+                }
+                String base = java.nio.file.Paths.get(trace).getFileName().toString()
+                        .replaceFirst("\\.jsonl$", "");
+                String out = output != null ? output : "results/" + base + "-replay.csv";
+                try (SchedulerClient client = parent.parent.newClient()) {
+                    com.predisched.client.workload.Replayer.Summary summary =
+                            com.predisched.client.workload.Replayer.replay(
+                                    entries, speed, client, java.nio.file.Paths.get(out),
+                                    pollMs, timeoutMs, System.out);
+                    return summary.totalFailed() == 0 ? 0 : 1;
+                } catch (Exception e) {
+                    System.out.println("replay failed: " + e.getMessage());
                     return 1;
                 }
             }

@@ -3,6 +3,7 @@ package com.predisched.worker;
 import com.predisched.common.ExecutionResult;
 import com.predisched.common.TaskExecutor;
 import com.predisched.proto.TaskType;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,9 +16,24 @@ public class ExecutorRegistry {
     private final Map<TaskType, TaskExecutor> executors = new ConcurrentHashMap<>();
 
     public ExecutorRegistry() {
+        this(null);
+    }
+
+    /**
+     * @param fileIoDir temp dir for {@code FILE_IO_TASK} files; null means the JVM temp dir.
+     *      The worker passes its configured dir so demos can show exactly where files land.
+     */
+    public ExecutorRegistry(Path fileIoDir) {
         register(new CpuTaskExecutor());
         register(new SleepTaskExecutor());
         register(new MatrixTaskExecutor());
+        register(new HashTaskExecutor());
+        register(new MonteCarloTaskExecutor());
+        register(new SortTaskExecutor());
+        register(new CompressTaskExecutor());
+        register(new GraphTaskExecutor());
+        register(fileIoDir == null ? new FileIoTaskExecutor() : new FileIoTaskExecutor(fileIoDir));
+        register(new HttpTaskExecutor());
     }
 
     public void register(TaskExecutor executor) {

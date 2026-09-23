@@ -24,9 +24,24 @@ public final class TaskInputSpec {
     /** An optional key whose value is a fraction, such as a failure rate. */
     public record FractionKey(String key, double min, double max) {}
 
+    /** A key whose value must be one of a fixed set, such as {@code type=random|sorted|reversed}. */
+    public record EnumKey(String key, List<String> allowed) {}
+
+    /** A key whose value must be an http(s) URL, such as an {@code HTTP_TASK} target. */
+    public record UrlKey(String key) {}
+
     private static final Map<TaskType, List<NumericKey>> REQUIRED = new LinkedHashMap<>();
     private static final Map<TaskType, List<NumericKey>> OPTIONAL = new LinkedHashMap<>();
     private static final Map<TaskType, List<FractionKey>> FRACTIONS = new LinkedHashMap<>();
+    private static final Map<TaskType, List<EnumKey>> REQUIRED_ENUMS = new LinkedHashMap<>();
+    private static final Map<TaskType, List<EnumKey>> OPTIONAL_ENUMS = new LinkedHashMap<>();
+    private static final Map<TaskType, List<UrlKey>> REQUIRED_URLS = new LinkedHashMap<>();
+
+    /**
+     * Types with no executor yet: four arrive with later prompts and one stays reserved.
+     * A submit of any of these is rejected by validation with this reason.
+     */
+    private static final Map<TaskType, String> RESERVED = new LinkedHashMap<>();
 
     static {
         REQUIRED.put(TaskType.CPU_TASK, List.of(new NumericKey("n", 2, 100_000_000L)));
@@ -37,6 +52,29 @@ public final class TaskInputSpec {
         // Test hooks for the retry and dead-letter demos (F4): a reproducible failure rate.
         FRACTIONS.put(TaskType.SLEEP_TASK, List.of(new FractionKey("failRate", 0.0, 1.0)));
         OPTIONAL.put(TaskType.SLEEP_TASK, List.of(new NumericKey("seed", 0, Long.MAX_VALUE)));
+        // Full catalogue (prompt 05, spec section 7.2).
+        REQUIRED.put(TaskType.HASH_TASK, List.of(new NumericKey("rounds", 1, 20_000_000L)));
+        REQUIRED.put(TaskType.MONTE_CARLO_TASK, List.of(new NumericKey("samples", 1, 500_000_000L)));
+        OPTIONAL.put(TaskType.MONTE_CARLO_TASK, List.of(new NumericKey("seed", 0, Long.MAX_VALUE)));
+        REQUIRED.put(TaskType.SORT_TASK, List.of(new NumericKey("n", 2, 20_000_000L)));
+        OPTIONAL_ENUMS.put(TaskType.SORT_TASK,
+                List.of(new EnumKey("type", List.of("random", "sorted", "reversed"))));
+        REQUIRED.put(TaskType.COMPRESS_TASK, List.of(new NumericKey("size_mb", 1, 512L)));
+        OPTIONAL.put(TaskType.COMPRESS_TASK, List.of(new NumericKey("level", 1, 9)));
+        REQUIRED.put(TaskType.GRAPH_TASK, List.of(new NumericKey("nodes", 2, 5_000_000L)));
+        OPTIONAL_ENUMS.put(TaskType.GRAPH_TASK,
+                List.of(new EnumKey("algo", List.of("bfs", "pagerank"))));
+        OPTIONAL.put(TaskType.GRAPH_TASK, List.of(new NumericKey("seed", 0, Long.MAX_VALUE)));
+        REQUIRED.put(TaskType.FILE_IO_TASK, List.of(new NumericKey("size_mb", 1, 2048L)));
+        OPTIONAL_ENUMS.put(TaskType.FILE_IO_TASK,
+                List.of(new EnumKey("mode", List.of("write", "read", "both"))));
+        REQUIRED.put(TaskType.HTTP_TASK, List.of(new NumericKey("timeout", 1, 120_000L)));
+        REQUIRED_URLS.put(TaskType.HTTP_TASK, List.of(new UrlKey("url")));
+        RESERVED.put(TaskType.WORKFLOW_TASK, "arrives in prompt 09 (workflows, F1)");
+        RESERVED.put(TaskType.DB_QUERY_TASK, "arrives in prompt 11 (PostgreSQL persistence)");
+        RESERVED.put(TaskType.MAPREDUCE_TASK, "arrives in prompt 12 (Spark MapReduce)");
+        RESERVED.put(TaskType.ML_INFER_TASK, "arrives in prompt 16 (ML models)");
+        RESERVED.put(TaskType.IMAGE_TASK, "reserved: in the enum but not in the catalogue (spec 7.2)");
     }
 
     private TaskInputSpec() {}
@@ -44,6 +82,14 @@ public final class TaskInputSpec {
     /** True when this type has an executor's input rules registered. */
     public static boolean isKnown(TaskType type) {
         return REQUIRED.containsKey(type);
+    }
+
+    /**
+     * Why a type with no executor cannot run yet, or null when it simply has no executor.
+     * Used by validation so a submit of a later prompt's type says where it arrives.
+     */
+    public static String reservedReason(TaskType type) {
+        return RESERVED.get(type);
     }
 
     /** The types that have an executor, for error messages. */
@@ -82,7 +128,41 @@ public final class TaskInputSpec {
             }
             checkNumeric(raw, required, errors);
         }
+        for (EnumKey required : REQUIRED_ENUMS.getOrDefault(type, List.of())) {
+            String raw = params.get(required.key());
+            if (raw == null || raw.isEmpty()) {
+                errors.add(type + " requires '" + required.key() + "="
+                        + String.join("|", required.allowed()) + "'");
+                continue;
+            }
+            checkEnum(raw, required, errors);
+        }
+        for (EnumKey optional : OPTIONAL_ENUMS.getOrDefault(type, List.of())) {
+            if (params.containsKey(optional.key())) {
+                checkEnum(params.get(optional.key()), optional, errors);
+            }
+        }
+        for (UrlKey required : REQUIRED_URLS.getOrDefault(type, List.of())) {
+            String raw = params.get(required.key());
+            if (raw == null || raw.isEmpty()) {
+                errors.add(type + " requires '" + required.key() + "=<http(s) url>'");
+                continue;
+            }
+            checkUrl(raw, required, errors);
+        }
         return errors;
+    }
+
+    private static void checkEnum(String raw, EnumKey key, List<String> errors) {
+        if (!key.allowed().contains(raw)) {
+            errors.add(key.key() + " must be one of " + key.allowed() + " (got '" + raw + "')");
+        }
+    }
+
+    private static void checkUrl(String raw, UrlKey key, List<String> errors) {
+        if (!(raw.startsWith("http://") || raw.startsWith("https://")) || raw.length() < 10) {
+            errors.add(key.key() + " must be an http(s) URL (got '" + raw + "')");
+        }
     }
 
     private static void checkFraction(String raw, FractionKey key, List<String> errors) {

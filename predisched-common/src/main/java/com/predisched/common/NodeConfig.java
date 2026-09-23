@@ -149,6 +149,8 @@ public class NodeConfig {
         private int poolSize = 4;
         private int queueCapacity = 100;
         private long heartbeatIntervalMs = 1000;
+        /** Temp dir for FILE_IO_TASK files; empty means the JVM temp dir. */
+        private String fileIoDir = "";
 
         public int getPoolSize() {
             return poolSize;
@@ -172,6 +174,14 @@ public class NodeConfig {
 
         public void setHeartbeatIntervalMs(long heartbeatIntervalMs) {
             this.heartbeatIntervalMs = heartbeatIntervalMs;
+        }
+
+        public String getFileIoDir() {
+            return fileIoDir;
+        }
+
+        public void setFileIoDir(String fileIoDir) {
+            this.fileIoDir = fileIoDir;
         }
 
         public String getId() {
