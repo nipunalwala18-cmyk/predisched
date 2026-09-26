@@ -229,7 +229,15 @@ public class ExecutorTest {
         java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("predisched-test-");
         try {
             FileIoTaskExecutor executor = new FileIoTaskExecutor(dir);
-            Thread worker = new Thread(() -> executor.execute("size_mb=100, mode=both"));
+            // An interrupt surfaces as CancellationException, which the engine turns into a failed
+            // outcome; here it is the expected outcome, so it must not reach the default handler.
+            Thread worker = new Thread(() -> {
+                try {
+                    executor.execute("size_mb=100, mode=both");
+                } catch (java.util.concurrent.CancellationException expected) {
+                    // cancelled mid-write, which is the point of the test
+                }
+            });
             worker.start();
             // Wait until the temp file actually exists, so the interrupt lands mid-write.
             long deadline = System.currentTimeMillis() + 10_000;
