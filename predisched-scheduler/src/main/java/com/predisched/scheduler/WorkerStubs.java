@@ -9,4 +9,7 @@ import com.predisched.proto.WorkerServiceGrpc;
 public interface WorkerStubs {
 
     WorkerServiceGrpc.WorkerServiceBlockingStub stubFor(WorkerInfo worker);
+
+    /** Drops any connection to a worker declared dead, failing calls still waiting on it. */
+    default void forget(WorkerInfo worker) {}
 }

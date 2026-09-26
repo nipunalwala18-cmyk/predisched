@@ -34,6 +34,7 @@ public final class TaskRecord {
     private final List<TaskAttempt> attempts;
     private final String clientId;
     private final String workflowId;
+    private final List<String> dependsOn;
 
     private TaskRecord(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id");
@@ -55,6 +56,7 @@ public final class TaskRecord {
                 : Collections.unmodifiableList(new ArrayList<>(builder.attempts));
         this.clientId = builder.clientId == null ? "" : builder.clientId;
         this.workflowId = builder.workflowId == null ? "" : builder.workflowId;
+        this.dependsOn = builder.dependsOn == null ? List.of() : List.copyOf(builder.dependsOn);
     }
 
     public static TaskRecord createQueued(String id, TaskType type, String input, int priority) {
@@ -200,6 +202,20 @@ public final class TaskRecord {
         return workflowId;
     }
 
+    /**
+     * The workflow tasks this one waits for (F1); empty for a standalone task. Kept on the record
+     * so a promoted primary can rebuild a BLOCKED task's dependencies from the store (prompt 10).
+     */
+    public List<String> dependsOn() {
+        return dependsOn;
+    }
+
+    public TaskRecord withDependsOn(List<String> parents) {
+        Builder builder = copy();
+        builder.dependsOn = parents;
+        return new TaskRecord(builder);
+    }
+
     public TaskRecord withClientId(String newClientId) {
         Builder builder = copy();
         builder.clientId = newClientId;
@@ -306,6 +322,7 @@ public final class TaskRecord {
         builder.attempts = new ArrayList<>(attempts);
         builder.clientId = clientId;
         builder.workflowId = workflowId;
+        builder.dependsOn = dependsOn;
         return builder;
     }
 
@@ -327,6 +344,7 @@ public final class TaskRecord {
         private List<TaskAttempt> attempts = new ArrayList<>();
         private String clientId;
         private String workflowId;
+        private List<String> dependsOn;
     }
 
     @Override
@@ -353,7 +371,8 @@ public final class TaskRecord {
                 && traceId.equals(that.traceId)
                 && attempts.equals(that.attempts)
                 && clientId.equals(that.clientId)
-                && workflowId.equals(that.workflowId);
+                && workflowId.equals(that.workflowId)
+                && dependsOn.equals(that.dependsOn);
     }
 
     @Override
@@ -361,7 +380,7 @@ public final class TaskRecord {
         return Objects.hash(
                 id, type, input, priority, status, workerId, result,
                 submittedAt, startedAt, completedAt, execTimeMs, traceId,
-                timeoutMs, maxRetries, attempts, clientId, workflowId);
+                timeoutMs, maxRetries, attempts, clientId, workflowId, dependsOn);
     }
 
     @Override

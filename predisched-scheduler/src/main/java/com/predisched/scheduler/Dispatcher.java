@@ -7,6 +7,7 @@ import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.obs.TraceContext;
 import com.predisched.common.time.Clocks;
+import com.predisched.fault.InDoubtResolver;
 import com.predisched.proto.ExecuteRequest;
 import com.predisched.proto.ExecuteResult;
 import com.predisched.proto.TaskRequest;
@@ -19,6 +20,8 @@ import com.predisched.scheduler.strategy.DecisionLog;
 import com.predisched.scheduler.strategy.RoundRobinStrategy;
 import com.predisched.scheduler.strategy.SchedulingDecision;
 import com.predisched.scheduler.strategy.SchedulingStrategy;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -44,6 +47,10 @@ import org.slf4j.LoggerFactory;
  * <p>Which worker gets a task is a {@link SchedulingStrategy} (prompt 08), held in an
  * {@link AtomicReference} so it can be swapped while running. Every choice is recorded as a
  * {@link SchedulingDecision} in the {@link DecisionLog} and the event log.
+ *
+ * <p>Every call carries a dispatch id, {@code <taskId>#<attempt>}, so a worker never runs one
+ * attempt twice (prompt 10). That is what lets a newly promoted primary {@link #reattach} to a
+ * call the old primary made, or {@link #takeResult} of one that finished while no one listened.
  */
 public class Dispatcher implements AutoCloseable {
 
@@ -124,7 +131,12 @@ public class Dispatcher implements AutoCloseable {
         active = false;
         if (thread != null) {
             thread.interrupt();
+            thread = null;
         }
+    }
+
+    public boolean isActive() {
+        return active;
     }
 
     private void loop() {
@@ -227,7 +239,8 @@ public class Dispatcher implements AutoCloseable {
         }
         TaskAttempt last = task.attempts().get(task.attempts().size() - 1);
         boolean troubled = last.outcome() == TaskAttempt.Outcome.TIMED_OUT
-                || last.outcome() == TaskAttempt.Outcome.REJECTED;
+                || last.outcome() == TaskAttempt.Outcome.REJECTED
+                || last.outcome() == TaskAttempt.Outcome.WORKER_LOST;
         return troubled ? last.workerId() : null;
     }
 
@@ -251,6 +264,14 @@ public class Dispatcher implements AutoCloseable {
         if (current == null || current.status() != TaskStatus.QUEUED) {
             return;
         }
+        if (registry.get(worker.id()).isEmpty() || registry.isSuspected(worker.id())) {
+            // Chosen when it was handed to the dispatch pool; the worker has since been declared
+            // dead or stopped answering (prompt 10). Back to the queue, no attempt used.
+            log.info("Worker {} went away before {} was sent to it; re-queueing", worker.id(),
+                    taskId);
+            queue.add(taskId, current.priority(), current.submittedAt());
+            return;
+        }
         try {
             store.update(taskId, r -> r.withWorkerId(worker.id()).withStatus(TaskStatus.RUNNING));
         } catch (Exception e) {
@@ -259,7 +280,33 @@ public class Dispatcher implements AutoCloseable {
         }
 
         TaskRecord record = store.get(taskId);
-        int attemptNumber = record.attemptCount() + 1;
+        execute(record, worker, record.attemptCount() + 1, false);
+    }
+
+    /**
+     * A task the old primary left running on {@code worker} (prompt 10): send the same dispatch
+     * again. The worker recognises the dispatch id and answers when that run ends, so the task is
+     * not run twice and its outcome is recorded here as usual.
+     */
+    public void reattach(TaskRecord record, WorkerInfo worker, int attempt) {
+        dispatchPool.execute(() -> {
+            LamportInterceptors.applyMdc();
+            execute(record, worker, attempt, true);
+        });
+    }
+
+    /** A dispatch that finished while no primary was listening: record its outcome now. */
+    public void takeResult(TaskRecord record, int attempt, ExecuteResult result) {
+        long now = Clocks.now();
+        RunningTasks.Running entry = running.start(record.id(), record.workerId(), attempt, now, 0L);
+        if (running.finish(entry)) {
+            recordOutcome(record.id(), record.workerId(), entry, attempt, now, result);
+        }
+    }
+
+    private void execute(TaskRecord record, WorkerInfo worker, int attemptNumber,
+            boolean reattach) {
+        String taskId = record.id();
         long startedAtMs = Clocks.now();
         long timeoutMs = record.timeoutMs() > 0 ? record.timeoutMs() : defaultTimeoutMs;
         RunningTasks.Running inFlight = running.start(
@@ -267,6 +314,7 @@ public class Dispatcher implements AutoCloseable {
                 timeoutMs > 0 ? startedAtMs + timeoutMs : 0L);
 
         TraceContext.set(record.traceId());
+        String dispatchId = InDoubtResolver.dispatchId(taskId, attemptNumber);
         ExecuteRequest execRequest = ExecuteRequest.newBuilder()
                 .setTask(TaskRequest.newBuilder()
                         .setTaskId(record.id())
@@ -277,20 +325,39 @@ public class Dispatcher implements AutoCloseable {
                         .setTraceId(record.traceId())
                         .setTimeoutMs(timeoutMs)
                         .build())
+                .setDispatchId(dispatchId)
                 .build();
-        EventLog.get().event(EventLog.DISPATCH, taskId, Map.of(
-                "worker", worker.id(),
-                "attempt", String.valueOf(attemptNumber)));
-        log.info("Dispatching {} to {} (attempt {})", taskId, worker.id(), attemptNumber);
+        if (reattach) {
+            EventLog.get().event("REATTACH", taskId, Map.of(
+                    "worker", worker.id(), "dispatch", dispatchId));
+            log.info("Re-attaching to {} on {} (dispatch {})", taskId, worker.id(), dispatchId);
+        } else {
+            EventLog.get().event(EventLog.DISPATCH, taskId, Map.of(
+                    "worker", worker.id(),
+                    "attempt", String.valueOf(attemptNumber)));
+            log.info("Dispatching {} to {} (attempt {})", taskId, worker.id(), attemptNumber);
+        }
 
         try {
             WorkerServiceGrpc.WorkerServiceBlockingStub stub = clients.stubFor(worker);
             ExecuteResult result = stub.executeTask(execRequest);
-            running.finish(taskId);
-            recordOutcome(taskId, worker, inFlight, attemptNumber, startedAtMs, result);
+            if (!running.finish(inFlight)) {
+                log.info("Reply for {} from {} ignored: the attempt was already settled",
+                        taskId, worker.id());
+                return;
+            }
+            recordOutcome(taskId, worker.id(), inFlight, attemptNumber, startedAtMs, result);
         } catch (Exception e) {
-            running.finish(taskId);
+            if (!running.finish(inFlight)) {
+                // Settled already: the worker was declared dead and the task re-queued.
+                return;
+            }
             log.warn("Worker {} call failed for {}: {}", worker.id(), taskId, e.getMessage());
+            if (e instanceof StatusRuntimeException status
+                    && status.getStatus().getCode() == Status.Code.UNAVAILABLE) {
+                // Probably gone: stop sending it work until it heartbeats again (prompt 10).
+                registry.suspect(worker.id());
+            }
             TaskAttempt attempt = new TaskAttempt(
                     attemptNumber, worker.id(),
                     inFlight.timedOut().get()
@@ -306,30 +373,30 @@ public class Dispatcher implements AutoCloseable {
 
     private void recordOutcome(
             String taskId,
-            WorkerInfo worker,
+            String workerId,
             RunningTasks.Running inFlight,
             int attemptNumber,
             long startedAtMs,
             ExecuteResult result) {
         long endedAtMs = Clocks.now();
         EventLog.get().event(EventLog.RESULT, taskId, Map.of(
-                "worker", worker.id(),
+                "worker", workerId,
                 "attempt", String.valueOf(attemptNumber),
                 "success", String.valueOf(result.getSuccess()),
                 "exec_ms", String.valueOf(result.getExecTimeMs()),
                 "wait_ms", String.valueOf(result.getWaitTimeMs())));
 
         if (result.getRejected()) {
-            log.info("Worker {} rejected {} (queue full), re-queueing", worker.id(), taskId);
+            log.info("Worker {} rejected {} (queue full), re-queueing", workerId, taskId);
             TaskAttempt attempt = new TaskAttempt(
-                    attemptNumber, worker.id(), TaskAttempt.Outcome.REJECTED,
+                    attemptNumber, workerId, TaskAttempt.Outcome.REJECTED,
                     "worker queue full", startedAtMs, endedAtMs, 0L);
             safeFail(taskId, attempt, result.getOutput());
             return;
         }
         if (result.getSuccess()) {
             TaskAttempt attempt = new TaskAttempt(
-                    attemptNumber, worker.id(), TaskAttempt.Outcome.SUCCEEDED, "",
+                    attemptNumber, workerId, TaskAttempt.Outcome.SUCCEEDED, "",
                     startedAtMs, endedAtMs, result.getExecTimeMs());
             retries.succeeded(taskId, attempt, result.getOutput(), result.getExecTimeMs());
             return;
@@ -337,7 +404,7 @@ public class Dispatcher implements AutoCloseable {
 
         boolean timedOut = inFlight.timedOut().get();
         TaskAttempt attempt = new TaskAttempt(
-                attemptNumber, worker.id(),
+                attemptNumber, workerId,
                 timedOut ? TaskAttempt.Outcome.TIMED_OUT : TaskAttempt.Outcome.FAILED,
                 timedOut ? "TIMEOUT" : result.getOutput(),
                 startedAtMs, endedAtMs, result.getExecTimeMs());

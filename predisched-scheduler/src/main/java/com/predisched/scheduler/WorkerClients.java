@@ -21,7 +21,16 @@ public class WorkerClients implements WorkerStubs, AutoCloseable {
         ManagedChannel channel = channels.computeIfAbsent(worker.address(), address ->
                 Transport.get().channel(worker.host(), worker.port(),
                         LamportInterceptors.client(Clocks.lamport())));
-        return WorkerServiceGrpc.newBlockingStub(channel);
+        return WorkerServiceGrpc.newBlockingStub(Transport.reconnecting(channel));
+    }
+
+    /** Closes the channel to a worker declared dead, failing any call still waiting on it. */
+    @Override
+    public void forget(WorkerInfo worker) {
+        ManagedChannel channel = channels.remove(worker.address());
+        if (channel != null) {
+            channel.shutdownNow();
+        }
     }
 
     @Override

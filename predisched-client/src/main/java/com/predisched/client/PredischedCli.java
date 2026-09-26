@@ -86,13 +86,22 @@ public class PredischedCli implements Runnable {
         new CommandLine(this).usage(System.out);
     }
 
+    /**
+     * A client for the scheduler at --host/--port, or, when the config lists a scheduler cluster
+     * and no address was given, a failover client for the whole cluster (prompt 10).
+     */
     SchedulerClient newClient() {
         String resolvedHost = host;
         int resolvedPort = port;
         try {
             if (Files.exists(Paths.get(config))) {
                 NodeConfig loaded = NodeConfig.load(Paths.get(config));
-                if ("localhost".equals(host) && port == 51051) {
+                boolean addressGiven = !"localhost".equals(host) || port != 51051;
+                if (!addressGiven && !loaded.getElection().getPeers().isEmpty()) {
+                    return SchedulerClient.forCluster(loaded.getElection().getPeers(),
+                            SchedulerClient.Failover.DEFAULT);
+                }
+                if (!addressGiven) {
                     resolvedHost = loaded.getScheduler().getHost();
                     resolvedPort = loaded.getScheduler().getPort();
                 }

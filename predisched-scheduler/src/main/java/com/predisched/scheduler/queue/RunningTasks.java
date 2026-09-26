@@ -8,11 +8,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * What is running right now, so the {@link com.predisched.scheduler.TimeoutWatcher} can find tasks
- * that have outstayed their deadline (FR26).
+ * that have outstayed their deadline (FR26) and the worker failure detector can find the tasks a
+ * dead worker was running (prompt 10).
  *
  * <p>The watcher does not decide the task's fate: it cancels the execution on the worker and marks
  * the attempt timed out. The dispatcher's own call then returns and handles the outcome, so exactly
  * one place records the attempt however it ended.
+ *
+ * <p>An attempt is <em>settled</em> exactly once, by whoever gets there first: the dispatcher when
+ * its call returns, or the failure detector when the worker is declared dead. The loser leaves the
+ * task alone, so a late reply from a worker given up on cannot overwrite the retry.
  */
 public class RunningTasks {
 
@@ -23,7 +28,8 @@ public class RunningTasks {
             int attempt,
             long startedAtMs,
             long deadlineMs,
-            AtomicBoolean timedOut) {
+            AtomicBoolean timedOut,
+            AtomicBoolean settled) {
 
         public boolean isOverdue(long nowMs) {
             return deadlineMs > 0 && nowMs > deadlineMs && !timedOut.get();
@@ -34,14 +40,36 @@ public class RunningTasks {
 
     public Running start(
             String taskId, String workerId, int attempt, long startedAtMs, long deadlineMs) {
-        Running entry =
-                new Running(taskId, workerId, attempt, startedAtMs, deadlineMs, new AtomicBoolean());
+        Running entry = new Running(taskId, workerId, attempt, startedAtMs, deadlineMs,
+                new AtomicBoolean(), new AtomicBoolean());
         running.put(taskId, entry);
         return entry;
     }
 
-    public Optional<Running> finish(String taskId) {
-        return Optional.ofNullable(running.remove(taskId));
+    /**
+     * Settles an attempt and forgets it. False if it was already settled elsewhere, in which case
+     * the caller must not record an outcome for it.
+     */
+    public boolean finish(Running entry) {
+        boolean mine = entry.settled().compareAndSet(false, true);
+        running.remove(entry.taskId(), entry);
+        return mine;
+    }
+
+    /** Settles and removes every attempt on one worker; returns the ones settled here. */
+    public List<Running> settleAllOn(String workerId) {
+        List<Running> settled = new ArrayList<>();
+        for (Running entry : running.values()) {
+            if (entry.workerId().equals(workerId) && finish(entry)) {
+                settled.add(entry);
+            }
+        }
+        return settled;
+    }
+
+    /** Forgets everything, when a new primary rebuilds its state from the store. */
+    public void clear() {
+        running.clear();
     }
 
     public Optional<Running> get(String taskId) {

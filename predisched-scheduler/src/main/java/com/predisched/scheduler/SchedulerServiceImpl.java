@@ -104,6 +104,16 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
             reply(observer, request.getTaskId(), false, refusal);
             return;
         }
+        if (isRepeatOfAccepted(request)) {
+            // A client retrying after a failover (prompt 10): the first try was stored and
+            // replicated but its reply was lost. Same id, same task: answer as the first time.
+            TaskRecord existing = store.get(request.getTaskId());
+            log.info("Duplicate submit of {}: already accepted ({}), not stored again",
+                    request.getTaskId(), existing.status());
+            reply(observer, request.getTaskId(), true,
+                    "already accepted (" + existing.status() + ")");
+            return;
+        }
         List<String> errors = validator.validate(request, store);
         if (!errors.isEmpty()) {
             reply(observer, request.getTaskId(), false, String.join("; ", errors));
@@ -277,6 +287,12 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
 
     @Override
     public void retryDeadLetter(TaskStatusRequest request, StreamObserver<TaskResponse> observer) {
+        String refusal = notLeader();
+        if (refusal != null) {
+            // Only the primary writes: a backup's store follows the primary's log (prompt 10).
+            reply(observer, request.getTaskId(), false, refusal);
+            return;
+        }
         boolean requeued = retries.retryDeadLetter(request.getTaskId());
         reply(observer, request.getTaskId(), requeued, requeued
                 ? "re-queued from the dead-letter queue"
@@ -286,6 +302,11 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
     /** Cancels a QUEUED task, or a BLOCKED one waiting in a workflow; its descendants follow. */
     @Override
     public void cancelTask(TaskStatusRequest request, StreamObserver<TaskResponse> observer) {
+        String refusal = notLeader();
+        if (refusal != null) {
+            reply(observer, request.getTaskId(), false, refusal);
+            return;
+        }
         TaskRecord record = store.get(request.getTaskId());
         if (record == null) {
             reply(observer, request.getTaskId(), false, "unknown task: " + request.getTaskId());
@@ -306,6 +327,22 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
         dispatchQueue.remove(request.getTaskId());
         retries.notifyTerminal(cancelled);
         reply(observer, request.getTaskId(), true, "cancelled");
+    }
+
+    /**
+     * True when a task with this id is already stored and is the same task: same type, input,
+     * priority and client. A different task under a taken id is still refused by the validator.
+     */
+    private boolean isRepeatOfAccepted(TaskRequest request) {
+        if (request.getTaskId().isBlank() || !store.contains(request.getTaskId())) {
+            return false;
+        }
+        TaskRecord existing = store.get(request.getTaskId());
+        return existing != null
+                && existing.type() == request.getType()
+                && existing.input().equals(request.getInput())
+                && existing.priority() == request.getPriority()
+                && existing.clientId().equals(callerClientId());
     }
 
     /** Null when this node may take work, else why not (only the leader accepts, FR9). */

@@ -105,6 +105,16 @@ public class AgeingPriorityQueue implements TaskQueue {
     }
 
     @Override
+    public void clear() {
+        lock.lock();
+        try {
+            entries.clear();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
     public int size() {
         lock.lock();
         try {

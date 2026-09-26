@@ -13,11 +13,13 @@ param(
     [string]$Config = 'configs/cluster.yaml',
     [ValidateRange(1, 5)][int]$Schedulers = 5,
     [ValidateRange(0, 3)][int]$Workers = 3,
-    [ValidateSet('', 'strong', 'eventual')][string]$ReplicationMode = ''
+    [ValidateSet('', 'strong', 'eventual', 'primary-backup')][string]$ReplicationMode = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
 New-Item -ItemType Directory -Force logs\pids | Out-Null
+# The java this shell runs: a WMI-created process does not inherit this session's PATH.
+$Java = (Get-Command java -ErrorAction Stop).Source
 
 function Start-Node([string]$Name, [string[]]$JavaArgs) {
     $pidFile = "logs\pids\$Name.pid"
@@ -33,7 +35,7 @@ function Start-Node([string]$Name, [string[]]$JavaArgs) {
     $hidden = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }
     $log = Join-Path (Get-Location) "logs\$Name.out"
     $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-        CommandLine               = "cmd /c java $($JavaArgs -join ' ') > `"$log`" 2>&1"
+        CommandLine               = "cmd /c `"`"$Java`" $($JavaArgs -join ' ') > `"$log`" 2>&1`""
         CurrentDirectory          = (Get-Location).Path
         ProcessStartupInformation = $hidden
     }

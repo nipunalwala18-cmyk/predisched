@@ -1,10 +1,12 @@
 package com.predisched.worker;
 
+import com.predisched.common.net.Transport;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.proto.Ack;
 import com.predisched.proto.Heartbeat;
 import com.predisched.proto.RegisterRequest;
 import com.predisched.proto.RegistryServiceGrpc;
+import io.grpc.ManagedChannel;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +68,7 @@ public class RegistrationClient implements AutoCloseable {
     /** Blocking single attempt, used by tests and by the backoff loop. */
     boolean register() {
         LamportInterceptors.applyMdc();
+        reconnect();
         RegisterRequest request = RegisterRequest.newBuilder()
                 .setWorkerId(workerId)
                 .setHost(host)
@@ -103,6 +106,7 @@ public class RegistrationClient implements AutoCloseable {
 
     void sendHeartbeat() {
         LamportInterceptors.applyMdc();
+        reconnect();
         if (!registered.get() && !register()) {
             return;
         }
@@ -126,6 +130,13 @@ public class RegistrationClient implements AutoCloseable {
         } catch (Exception e) {
             log.debug("Heartbeat from {} failed: {}", workerId, e.getMessage());
             registered.set(false);
+        }
+    }
+
+    /** A scheduler that crashed and restarted is reachable at the next try (prompt 10). */
+    private void reconnect() {
+        if (registry.getChannel() instanceof ManagedChannel channel) {
+            Transport.reconnecting(channel);
         }
     }
 

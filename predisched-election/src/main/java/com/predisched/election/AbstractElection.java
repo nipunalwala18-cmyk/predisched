@@ -2,6 +2,8 @@ package com.predisched.election;
 
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
+import com.predisched.proto.Ack;
+import io.grpc.StatusRuntimeException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -12,6 +14,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntConsumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +28,7 @@ import org.slf4j.LoggerFactory;
 abstract class AbstractElection implements ElectionAlgorithm {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractElection.class);
+    private static final Pattern LEADER_HINT = Pattern.compile("leader=(\\d+)");
 
     protected final ClusterView cluster;
     protected final long timeoutMs;
@@ -52,10 +57,49 @@ abstract class AbstractElection implements ElectionAlgorithm {
         });
     }
 
+    /**
+     * Joins the cluster. A node that starts while a leader is already serving (a restart after a
+     * crash) adopts that leader and rejoins as a follower rather than calling an election that
+     * would unseat a working primary (Exp 8: a recovered node rejoins as a backup). Only with no
+     * live leader around does it elect.
+     */
     @Override
     public void start() {
-        if (leader().isEmpty()) {
-            startElection();
+        if (leader().isPresent()) {
+            return;
+        }
+        Optional<Integer> serving = servingLeader();
+        if (serving.isPresent()) {
+            log.info("Node {} found leader {} already serving: rejoins as a follower",
+                    cluster.selfId(), serving.get());
+            setLeader(serving.get());
+            return;
+        }
+        startElection();
+    }
+
+    /**
+     * The leader the other nodes report, if that leader itself answers and names itself. Each
+     * peer's Ping reply carries {@code leader=<id>} ({@link ElectionServiceImpl#describe}).
+     */
+    private Optional<Integer> servingLeader() {
+        for (int peer : cluster.others()) {
+            Optional<Integer> named = askLeader(peer);
+            if (named.isPresent() && named.get() != cluster.selfId()
+                    && (named.get() == peer || askLeader(named.get()).equals(named))) {
+                return named;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Integer> askLeader(int peer) {
+        try {
+            String reply = cluster.stub(peer, timeoutMs).ping(Ack.getDefaultInstance()).getMessage();
+            Matcher matcher = LEADER_HINT.matcher(reply);
+            return matcher.find() ? Optional.of(Integer.parseInt(matcher.group(1))) : Optional.empty();
+        } catch (StatusRuntimeException e) {
+            return Optional.empty();
         }
     }
 

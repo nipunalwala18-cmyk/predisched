@@ -121,7 +121,7 @@ public class SchedulerIntegrationTest {
     }
 
     @Test
-    public void duplicateIdIsRejected() {
+    public void aDifferentTaskUnderATakenIdIsRejected() {
         String id = "dup-" + UUID.randomUUID();
         TaskResponse first = client.submitTask(com.predisched.proto.TaskRequest.newBuilder()
                 .setTaskId(id)
@@ -133,11 +133,28 @@ public class SchedulerIntegrationTest {
         TaskResponse second = client.submitTask(com.predisched.proto.TaskRequest.newBuilder()
                 .setTaskId(id)
                 .setType(TaskType.CPU_TASK)
-                .setInput("n=50")
+                .setInput("n=51")
                 .setPriority(5)
                 .build());
         assertFalse(second.getAccepted());
         assertTrue(second.getMessage().contains("already exists"));
+    }
+
+    /** Prompt 10: a client retrying a submit whose reply was lost gets the first answer again. */
+    @Test
+    public void resubmittingTheSameTaskIsIdempotent() {
+        String id = "retry-" + UUID.randomUUID();
+        com.predisched.proto.TaskRequest request = com.predisched.proto.TaskRequest.newBuilder()
+                .setTaskId(id)
+                .setType(TaskType.CPU_TASK)
+                .setInput("n=50")
+                .setPriority(5)
+                .build();
+        assertTrue(client.submitTask(request).getAccepted());
+        TaskResponse again = client.submitTask(request);
+        assertTrue(again.getAccepted(), again.getMessage());
+        assertTrue(again.getMessage().startsWith("already accepted"), again.getMessage());
+        assertEquals(1, harness.store.list().stream().filter(t -> t.id().equals(id)).count());
     }
 
     @Test

@@ -141,7 +141,8 @@ public class RetryCoordinator implements AutoCloseable {
                     parked.id(), parked.type(), parked.input(), parked.priority(),
                     parked.traceId(), parked.timeoutMs(), parked.maxRetries())
                     .withClientId(parked.clientId())
-                    .withWorkflowId(parked.workflowId()));
+                    .withWorkflowId(parked.workflowId())
+                    .withDependsOn(parked.dependsOn()));
             queue.add(parked.id(), parked.priority(), Clocks.now());
             log.info("Task {} taken out of the dead-letter queue and re-queued", taskId);
             return true;

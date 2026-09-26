@@ -19,6 +19,9 @@ public interface TaskQueue {
 
     int size();
 
+    /** Empties the queue, when a new primary rebuilds it from the store (prompt 10). */
+    void clear();
+
     /** Queued ids in the order they would be taken, for logs and tests. */
     List<String> snapshot();
 }

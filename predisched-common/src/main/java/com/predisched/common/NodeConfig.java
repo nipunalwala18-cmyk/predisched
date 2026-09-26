@@ -194,6 +194,8 @@ public class NodeConfig {
         private int poolSize = 4;
         private int queueCapacity = 100;
         private long heartbeatIntervalMs = 1000;
+        /** Heartbeat intervals without one before the primary declares a worker DEAD (FR12). */
+        private int heartbeatMisses = 3;
         /** Temp dir for FILE_IO_TASK files; empty means the JVM temp dir. */
         private String fileIoDir = "";
 
@@ -219,6 +221,14 @@ public class NodeConfig {
 
         public void setHeartbeatIntervalMs(long heartbeatIntervalMs) {
             this.heartbeatIntervalMs = heartbeatIntervalMs;
+        }
+
+        public int getHeartbeatMisses() {
+            return heartbeatMisses;
+        }
+
+        public void setHeartbeatMisses(int heartbeatMisses) {
+            this.heartbeatMisses = heartbeatMisses;
         }
 
         public String getFileIoDir() {
@@ -609,6 +619,8 @@ public class NodeConfig {
         private int writeQuorum = 2;
         private int readQuorum = 2;
         private long writeTimeoutMs = 1000;
+        /** Primary-backup: how often a backup catches up from the primary and asks to join. */
+        private long catchUpIntervalMs = 500;
         // Untyped: SnakeYAML ignores generics and fills this with whatever number types it parses.
         private java.util.Map<Object, Object> delayMs = new java.util.HashMap<>();
 
@@ -620,7 +632,15 @@ public class NodeConfig {
             this.enabled = enabled;
         }
 
-        /** strong (quorum) or eventual. */
+        public long getCatchUpIntervalMs() {
+            return catchUpIntervalMs;
+        }
+
+        public void setCatchUpIntervalMs(long catchUpIntervalMs) {
+            this.catchUpIntervalMs = catchUpIntervalMs;
+        }
+
+        /** strong (quorum), eventual or primary-backup (prompt 10). */
         public String getMode() {
             return mode;
         }

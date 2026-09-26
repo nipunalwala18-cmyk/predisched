@@ -138,6 +138,8 @@ message TaskRecordProto {
   repeated TaskAttemptProto attempts = 15;
   string client_id = 16;
   string workflow_id = 17;
+  // Parents of a workflow task (F1), so a promoted primary can rebuild BLOCKED tasks (prompt 10).
+  repeated string depends_on = 18;
 }
 
 service SchedulerService {

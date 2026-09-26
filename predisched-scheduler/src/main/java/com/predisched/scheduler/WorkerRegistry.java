@@ -5,6 +5,7 @@ import com.predisched.proto.RegisterRequest;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
@@ -16,6 +17,8 @@ import java.util.stream.Collectors;
 public class WorkerRegistry {
 
     private final ConcurrentHashMap<String, WorkerInfo> workers = new ConcurrentHashMap<>();
+    /** Workers whose last call failed as unreachable, until their next heartbeat (prompt 10). */
+    private final Set<String> suspected = ConcurrentHashMap.newKeySet();
     private final long staleAfterMs;
     private final LongSupplier clock;
 
@@ -31,6 +34,7 @@ public class WorkerRegistry {
 
     public WorkerInfo register(RegisterRequest request) {
         long now = clock.getAsLong();
+        suspected.remove(request.getWorkerId());
         return workers.compute(request.getWorkerId(), (id, existing) ->
                 WorkerInfo.fromRegistration(request, now));
     }
@@ -40,6 +44,9 @@ public class WorkerRegistry {
         long now = clock.getAsLong();
         WorkerInfo updated = workers.computeIfPresent(heartbeat.getWorkerId(),
                 (id, existing) -> existing.withHeartbeat(heartbeat, now));
+        if (updated != null) {
+            suspected.remove(heartbeat.getWorkerId());
+        }
         return Optional.ofNullable(updated);
     }
 
@@ -54,11 +61,15 @@ public class WorkerRegistry {
                 .collect(Collectors.toList());
     }
 
-    /** Workers that have sent a heartbeat recently enough to be dispatched to, ordered by id. */
+    /**
+     * Workers that have sent a heartbeat recently enough to be dispatched to, and are not
+     * suspected, ordered by id.
+     */
     public List<WorkerInfo> healthy() {
         long now = clock.getAsLong();
         return workers.values().stream()
                 .filter(worker -> worker.isHealthy(now, staleAfterMs))
+                .filter(worker -> !suspected.contains(worker.id()))
                 .sorted(Comparator.comparing(WorkerInfo::id))
                 .collect(Collectors.toList());
     }
@@ -69,5 +80,20 @@ public class WorkerRegistry {
 
     public void remove(String workerId) {
         workers.remove(workerId);
+        suspected.remove(workerId);
+    }
+
+    /**
+     * A call to this worker failed as unreachable: leave it out of dispatch until it heartbeats
+     * again. Declaring it dead stays with the failure detector, after its missed heartbeats.
+     */
+    public void suspect(String workerId) {
+        if (workers.containsKey(workerId)) {
+            suspected.add(workerId);
+        }
+    }
+
+    public boolean isSuspected(String workerId) {
+        return suspected.contains(workerId);
     }
 }

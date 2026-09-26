@@ -62,12 +62,17 @@ public class ReplicaSet {
 
     /** A stub for one call to a peer; an isolated peer fails the call with UNAVAILABLE. */
     public ReplicationServiceGrpc.ReplicationServiceBlockingStub stub(int peer) {
+        return stub(peer, callTimeoutMs);
+    }
+
+    /** As {@link #stub(int)} with its own deadline, for a catch-up stream that may be long. */
+    public ReplicationServiceGrpc.ReplicationServiceBlockingStub stub(int peer, long deadlineMs) {
         if (isolated.contains(peer)) {
             throw Status.UNAVAILABLE
                     .withDescription("peer " + peer + " is isolated from node " + selfId())
                     .asRuntimeException();
         }
         return ReplicationServiceGrpc.newBlockingStub(cluster.channel(peer))
-                .withDeadlineAfter(callTimeoutMs, TimeUnit.MILLISECONDS);
+                .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS);
     }
 }

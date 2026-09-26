@@ -5,7 +5,10 @@ import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.obs.TraceContext;
 import com.predisched.proto.TaskType;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -25,6 +28,11 @@ import org.slf4j.LoggerFactory;
  * <p>Backpressure is explicit. When the queue is full the task is <em>rejected</em> rather than
  * queued forever or run on the caller's thread, so the scheduler learns immediately that this
  * worker is saturated and can place the task elsewhere.
+ *
+ * <p>Idempotent dispatch (prompt 10): a call may carry a dispatch id naming one attempt. The engine
+ * runs each dispatch id at most once. A second call with the same id while it runs waits for that
+ * run; after it finished, it gets the recorded outcome. That is what lets a newly promoted primary
+ * re-attach to work the old primary started, or collect its result, without running it twice.
  */
 public class ExecutionEngine implements AutoCloseable {
 
@@ -49,6 +57,28 @@ public class ExecutionEngine implements AutoCloseable {
 
     /** Tasks queued or running, so a timeout or a cancellation can stop them (FR26). */
     private final ConcurrentHashMap<String, InFlight> inFlight = new ConcurrentHashMap<>();
+
+    /** Where a dispatch stands, for {@code QueryExecution}. */
+    public enum DispatchState { UNKNOWN, RUNNING, FINISHED }
+
+    /** How many finished dispatches are remembered; older ones answer UNKNOWN. */
+    static final int FINISHED_REMEMBERED = 10_000;
+
+    /** Dispatches queued or running, by dispatch id. */
+    private final ConcurrentHashMap<String, CompletableFuture<Outcome>> dispatches =
+            new ConcurrentHashMap<>();
+
+    /**
+     * Outcomes of finished dispatches, oldest evicted first. Guarded by its own monitor
+     * ({@code Collections.synchronizedMap}).
+     */
+    private final Map<String, Outcome> finished = Collections.synchronizedMap(
+            new LinkedHashMap<>(256, 0.75f, false) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Outcome> eldest) {
+                    return size() > FINISHED_REMEMBERED;
+                }
+            });
 
     public ExecutionEngine(
             ExecutorRegistry registry,
@@ -78,6 +108,61 @@ public class ExecutionEngine implements AutoCloseable {
      */
     public CompletableFuture<Outcome> submit(String taskId, TaskType type, String input) {
         return submit(taskId, type, input, TraceContext.current());
+    }
+
+    /**
+     * Runs one attempt at most once (see the class comment). An empty dispatch id runs the task
+     * unconditionally, as before prompt 10.
+     */
+    public CompletableFuture<Outcome> submit(
+            String taskId, String dispatchId, TaskType type, String input, String traceId) {
+        if (dispatchId == null || dispatchId.isEmpty()) {
+            return submit(taskId, type, input, traceId);
+        }
+        Outcome done = finished.get(dispatchId);
+        if (done != null) {
+            log.info("Dispatch {} already ran here: answering with its result, not running it again",
+                    dispatchId);
+            return CompletableFuture.completedFuture(done);
+        }
+        CompletableFuture<Outcome> mine = new CompletableFuture<>();
+        CompletableFuture<Outcome> running = dispatches.putIfAbsent(dispatchId, mine);
+        if (running != null) {
+            log.info("Dispatch {} is already running here: the new call waits for that run",
+                    dispatchId);
+            return running;
+        }
+        // It may have finished between the first look and the claim.
+        done = finished.get(dispatchId);
+        if (done != null) {
+            dispatches.remove(dispatchId, mine);
+            return CompletableFuture.completedFuture(done);
+        }
+        submit(taskId, type, input, traceId).whenComplete((outcome, error) -> {
+            // A rejection never ran, so the same attempt may be sent again.
+            if (outcome != null && !outcome.rejected()) {
+                finished.put(dispatchId, outcome);
+            }
+            dispatches.remove(dispatchId, mine);
+            if (error != null) {
+                mine.completeExceptionally(error);
+            } else {
+                mine.complete(outcome);
+            }
+        });
+        return mine;
+    }
+
+    /** Where a dispatch stands. */
+    public DispatchState query(String dispatchId) {
+        if (finished.containsKey(dispatchId)) {
+            return DispatchState.FINISHED;
+        }
+        return dispatches.containsKey(dispatchId) ? DispatchState.RUNNING : DispatchState.UNKNOWN;
+    }
+
+    public Optional<Outcome> finishedOutcome(String dispatchId) {
+        return Optional.ofNullable(finished.get(dispatchId));
     }
 
     /** Runs the task with a trace id in scope, so the worker's log lines join the client's. */

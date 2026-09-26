@@ -23,8 +23,21 @@ public final class InProcessElectionCluster implements AutoCloseable {
 
     private final Map<Integer, Node> live = new TreeMap<>();
     private final Map<Integer, ElectionAlgorithm> all = new TreeMap<>();
+    private final String prefix = "election-" + UUID.randomUUID() + "-";
+    private final String algorithm;
+    private final List<Integer> ids;
+    private final long timeoutMs;
+    private final long pingIntervalMs;
+    private final int pingMisses;
 
-    private InProcessElectionCluster() {}
+    private InProcessElectionCluster(String algorithm, List<Integer> ids, long timeoutMs,
+            long pingIntervalMs, int pingMisses) {
+        this.algorithm = algorithm;
+        this.ids = List.copyOf(ids);
+        this.timeoutMs = timeoutMs;
+        this.pingIntervalMs = pingIntervalMs;
+        this.pingMisses = pingMisses;
+    }
 
     /**
      * Starts every node, then lets them elect. {@code pingIntervalMs <= 0} disables the leader
@@ -33,22 +46,11 @@ public final class InProcessElectionCluster implements AutoCloseable {
     public static InProcessElectionCluster start(
             String algorithm, List<Integer> ids, long timeoutMs, long pingIntervalMs,
             int pingMisses) {
-        InProcessElectionCluster cluster = new InProcessElectionCluster();
-        String prefix = "election-" + UUID.randomUUID() + "-";
+        InProcessElectionCluster cluster = new InProcessElectionCluster(
+                algorithm, ids, timeoutMs, pingIntervalMs, pingMisses);
         try {
             for (int id : ids) {
-                ClusterView view = new ClusterView(id, ids,
-                        peer -> InProcessChannelBuilder.forName(prefix + peer).build());
-                ElectionAlgorithm node = ElectionAlgorithm.create(algorithm, view, timeoutMs);
-                Server server = InProcessServerBuilder.forName(prefix + id)
-                        .addService(new ElectionServiceImpl(node))
-                        .build()
-                        .start();
-                LeaderMonitor monitor = pingIntervalMs > 0
-                        ? new LeaderMonitor(node, pingIntervalMs, pingMisses)
-                        : null;
-                cluster.live.put(id, new Node(node, monitor, server));
-                cluster.all.put(id, node);
+                cluster.newNode(id);
             }
         } catch (IOException e) {
             cluster.close();
@@ -61,6 +63,37 @@ public final class InProcessElectionCluster implements AutoCloseable {
             }
         }
         return cluster;
+    }
+
+    private synchronized Node newNode(int id) throws IOException {
+        ClusterView view = new ClusterView(id, ids,
+                peer -> InProcessChannelBuilder.forName(prefix + peer).build());
+        ElectionAlgorithm node = ElectionAlgorithm.create(algorithm, view, timeoutMs);
+        Server server = InProcessServerBuilder.forName(prefix + id)
+                .addService(new ElectionServiceImpl(node))
+                .build()
+                .start();
+        LeaderMonitor monitor = pingIntervalMs > 0
+                ? new LeaderMonitor(node, pingIntervalMs, pingMisses)
+                : null;
+        Node started = new Node(node, monitor, server);
+        live.put(id, started);
+        all.put(id, node);
+        return started;
+    }
+
+    /** Brings a killed node back as a restarted process: same id, fresh state. */
+    public void restart(int id) {
+        Node node;
+        try {
+            node = newNode(id);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        node.algorithm().start();
+        if (node.monitor() != null) {
+            node.monitor().start();
+        }
     }
 
     /** Crashes a node: its server stops answering and its algorithm stops acting. */

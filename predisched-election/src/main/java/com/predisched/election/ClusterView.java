@@ -95,9 +95,13 @@ public class ClusterView implements AutoCloseable {
                 .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS);
     }
 
-    /** The shared channel to a peer, for other services on the same node (replication). */
+    /**
+     * The shared channel to a peer, for other services on the same node (replication). A channel
+     * that failed to connect is told to retry now rather than after its backoff, so a restarted
+     * peer is reachable at once (see {@link Transport#reconnecting}).
+     */
     public ManagedChannel channel(int peerId) {
-        return channels.computeIfAbsent(peerId, connect::apply);
+        return Transport.reconnecting(channels.computeIfAbsent(peerId, connect::apply));
     }
 
     @Override

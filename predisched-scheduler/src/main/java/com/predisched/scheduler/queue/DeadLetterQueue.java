@@ -38,6 +38,11 @@ public class DeadLetterQueue {
         return limit <= 0 || limit >= all.size() ? all : all.subList(0, limit);
     }
 
+    /** Forgets every entry, when a new primary rebuilds the queue from the store (prompt 10). */
+    public void clear() {
+        entries.clear();
+    }
+
     public int size() {
         return entries.size();
     }

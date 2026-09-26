@@ -51,6 +51,10 @@ illegal move throws instead of silently corrupting a record.
   and PostgreSQL (prompt 11) plug in behind the same interface.
 - **Records are immutable.** `TaskRecord` state changes return a new record, kept in a
   `ConcurrentHashMap` (rule 5).
+- **A repeated submit is idempotent** (prompt 10). Submitting the same task again under its id
+  (same type, input, priority and client) is answered `accepted=true`, `already accepted
+  (<status>)`, and stores nothing. That is what makes a client's retry after a failover safe. A
+  different task under a taken id is still refused with `task_id already exists` (FR2).
 
 ## Task types in this prompt
 

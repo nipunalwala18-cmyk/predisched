@@ -6,6 +6,7 @@ import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
 import io.grpc.ClientInterceptor;
+import io.grpc.ConnectivityState;
 import io.grpc.ForwardingClientCall;
 import io.grpc.Grpc;
 import io.grpc.ManagedChannel;
@@ -111,5 +112,20 @@ public final class Transport {
                 }
             };
         }
+    }
+
+    /**
+     * Skips the reconnect backoff of a channel whose last connection attempt failed, so the next
+     * call tries to connect now (prompt 10). gRPC waits out an exponential backoff, up to two
+     * minutes, before reconnecting, and fails calls at once meanwhile; between nodes that crash
+     * and restart that makes a peer that is back look dead (a Bully election then skips it, and
+     * a worker never re-registers). A peer still down refuses the new attempt just as fast.
+     * Call it just before a call on a channel to another node.
+     */
+    public static ManagedChannel reconnecting(ManagedChannel channel) {
+        if (channel.getState(false) == ConnectivityState.TRANSIENT_FAILURE) {
+            channel.resetConnectBackoff();
+        }
+        return channel;
     }
 }

@@ -115,6 +115,30 @@ public final class InProcessReplicaCluster implements AutoCloseable {
         }
     }
 
+    /**
+     * Brings a killed replica back as a restarted process would be: same id and address, empty
+     * state. Nothing is replicated to it until it catches up.
+     */
+    public ReplicatedTaskStore restart(int id) {
+        Node old = nodes.get(id);
+        old.server().shutdownNow();
+        old.store().mode().close();
+        old.view().close();
+        ReplicatedTaskStore store = newStore(id, ids);
+        try {
+            Server server = InProcessServerBuilder.forName(prefix + id)
+                    .addService(new ReplicationServiceImpl(store))
+                    .build()
+                    .start();
+            Node node = new Node(store, server, store.replicas().cluster());
+            nodes.put(id, node);
+            live.put(id, node);
+            return store;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     public List<Integer> liveIds() {
         return List.copyOf(live.keySet());
     }

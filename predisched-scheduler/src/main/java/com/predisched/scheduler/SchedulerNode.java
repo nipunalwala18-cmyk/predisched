@@ -7,8 +7,12 @@ import com.predisched.election.ClusterView;
 import com.predisched.election.ElectionAlgorithm;
 import com.predisched.election.ElectionServiceImpl;
 import com.predisched.election.LeaderMonitor;
+import com.predisched.fault.InDoubtResolver;
+import com.predisched.fault.PrimaryBackupCoordinator;
+import com.predisched.fault.WorkerFailureDetector;
 import com.predisched.replication.ConsistencyMode;
 import com.predisched.replication.LocalReplica;
+import com.predisched.replication.PrimaryBackupReplication;
 import com.predisched.replication.ReplicaSet;
 import com.predisched.replication.ReplicatedTaskStore;
 import com.predisched.replication.ReplicationServiceImpl;
@@ -18,10 +22,11 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This scheduler's place in the cluster (FR9): its election id, the configured algorithm and the
- * leader monitor. Only the leader accepts submits and dispatches; the rest are followers.
+ * leader monitor. Only the primary accepts submits and dispatches; the rest are backups.
  *
- * <p>TODO(prompt 10): a new leader starts with an empty queue. Primary-backup replication hands
- * the task state over.
+ * <p>With failover enabled (prompt 10) the elected leader is not the primary until the
+ * {@link PrimaryBackupCoordinator} has promoted it: log caught up, queue rebuilt from the replicated
+ * store, dispatcher started. Until then it refuses submits like a follower, naming itself leader.
  */
 public class SchedulerNode implements Leadership, AutoCloseable {
 
@@ -31,6 +36,7 @@ public class SchedulerNode implements Leadership, AutoCloseable {
     private final ElectionAlgorithm election;
     private final LeaderMonitor monitor;
     private final ReplicatedTaskStore replicated;
+    private volatile PrimaryBackupCoordinator coordinator;
 
     private SchedulerNode(int selfId, ElectionAlgorithm election, LeaderMonitor monitor,
             ReplicatedTaskStore replicated) {
@@ -50,13 +56,21 @@ public class SchedulerNode implements Leadership, AutoCloseable {
         if (electionConfig.getPeers().isEmpty()) {
             return null;
         }
-        ClusterView cluster = ClusterView.fromConfig(selfId, electionConfig.getPeers(), clock);
+        return inCluster(selfId, nodeName, config,
+                ClusterView.fromConfig(selfId, electionConfig.getPeers(), clock), clock);
+    }
+
+    /** A cluster member reaching its peers through {@code cluster}; tests pass in-process ones. */
+    public static SchedulerNode inCluster(
+            int selfId, String nodeName, NodeConfig config, ClusterView cluster,
+            LamportClock clock) {
+        NodeConfig.ElectionConfig electionConfig = config.getElection();
         ElectionAlgorithm election = ElectionAlgorithm.create(
                 electionConfig.getAlgorithm(), cluster, electionConfig.getTimeoutMs());
         LeaderMonitor monitor = new LeaderMonitor(election,
                 electionConfig.getPingIntervalMs(), electionConfig.getPingMisses());
         election.addLeaderListener(leader -> log.info(leader == selfId
-                ? "This scheduler (node " + selfId + ") is now the leader: accepting tasks"
+                ? "This scheduler (node " + selfId + ") is now the leader"
                 : "Node " + selfId + " follows leader " + leader + ": submits are redirected"));
         ReplicatedTaskStore replicated = null;
         NodeConfig.ReplicationConfig replication = config.getReplication();
@@ -69,11 +83,35 @@ public class SchedulerNode implements Leadership, AutoCloseable {
             replicated = new ReplicatedTaskStore(local, replicas, ConsistencyMode.create(
                     replication.getMode(), local, replicas, replication.getWriteQuorum(),
                     replication.getReadQuorum(), replication.getWriteTimeoutMs()));
-            log.info("Task state replicated to {} peers, {} consistency (W={} R={} of N={})",
-                    cluster.others().size(), replication.getMode(), replication.getWriteQuorum(),
-                    replication.getReadQuorum(), cluster.size());
+            if (replicated.mode() instanceof PrimaryBackupReplication) {
+                log.info("Task state replicated to {} peers, primary-backup: every write reaches"
+                        + " every live backup before it is acknowledged", cluster.others().size());
+            } else {
+                log.info("Task state replicated to {} peers, {} consistency (W={} R={} of N={})",
+                        cluster.others().size(), replication.getMode(),
+                        replication.getWriteQuorum(), replication.getReadQuorum(), cluster.size());
+            }
         }
         return new SchedulerNode(selfId, election, monitor, replicated);
+    }
+
+    /**
+     * Hands promotion, demotion and worker failure handling to a {@link PrimaryBackupCoordinator}
+     * (prompt 10). Call before {@link #start()}, so the first election result is seen.
+     */
+    public void enableFailover(SchedulerFailover failover, WorkerFailureDetector detector,
+            TaskStore store, long catchUpIntervalMs) {
+        PrimaryBackupReplication sequenced = replicated != null
+                && replicated.mode() instanceof PrimaryBackupReplication primaryBackup
+                ? primaryBackup
+                : null;
+        coordinator = new PrimaryBackupCoordinator(selfId, election, store, sequenced, failover,
+                new InDoubtResolver(failover), detector, catchUpIntervalMs);
+        coordinator.start();
+    }
+
+    public PrimaryBackupCoordinator coordinator() {
+        return coordinator;
     }
 
     /** The replicated store when replication is on, else the given local one. */
@@ -118,9 +156,12 @@ public class SchedulerNode implements Leadership, AutoCloseable {
         return election;
     }
 
+    /** With failover on, true only once the promotion to primary has finished. */
     @Override
     public boolean isLeader() {
-        return election.leader().map(leader -> leader == selfId).orElse(false);
+        boolean elected = election.leader().map(leader -> leader == selfId).orElse(false);
+        PrimaryBackupCoordinator current = coordinator;
+        return elected && (current == null || current.isPrimary());
     }
 
     @Override
@@ -130,6 +171,9 @@ public class SchedulerNode implements Leadership, AutoCloseable {
 
     @Override
     public void close() {
+        if (coordinator != null) {
+            coordinator.close();
+        }
         monitor.close();
         if (replicated != null) {
             replicated.mode().close();

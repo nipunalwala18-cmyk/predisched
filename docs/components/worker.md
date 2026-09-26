@@ -34,6 +34,11 @@ the logs.
   `exec_time_ms` is time the executor actually ran. The ML dataset in prompt 15 needs both.
 - **The gRPC call never blocks a pool thread.** `WorkerServiceImpl` submits to the engine and
   completes the response from the future.
+- **Each dispatch runs at most once** (prompt 10). `ExecuteRequest.dispatch_id`
+  (`<taskId>#<attempt>`) names one attempt. A repeated call with the same id waits for the run in
+  progress, or gets the recorded outcome of the last 10 000 finished ones. `QueryExecution` reports
+  a dispatch as RUNNING, FINISHED (with its result) or UNKNOWN. A newly promoted primary uses both
+  to settle work the old one started; see [fault-tolerance.md](fault-tolerance.md).
 
 ## Metrics
 
@@ -159,5 +164,6 @@ as it really is, which would have made pool size 1 look artificially bad.
   starts a real cluster.
 - Worker choice ignores load beyond a capacity limit added in prompt 04 (prompt 08 adds real
   strategies).
-- A dead worker's running tasks are not yet reassigned; failure detection is prompt 10.
+- A dead worker's running tasks are not yet reassigned; failure detection is prompt 10 (done:
+  three missed heartbeats re-queue them, see [fault-tolerance.md](fault-tolerance.md)).
 - Heartbeats carry `lamport_time = 0` until prompt 03.

@@ -27,6 +27,16 @@
             <artifactId>predisched-replication</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.predisched</groupId>
+            <artifactId>predisched-fault</artifactId>
+        </dependency>
+        <dependency>
+            <!-- Tests only: the failover test drives the cluster through the real failover client. -->
+            <groupId>com.predisched</groupId>
+            <artifactId>predisched-client</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-inprocess</artifactId>
             <scope>test</scope>

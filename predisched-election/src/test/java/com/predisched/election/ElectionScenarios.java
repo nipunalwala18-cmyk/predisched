@@ -58,6 +58,20 @@ abstract class ElectionScenarios {
     }
 
     @Test
+    void aRestartedNodeRejoinsAsAFollowerInsteadOfUnseatingTheLeader() throws Exception {
+        start(PING_MS);
+        assertEquals(Optional.of(5), cluster.awaitAgreedLeader(AGREE_MS));
+        cluster.kill(5);
+        assertEquals(Optional.of(4), cluster.awaitAgreedLeader(AGREE_MS));
+
+        cluster.restart(5);
+        assertEquals(Optional.of(4), cluster.awaitAgreedLeader(AGREE_MS));
+        Thread.sleep(5 * PING_MS);
+        assertEquals(Optional.of(4), cluster.node(5).leader(), "node 5 follows the serving leader");
+        assertExactlyOneLeader();
+    }
+
+    @Test
     void killingTheTwoHighestElectsThree() throws Exception {
         start(PING_MS);
         assertEquals(Optional.of(5), cluster.awaitAgreedLeader(AGREE_MS));

@@ -76,6 +76,16 @@ public class ClientLimits implements ServerInterceptor {
         }
     }
 
+    /**
+     * Replaces every client's count of unfinished tasks, when a new primary rebuilds its state
+     * from the store (prompt 10): the old primary's counters died with it.
+     */
+    public void restore(Map<String, Integer> unfinishedByClient) {
+        unfinished.clear();
+        unfinishedByClient.forEach((client, count) ->
+                unfinished.put(client, new AtomicInteger(count)));
+    }
+
     public int unfinished(String clientId) {
         AtomicInteger used = unfinished.get(clientId);
         return used == null ? 0 : used.get();

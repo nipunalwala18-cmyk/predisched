@@ -1,6 +1,8 @@
 package com.predisched.replication;
 
 import com.predisched.proto.Ack;
+import com.predisched.proto.JoinRequest;
+import com.predisched.proto.JoinResponse;
 import com.predisched.proto.ReadRequest;
 import com.predisched.proto.ReadResponse;
 import com.predisched.proto.ReplicateRequest;
@@ -8,6 +10,7 @@ import com.predisched.proto.ReplicationServiceGrpc;
 import com.predisched.proto.SyncRequest;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.CompletableFuture;
 
 /** gRPC face of one replica: take a change, answer a read, stream the log for catch-up. */
 public class ReplicationServiceImpl extends ReplicationServiceGrpc.ReplicationServiceImplBase {
@@ -18,8 +21,25 @@ public class ReplicationServiceImpl extends ReplicationServiceGrpc.ReplicationSe
         this.store = store;
     }
 
+    /**
+     * Primary-backup answers only once the change is applied in sequence, which may wait for
+     * earlier ones still in flight; the other modes apply by last-writer-wins and ack at once.
+     */
     @Override
     public void replicate(ReplicateRequest request, StreamObserver<Ack> observer) {
+        CompletableFuture<Ack> sequenced = store.mode().receive(request);
+        if (sequenced != null) {
+            sequenced.whenComplete((ack, error) -> {
+                if (error != null) {
+                    observer.onError(Status.UNAVAILABLE.withDescription(error.getMessage())
+                            .asRuntimeException());
+                } else {
+                    observer.onNext(ack);
+                    observer.onCompleted();
+                }
+            });
+            return;
+        }
         boolean applied = store.local().apply(VersionedRecord.from(request));
         observer.onNext(Ack.newBuilder()
                 .setOk(true)
@@ -42,6 +62,12 @@ public class ReplicationServiceImpl extends ReplicationServiceGrpc.ReplicationSe
         } catch (ReplicationException e) {
             observer.onError(Status.UNAVAILABLE.withDescription(e.getMessage()).asRuntimeException());
         }
+    }
+
+    @Override
+    public void join(JoinRequest request, StreamObserver<JoinResponse> observer) {
+        observer.onNext(store.mode().join(request));
+        observer.onCompleted();
     }
 
     @Override

@@ -21,6 +21,7 @@ public class BenchmarkMain {
             case "election-compare" -> ElectionCompare.main(rest);
             case "consistency-compare" -> ConsistencyCompare.main(rest);
             case "strategy-compare" -> StrategyCompare.main(rest);
+            case "failover-test" -> FailoverTest.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -50,6 +51,13 @@ public class BenchmarkMain {
                               pools 2/4/8 (needs scripts/mock-http.py for HTTP_TASK)
                               [--trace workloads/mixed-steady-7.jsonl] [--speed 1.0]
                               [--seed 42] [--out results/exp6-strategies.csv]
+                  failover-test
+                              Against a running cluster: submit tasks, kill the primary process
+                              after one of them (scripts/kill-primary), check every task
+                              completed exactly once, time the failover
+                              [--tasks 100] [--kill-at 50] [--config configs/cluster.yaml]
+                              [--type SLEEP_TASK] [--input ms=2000] [--submit-interval-ms 20]
+                              [--out results/exp8-failover.csv]
                 """);
     }
 }

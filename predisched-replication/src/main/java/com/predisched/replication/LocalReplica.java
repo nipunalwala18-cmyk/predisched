@@ -49,6 +49,23 @@ public class LocalReplica {
         return applied[0];
     }
 
+    /**
+     * Primary-backup (prompt 10): applies a change at log position {@code seqNo}, unconditionally.
+     * The primary's sequence order is the write order, so there is nothing to compare. The caller
+     * serialises these calls, which keeps the log and the records in step.
+     */
+    public void applySequenced(long seqNo, VersionedRecord record) {
+        clock.update(record.lamportTime());
+        log.appendAt(seqNo, record);
+        records.put(record.taskId(), record);
+    }
+
+    /** Forgets every record and the whole log, before a resync from scratch. */
+    public void reset() {
+        records.clear();
+        log.clear();
+    }
+
     public VersionedRecord get(String taskId) {
         return records.get(taskId);
     }

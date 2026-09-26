@@ -14,6 +14,7 @@ import com.predisched.common.time.ClockServiceImpl;
 import com.predisched.common.time.Clocks;
 import com.predisched.common.time.LamportClock;
 import com.predisched.common.time.PhysicalClock;
+import com.predisched.fault.WorkerFailureDetector;
 import com.predisched.proto.ClockServiceGrpc;
 import com.predisched.scheduler.auth.ClientLimits;
 import com.predisched.scheduler.auth.RateLimiter;
@@ -120,7 +121,23 @@ public class SchedulerMain {
                 config.getScheduler().getDispatchThreads(),
                 config.getScheduler().getNoWorkerRetryMs(),
                 strategy);
-        dispatcher.start();
+        SchedulerServiceImpl schedulerService = new SchedulerServiceImpl(
+                store, validator, queue, retries, leadership, limits);
+        // Prompt 10: what a promotion rebuilds, and what a dead worker's tasks go through.
+        SchedulerFailover failover = new SchedulerFailover(
+                store, queue, running, dispatcher, workers, clients, retries,
+                schedulerService.workflows(), limits, electionConfig.getTimeoutMs());
+        WorkerFailureDetector workerDeaths = new WorkerFailureDetector(
+                failover, config.getWorker().getHeartbeatIntervalMs(),
+                config.getWorker().getHeartbeatMisses(), System::currentTimeMillis);
+        if (node == null) {
+            // Alone, this scheduler is the primary from the start.
+            dispatcher.start();
+            workerDeaths.start();
+        } else {
+            node.enableFailover(failover, workerDeaths, store,
+                    config.getReplication().getCatchUpIntervalMs());
+        }
         TimeoutWatcher timeouts = new TimeoutWatcher(
                 running, workers, clients, queueConfig.getTimeoutCheckMs());
         timeouts.start();
@@ -129,8 +146,7 @@ public class SchedulerMain {
         reporter.start();
 
         ServerBuilder<?> builder = Transport.get().server(port)
-                .addService(new SchedulerServiceImpl(
-                        store, validator, queue, retries, leadership, limits))
+                .addService(schedulerService)
                 .addService(new RegistryServiceImpl(workers))
                 .addService(new ClockServiceImpl(id, physicalClock));
         if (node != null) {
@@ -168,6 +184,7 @@ public class SchedulerMain {
                 node.close();
             }
             timeouts.close();
+            workerDeaths.close();
             retries.close();
             berkeley.close();
             reporter.close();

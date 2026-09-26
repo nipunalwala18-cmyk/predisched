@@ -13,6 +13,7 @@ import com.predisched.scheduler.queue.RetryCoordinator;
 import com.predisched.scheduler.queue.TaskQueue;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -182,7 +183,8 @@ public class WorkflowManager {
                             task.getPriority(), traceId, task.getTimeoutMs(),
                             task.getMaxRetries() == 0 ? -1 : task.getMaxRetries())
                     .withClientId(clientId)
-                    .withWorkflowId(workflowId);
+                    .withWorkflowId(workflowId)
+                    .withDependsOn(dependsOn.get(id));
             if (dependsOn.get(id).isEmpty()) {
                 roots.add(id);
                 store.put(record);
@@ -198,6 +200,67 @@ public class WorkflowManager {
             release(id);
         }
         return order;
+    }
+
+    /**
+     * Rebuilds every workflow's edges from the store, when a new primary takes over (prompt 10).
+     * Each workflow task keeps its parents on its record, so nothing else is needed. A BLOCKED
+     * task whose parents all completed before the old primary could release it is released now;
+     * one with a failed or cancelled parent is cancelled, as {@link #onTerminal} would have done.
+     */
+    public void restore(Collection<TaskRecord> records) {
+        children.clear();
+        unfinishedParents.clear();
+        workflows.clear();
+        Map<String, TaskRecord> byId = new LinkedHashMap<>();
+        Map<String, Map<String, List<String>>> byWorkflow = new LinkedHashMap<>();
+        for (TaskRecord record : records) {
+            if (record.workflowId().isEmpty()) {
+                continue;
+            }
+            byId.put(record.id(), record);
+            byWorkflow.computeIfAbsent(record.workflowId(), key -> new LinkedHashMap<>())
+                    .put(record.id(), record.dependsOn());
+        }
+        byWorkflow.forEach((workflowId, dependsOn) -> {
+            try {
+                workflows.put(workflowId, topologicalOrder(dependsOn));
+            } catch (IllegalArgumentException e) {
+                log.warn("Workflow {} could not be restored: {}", workflowId, e.getMessage());
+            }
+        });
+        for (TaskRecord record : byId.values()) {
+            int unfinished = 0;
+            for (String parent : record.dependsOn()) {
+                children.computeIfAbsent(parent, key -> new ArrayList<>()).add(record.id());
+                TaskRecord parentRecord = byId.get(parent);
+                if (parentRecord == null || parentRecord.status() != TaskStatus.COMPLETED) {
+                    unfinished++;
+                }
+            }
+            unfinishedParents.put(record.id(), new AtomicInteger(unfinished));
+        }
+        for (TaskRecord record : byId.values()) {
+            if (record.status() != TaskStatus.BLOCKED) {
+                continue;
+            }
+            TaskRecord failedParent = record.dependsOn().stream()
+                    .map(byId::get)
+                    .filter(parent -> parent != null && (parent.status() == TaskStatus.FAILED
+                            || parent.status() == TaskStatus.CANCELLED))
+                    .findFirst()
+                    .orElse(null);
+            if (failedParent != null) {
+                cancel(record.id(), UPSTREAM_FAILED + ": " + failedParent.id() + " "
+                        + failedParent.status());
+            } else if (unfinishedParents.get(record.id()).get() == 0) {
+                release(record.id());
+            }
+        }
+        if (!byWorkflow.isEmpty()) {
+            log.info("Restored {} workflows ({} tasks) from the store", workflows.size(),
+                    byId.size());
+        }
     }
 
     /** Every task of a workflow in topological order, or empty if unknown. */

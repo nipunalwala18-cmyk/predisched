@@ -140,5 +140,6 @@ replicas; `SyncFrom` brings a fresh replica to the leader's sequence number; a `
 a lagging replica sees its own write. `TaskCodecTest`: every field survives the round trip.
 
 Not done yet: an admin command to isolate a peer at runtime (the switch exists in `ReplicaSet`;
-TODO(prompt 22) exposes it through the admin API), and automatic catch-up of a replica that was
-down (TODO(prompt 10) runs `SyncFrom` when a backup rejoins).
+TODO(prompt 22) exposes it through the admin API). Automatic catch-up of a replica that was down
+came with prompt 10's third mode, `primary-backup`: a backup that was down or fell behind catches up
+with `SyncFrom` before it rejoins the primary's live set. See [fault-tolerance.md](fault-tolerance.md).

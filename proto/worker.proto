@@ -10,6 +10,9 @@ option java_package = "com.predisched.proto";
 
 message ExecuteRequest {
   TaskRequest task = 1;
+  // <task_id>#<attempt>: names one attempt. A worker runs each dispatch id at most once; a
+  // repeated ExecuteTask with the same id waits for, or returns, that run (prompt 10).
+  string dispatch_id = 2;
 }
 
 message ExecuteResult {
@@ -49,6 +52,25 @@ service WorkerService {
   // Stops a running task: used for timeouts now (FR26) and for cancellation and
   // speculative execution later.
   rpc CancelExecution (CancelRequest) returns (Ack);
+  // What this worker knows about one dispatch: how a promoted primary resolves a task the old
+  // primary left RUNNING (prompt 10).
+  rpc QueryExecution (QueryExecutionRequest) returns (ExecutionStatus);
+}
+
+message QueryExecutionRequest {
+  string task_id = 1;
+  string dispatch_id = 2;
+}
+
+enum ExecutionState {
+  EXECUTION_UNKNOWN = 0;    // never received, or forgotten (the worker restarted)
+  EXECUTION_RUNNING = 1;    // queued or running now
+  EXECUTION_FINISHED = 2;   // done; result holds the outcome
+}
+
+message ExecutionStatus {
+  ExecutionState state = 1;
+  ExecuteResult result = 2;
 }
 
 message CancelRequest {

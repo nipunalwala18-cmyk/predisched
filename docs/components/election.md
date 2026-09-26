@@ -43,6 +43,12 @@ election. No OK within `timeoutMs` means declare yourself leader and broadcast `
 followed by no `Coordinator` within `timeoutMs` means the higher node died mid-election, so try again.
 A `Coordinator` from a *lower* id than yourself starts an election: you are alive and outrank it.
 
+**Restarting** (prompt 10). A node that starts while a leader is already serving adopts it and
+rejoins as a follower, instead of calling an election that, under Bully, the restarted highest id
+would win. It asks its peers who leads (`Ping` replies carry `leader=<id>`) and adopts that leader
+if the leader answers too. A working primary is not unseated just because an old one came back.
+See [fault-tolerance.md](fault-tolerance.md).
+
 ## Ring
 
 ```

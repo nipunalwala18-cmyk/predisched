@@ -19,6 +19,9 @@ worker:
   poolSize: 4
   queueCapacity: 100
   heartbeatIntervalMs: 1000
+  # The primary declares a worker DEAD after this many intervals without a heartbeat and
+  # re-queues its running tasks with reason WORKER_LOST (FR12, Exp 8).
+  heartbeatMisses: 3
 queue:
   # Effective priority = priority + ageingPerSecond * secondsWaiting, capped at maxPriority (F2).
   ageingPerSecond: 0.1
@@ -60,6 +63,16 @@ election:
     - { id: 3, host: "localhost", port: 51053 }
     - { id: 4, host: "localhost", port: 51054 }
     - { id: 5, host: "localhost", port: 51055 }
+replication:
+  # Primary-backup (FR12, Exp 8): the elected leader is the primary. Every change is logged with a
+  # sequence number and reaches every live backup before the client is acknowledged; a backup that
+  # misses an ack is dropped, catches up with SyncFrom and rejoins. A new leader pulls any gap,
+  # rebuilds the queue from the store and settles in-doubt dispatches before it dispatches.
+  # --replication-mode strong|eventual switches to the Exp 5 models.
+  enabled: true
+  mode: "primary-backup"
+  writeTimeoutMs: 1000
+  catchUpIntervalMs: 500
 scheduling:
   # How the scheduler picks a worker (FR11, Exp 6): round_robin, random, least_loaded or
   # resource_aware. Override per run with --strategy. Seed and weights feed random and

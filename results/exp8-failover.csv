@@ -1,0 +1,3 @@
+run_id,input,tasks,kill_at,killed_primary,new_primary,accepted,completed,lost,duplicated,ran_twice_on_workers,election_ms,promotion_ms,failover_ms,first_new_dispatch_ms,wall_s
+fo-0927-030945,ms=2000,100,50,5,4,100,100,0,0,0,1003,218,1137,1826,55.2
+fo-0927-031119,ms=6000,40,20,4,5,40,40,0,0,0,1413,249,1635,5018,63.8

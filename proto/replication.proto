@@ -40,8 +40,25 @@ message SyncRequest {
   int64 from_seq = 1;
 }
 
+// Primary-backup (prompt 10): a backup that has caught up asks the primary to add it to the
+// live set, the backups every write must reach before the client is acknowledged.
+message JoinRequest {
+  int32 node_id = 1;
+  int64 last_seq = 2;       // the backup's last applied sequence number
+  int64 last_lamport = 3;   // with last_origin, names the change at last_seq, so a log that
+  string last_origin = 4;   // forked at the same length is not mistaken for one in step
+}
+
+message JoinResponse {
+  bool joined = 1;          // true: in the live set now (or already)
+  int64 primary_last_seq = 2;
+  string message = 3;
+  bool ready = 4;           // false: the node is not the primary (or not done promoting); try later
+}
+
 service ReplicationService {
   rpc Replicate (ReplicateRequest) returns (Ack);
   rpc Read      (ReadRequest)      returns (ReadResponse);
   rpc SyncFrom  (SyncRequest)      returns (stream ReplicateRequest);  // catch-up for new or recovered replicas
+  rpc Join      (JoinRequest)      returns (JoinResponse);             // primary-backup: rejoin the live set
 }
