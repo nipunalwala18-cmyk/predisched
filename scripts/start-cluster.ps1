@@ -6,12 +6,14 @@
     scripts\start-cluster.ps1                      # Bully (the default in configs\cluster.yaml)
     scripts\start-cluster.ps1 -Algorithm ring
     scripts\start-cluster.ps1 -Schedulers 3 -Workers 1
+    scripts\start-cluster.ps1 -Config configs/replication.yaml -Schedulers 3 -Workers 1 -ReplicationMode strong
 #>
 param(
     [ValidateSet('bully', 'ring')][string]$Algorithm = 'bully',
     [string]$Config = 'configs/cluster.yaml',
     [ValidateRange(1, 5)][int]$Schedulers = 5,
-    [ValidateRange(0, 3)][int]$Workers = 3
+    [ValidateRange(0, 3)][int]$Workers = 3,
+    [ValidateSet('', 'strong', 'eventual')][string]$ReplicationMode = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -41,8 +43,10 @@ function Start-Node([string]$Name, [string[]]$JavaArgs) {
 }
 
 for ($n = 1; $n -le $Schedulers; $n++) {
-    Start-Node "scheduler-$n" @('-jar', 'predisched-scheduler/target/predisched-scheduler.jar',
+    $schedulerArgs = @('-jar', 'predisched-scheduler/target/predisched-scheduler.jar',
         '--config', $Config, '--id', "scheduler-$n", '--election-algorithm', $Algorithm)
+    if ($ReplicationMode) { $schedulerArgs += @('--replication-mode', $ReplicationMode) }
+    Start-Node "scheduler-$n" $schedulerArgs
 }
 for ($n = 1; $n -le $Workers; $n++) {
     Start-Node "worker-$n" @('-jar', 'predisched-worker/target/predisched-worker.jar',

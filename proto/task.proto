@@ -87,6 +87,35 @@ message DeadLetterList {
   repeated DeadLetterEntry entries = 1;
 }
 
+// A whole task record, for replicating scheduler state between nodes (prompt 07).
+message TaskAttemptProto {
+  int32 attempt = 1;
+  string worker_id = 2;
+  string outcome = 3;       // TaskAttempt.Outcome name
+  string reason = 4;
+  int64 started_at_ms = 5;
+  int64 ended_at_ms = 6;
+  int64 exec_time_ms = 7;
+}
+
+message TaskRecordProto {
+  string id = 1;
+  TaskType type = 2;
+  string input = 3;
+  int32 priority = 4;
+  TaskStatus status = 5;
+  string worker_id = 6;
+  string result = 7;
+  int64 submitted_at = 8;
+  int64 started_at = 9;
+  int64 completed_at = 10;
+  int64 exec_time_ms = 11;
+  string trace_id = 12;
+  int64 timeout_ms = 13;
+  int32 max_retries = 14;
+  repeated TaskAttemptProto attempts = 15;
+}
+
 service SchedulerService {
   rpc SubmitTask (TaskRequest) returns (TaskResponse);
   rpc GetTaskStatus (TaskStatusRequest) returns (TaskStatusResponse);

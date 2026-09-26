@@ -1,11 +1,17 @@
 package com.predisched.scheduler;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.common.TaskStore;
 import com.predisched.common.time.LamportClock;
 import com.predisched.election.ClusterView;
 import com.predisched.election.ElectionAlgorithm;
 import com.predisched.election.ElectionServiceImpl;
 import com.predisched.election.LeaderMonitor;
+import com.predisched.replication.ConsistencyMode;
+import com.predisched.replication.LocalReplica;
+import com.predisched.replication.ReplicaSet;
+import com.predisched.replication.ReplicatedTaskStore;
+import com.predisched.replication.ReplicationServiceImpl;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,28 +30,60 @@ public class SchedulerNode implements Leadership, AutoCloseable {
     private final int selfId;
     private final ElectionAlgorithm election;
     private final LeaderMonitor monitor;
+    private final ReplicatedTaskStore replicated;
 
-    private SchedulerNode(int selfId, ElectionAlgorithm election, LeaderMonitor monitor) {
+    private SchedulerNode(int selfId, ElectionAlgorithm election, LeaderMonitor monitor,
+            ReplicatedTaskStore replicated) {
         this.selfId = selfId;
         this.election = election;
         this.monitor = monitor;
+        this.replicated = replicated;
     }
 
-    /** A cluster member when election peers are configured; otherwise null (run alone). */
+    /**
+     * A cluster member when election peers are configured; otherwise null (run alone). With
+     * {@code replication.enabled} its task state is replicated to the same peers (Exp 5).
+     */
     public static SchedulerNode fromConfig(
-            int selfId, NodeConfig.ElectionConfig config, LamportClock clock) {
-        if (config.getPeers().isEmpty()) {
+            int selfId, String nodeName, NodeConfig config, LamportClock clock) {
+        NodeConfig.ElectionConfig electionConfig = config.getElection();
+        if (electionConfig.getPeers().isEmpty()) {
             return null;
         }
-        ClusterView cluster = ClusterView.fromConfig(selfId, config.getPeers(), clock);
-        ElectionAlgorithm election =
-                ElectionAlgorithm.create(config.getAlgorithm(), cluster, config.getTimeoutMs());
-        LeaderMonitor monitor = new LeaderMonitor(
-                election, config.getPingIntervalMs(), config.getPingMisses());
+        ClusterView cluster = ClusterView.fromConfig(selfId, electionConfig.getPeers(), clock);
+        ElectionAlgorithm election = ElectionAlgorithm.create(
+                electionConfig.getAlgorithm(), cluster, electionConfig.getTimeoutMs());
+        LeaderMonitor monitor = new LeaderMonitor(election,
+                electionConfig.getPingIntervalMs(), electionConfig.getPingMisses());
         election.addLeaderListener(leader -> log.info(leader == selfId
                 ? "This scheduler (node " + selfId + ") is now the leader: accepting tasks"
                 : "Node " + selfId + " follows leader " + leader + ": submits are redirected"));
-        return new SchedulerNode(selfId, election, monitor);
+        ReplicatedTaskStore replicated = null;
+        NodeConfig.ReplicationConfig replication = config.getReplication();
+        if (replication.isEnabled()) {
+            ReplicaSet replicas = new ReplicaSet(cluster, replication.getWriteTimeoutMs());
+            for (int peer : cluster.others()) {
+                replicas.setDelay(peer, replication.delayTo(peer));
+            }
+            LocalReplica local = new LocalReplica(nodeName, clock);
+            replicated = new ReplicatedTaskStore(local, replicas, ConsistencyMode.create(
+                    replication.getMode(), local, replicas, replication.getWriteQuorum(),
+                    replication.getReadQuorum(), replication.getWriteTimeoutMs()));
+            log.info("Task state replicated to {} peers, {} consistency (W={} R={} of N={})",
+                    cluster.others().size(), replication.getMode(), replication.getWriteQuorum(),
+                    replication.getReadQuorum(), cluster.size());
+        }
+        return new SchedulerNode(selfId, election, monitor, replicated);
+    }
+
+    /** The replicated store when replication is on, else the given local one. */
+    public TaskStore taskStore(TaskStore unreplicated) {
+        return replicated != null ? replicated : unreplicated;
+    }
+
+    /** The replication service to serve, or null when replication is off. */
+    public ReplicationServiceImpl replicationService() {
+        return replicated == null ? null : new ReplicationServiceImpl(replicated);
     }
 
     /**
@@ -93,6 +131,9 @@ public class SchedulerNode implements Leadership, AutoCloseable {
     @Override
     public void close() {
         monitor.close();
+        if (replicated != null) {
+            replicated.mode().close();
+        }
         election.close();
     }
 }

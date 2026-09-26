@@ -5,12 +5,14 @@
 #   scripts/start-cluster.sh            # Bully (the default in configs/cluster.yaml)
 #   scripts/start-cluster.sh ring
 #   SCHEDULERS=3 WORKERS=1 scripts/start-cluster.sh
+#   CONFIG=configs/replication.yaml SCHEDULERS=3 WORKERS=1 REPLICATION_MODE=strong scripts/start-cluster.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ALGORITHM="${1:-bully}"
 CONFIG="${CONFIG:-configs/cluster.yaml}"
 SCHEDULERS="${SCHEDULERS:-5}"
 WORKERS="${WORKERS:-3}"
+REPLICATION_MODE="${REPLICATION_MODE:-}"
 mkdir -p logs/pids
 
 start_node() {
@@ -26,7 +28,8 @@ start_node() {
 
 for n in $(seq 1 "$SCHEDULERS"); do
   start_node "scheduler-$n" -jar predisched-scheduler/target/predisched-scheduler.jar \
-    --config "$CONFIG" --id "scheduler-$n" --election-algorithm "$ALGORITHM"
+    --config "$CONFIG" --id "scheduler-$n" --election-algorithm "$ALGORITHM" \
+    ${REPLICATION_MODE:+--replication-mode "$REPLICATION_MODE"}
 done
 for n in $(seq 1 "$WORKERS"); do
   start_node "worker-$n" -jar predisched-worker/target/predisched-worker.jar \

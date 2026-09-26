@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package predisched;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+// One change to a replicated task record (spec 10.5). payload is a TaskRecordProto.
+// A replica keeps the copy with the higher lamport_time; equal times are broken by
+// origin_node, so concurrent writes converge to the same value everywhere.
+message ReplicateRequest {
+  int64 seq_no = 1;         // position in the sender's replication log
+  string op = 2;            // ENQUEUE, UPDATE_STATUS, CANCEL
+  string task_id = 3;
+  bytes payload = 4;
+  int64 version = 5;        // per-task write count
+  int64 lamport_time = 6;
+  string origin_node = 7;   // node that made the write: last-writer-wins tie-break
+}
+
+// local_only: return this replica's own copy. Unset, the node answers with the read its
+// consistency mode defines (a quorum read in strong mode), which is what clients use.
+message ReadRequest {
+  string task_id = 1;
+  bool local_only = 2;
+}
+
+message ReadResponse {
+  string task_id = 1;
+  bytes payload = 2;
+  int64 version = 3;
+  int64 lamport_time = 4;
+  string origin_node = 5;
+  bool found = 6;
+}
+
+message SyncRequest {
+  int64 from_seq = 1;
+}
+
+service ReplicationService {
+  rpc Replicate (ReplicateRequest) returns (Ack);
+  rpc Read      (ReadRequest)      returns (ReadResponse);
+  rpc SyncFrom  (SyncRequest)      returns (stream ReplicateRequest);  // catch-up for new or recovered replicas
+}

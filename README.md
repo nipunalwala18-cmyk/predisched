@@ -23,7 +23,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 04 | Queue discipline | [x] |
 | 05 | Task catalogue and workload generator | [x] |
 | 06 | Leader election | [x] |
-| 07 | Replication and consistency | [ ] |
+| 07 | Replication and consistency | [x] |
 | 08 | Load-balancing strategies | [ ] |
 | 09 | Workflows and client auth | [ ] |
 | 10 | Primary-backup fault tolerance | [ ] |

@@ -67,7 +67,16 @@ public class SchedulerMain {
         LamportInterceptors.applyMdc(id, 0L, null);
         EventLog events = EventLog.install(id);
 
-        TaskStore store = new InMemoryTaskStore();
+        config.getReplication().setMode(
+                opts.getOrDefault("--replication-mode", config.getReplication().getMode()));
+        SchedulerNode node = clustered
+                ? SchedulerNode.fromConfig(electionId, id, config, lamportClock)
+                : null;
+        Leadership leadership = node == null ? Leadership.ALONE : node;
+        // The rest of the scheduler sees only the TaskStore interface, replicated or not.
+        TaskStore store = node == null
+                ? new InMemoryTaskStore()
+                : node.taskStore(new InMemoryTaskStore());
         TaskValidator validator = new TaskValidator(config.getValidation().getMaxInputChars());
 
         NodeConfig.QueueConfig queueConfig = config.getQueue();
@@ -102,16 +111,15 @@ public class SchedulerMain {
                 workers, config.getScheduler().getClusterReportIntervalMs());
         reporter.start();
 
-        SchedulerNode node = clustered
-                ? SchedulerNode.fromConfig(electionId, electionConfig, lamportClock)
-                : null;
-        Leadership leadership = node == null ? Leadership.ALONE : node;
         ServerBuilder<?> builder = ServerBuilder.forPort(port)
                 .addService(new SchedulerServiceImpl(store, validator, queue, retries, leadership))
                 .addService(new RegistryServiceImpl(workers))
                 .addService(new ClockServiceImpl(id, physicalClock));
         if (node != null) {
             builder.addService(node.service());
+            if (node.replicationService() != null) {
+                builder.addService(node.replicationService());
+            }
         }
         Server server = builder
                 .intercept(LamportInterceptors.server(id, lamportClock))

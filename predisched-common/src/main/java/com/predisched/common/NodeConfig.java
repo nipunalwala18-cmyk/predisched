@@ -15,6 +15,15 @@ public class NodeConfig {
     private ClockConfig clock = new ClockConfig();
     private QueueConfig queue = new QueueConfig();
     private ElectionConfig election = new ElectionConfig();
+    private ReplicationConfig replication = new ReplicationConfig();
+
+    public ReplicationConfig getReplication() {
+        return replication;
+    }
+
+    public void setReplication(ReplicationConfig replication) {
+        this.replication = replication;
+    }
 
     public ElectionConfig getElection() {
         return election;
@@ -408,6 +417,82 @@ public class NodeConfig {
 
         public void setPeers(java.util.List<PeerConfig> peers) {
             this.peers = peers;
+        }
+    }
+
+    /**
+     * Replicated scheduler task state (spec section 11, Exp 5). Replicas are the election peers.
+     * Off by default: each scheduler then keeps its tasks in memory only.
+     */
+    public static class ReplicationConfig {
+        private boolean enabled = false;
+        private String mode = "strong";
+        private int writeQuorum = 2;
+        private int readQuorum = 2;
+        private long writeTimeoutMs = 1000;
+        // Untyped: SnakeYAML ignores generics and fills this with whatever number types it parses.
+        private java.util.Map<Object, Object> delayMs = new java.util.HashMap<>();
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /** strong (quorum) or eventual. */
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        /** W: replicas, this one included, that must hold a write before it succeeds. */
+        public int getWriteQuorum() {
+            return writeQuorum;
+        }
+
+        public void setWriteQuorum(int writeQuorum) {
+            this.writeQuorum = writeQuorum;
+        }
+
+        /** R: replicas, this one included, a strong read consults. */
+        public int getReadQuorum() {
+            return readQuorum;
+        }
+
+        public void setReadQuorum(int readQuorum) {
+            this.readQuorum = readQuorum;
+        }
+
+        public long getWriteTimeoutMs() {
+            return writeTimeoutMs;
+        }
+
+        public void setWriteTimeoutMs(long writeTimeoutMs) {
+            this.writeTimeoutMs = writeTimeoutMs;
+        }
+
+        /** Injected delay, per peer id, on replication traffic this node sends to it (demos). */
+        public java.util.Map<Object, Object> getDelayMs() {
+            return delayMs;
+        }
+
+        public void setDelayMs(java.util.Map<Object, Object> delayMs) {
+            this.delayMs = delayMs;
+        }
+
+        /** The configured delay towards one peer, 0 if none. */
+        public long delayTo(int peerId) {
+            for (java.util.Map.Entry<Object, Object> entry : delayMs.entrySet()) {
+                if (String.valueOf(entry.getKey()).equals(String.valueOf(peerId))) {
+                    return Long.parseLong(String.valueOf(entry.getValue()));
+                }
+            }
+            return 0;
         }
     }
 

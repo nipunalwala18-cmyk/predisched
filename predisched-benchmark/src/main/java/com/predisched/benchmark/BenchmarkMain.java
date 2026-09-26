@@ -19,6 +19,7 @@ public class BenchmarkMain {
         switch (command) {
             case "pool-size" -> PoolSizeBenchmark.main(rest);
             case "election-compare" -> ElectionCompare.main(rest);
+            case "consistency-compare" -> ConsistencyCompare.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -39,6 +40,10 @@ public class BenchmarkMain {
                               Bully vs Ring on 5 in-process nodes: kill the leader, count
                               messages, time the failover [--runs 5]
                               [--out results/exp4-election.csv]
+                  consistency-compare
+                              Strong (W=2 R=2 of 3) vs eventual replication: write latency,
+                              failed writes, stale reads, convergence, 0 and 1 replica down
+                              [--writes 500] [--out results/exp5-consistency.csv]
                 """);
     }
 }

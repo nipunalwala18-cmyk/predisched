@@ -13,3 +13,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [queue.md](queue.md) | Priority ageing, retries, dead-letter queue, timeouts | 04 |
 | [tasks-and-workloads.md](tasks-and-workloads.md) | Task catalogue, executors, workload generator and replay | 05 |
 | [election.md](election.md) | Bully and Ring leader election across 5 schedulers | 06 |
+| [replication.md](replication.md) | Replicated task state: strong quorum and eventual consistency | 07 |

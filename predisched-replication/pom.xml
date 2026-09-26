@@ -19,6 +19,14 @@
             <artifactId>predisched-common</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.predisched</groupId>
+            <artifactId>predisched-election</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-inprocess</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
         </dependency>

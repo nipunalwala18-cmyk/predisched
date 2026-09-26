@@ -115,6 +115,16 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                     .build());
             observer.onCompleted();
             return;
+        } catch (RuntimeException e) {
+            // A replicated store that cannot reach its write quorum (prompt 07): not accepted.
+            observer.onNext(TaskResponse.newBuilder()
+                    .setTaskId(request.getTaskId())
+                    .setAccepted(false)
+                    .setMessage("could not store the task: " + e.getMessage())
+                    .setLamportTime(0L)
+                    .build());
+            observer.onCompleted();
+            return;
         }
         EventLog.get().event(EventLog.SUBMIT, record.id(), Map.of(
                 "task_type", record.type().name(),

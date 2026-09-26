@@ -5,6 +5,10 @@ import com.predisched.proto.Ack;
 import com.predisched.proto.DeadLetterEntry;
 import com.predisched.proto.DeadLetterList;
 import com.predisched.proto.ElectionServiceGrpc;
+import com.predisched.proto.ReadRequest;
+import com.predisched.proto.ReadResponse;
+import com.predisched.proto.ReplicationServiceGrpc;
+import com.predisched.proto.TaskRecordProto;
 import com.predisched.proto.TaskResponse;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusResponse;
@@ -35,7 +39,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Watch.class,
             PredischedCli.Dlq.class,
             PredischedCli.Workload.class,
-            PredischedCli.Cluster.class
+            PredischedCli.Cluster.class,
+            PredischedCli.Replica.class
         })
 public class PredischedCli implements Runnable {
 
@@ -501,6 +506,78 @@ public class PredischedCli implements Runnable {
                     }
                 }
                 return List.of();
+            }
+        }
+    }
+
+    @Command(name = "replica", description = "Inspect replicated task state (Exp 5).",
+            subcommands = {Replica.Read.class})
+    static class Replica implements Runnable {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Override
+        public void run() {
+            new CommandLine(this).usage(System.out);
+        }
+
+        @Command(name = "read",
+                description = "Read a task from one specific replica, for the stale-read demo.")
+        static class Read implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Replica parent;
+
+            @Option(names = "--node", required = true, description = "Scheduler node id to ask")
+            int node;
+
+            @Option(names = "--local",
+                    description = "That replica's own copy, not its consistency mode's read")
+            boolean localOnly;
+
+            @Parameters(index = "0", description = "Task id")
+            String taskId;
+
+            @Override
+            public Integer call() throws Exception {
+                NodeConfig.PeerConfig peer = Cluster.Leader.peers(parent.parent.config).stream()
+                        .filter(candidate -> candidate.getId() == node)
+                        .findFirst()
+                        .orElse(null);
+                if (peer == null) {
+                    System.out.println("no scheduler " + node + " in the config");
+                    return 1;
+                }
+                ManagedChannel channel = ManagedChannelBuilder
+                        .forAddress(peer.getHost(), peer.getPort())
+                        .usePlaintext()
+                        .build();
+                try {
+                    ReadResponse reply = ReplicationServiceGrpc.newBlockingStub(channel)
+                            .withDeadlineAfter(5, TimeUnit.SECONDS)
+                            .read(ReadRequest.newBuilder()
+                                    .setTaskId(taskId)
+                                    .setLocalOnly(localOnly)
+                                    .build());
+                    String how = localOnly ? "own copy" : "read";
+                    if (!reply.getFound()) {
+                        System.out.printf(Locale.ROOT, "node %d %s: %s not found%n",
+                                node, how, taskId);
+                        return 0;
+                    }
+                    TaskRecordProto task = TaskRecordProto.parseFrom(reply.getPayload());
+                    System.out.printf(Locale.ROOT,
+                            "node %d %s: %s status=%s worker=%s version=%d lamport=%d origin=%s%n",
+                            node, how, taskId, task.getStatus(),
+                            task.getWorkerId().isEmpty() ? "-" : task.getWorkerId(),
+                            reply.getVersion(), reply.getLamportTime(), reply.getOriginNode());
+                    return 0;
+                } catch (StatusRuntimeException e) {
+                    System.out.printf(Locale.ROOT, "node %d: %s (%s)%n", node,
+                            e.getStatus().getCode(), e.getStatus().getDescription());
+                    return 1;
+                } finally {
+                    channel.shutdownNow();
+                }
             }
         }
     }

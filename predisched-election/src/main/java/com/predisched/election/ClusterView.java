@@ -93,9 +93,13 @@ public class ClusterView implements AutoCloseable {
 
     /** A blocking stub to a peer with a per-call deadline. */
     public ElectionServiceGrpc.ElectionServiceBlockingStub stub(int peerId, long deadlineMs) {
-        ManagedChannel channel = channels.computeIfAbsent(peerId, connect::apply);
-        return ElectionServiceGrpc.newBlockingStub(channel)
+        return ElectionServiceGrpc.newBlockingStub(channel(peerId))
                 .withDeadlineAfter(deadlineMs, TimeUnit.MILLISECONDS);
+    }
+
+    /** The shared channel to a peer, for other services on the same node (replication). */
+    public ManagedChannel channel(int peerId) {
+        return channels.computeIfAbsent(peerId, connect::apply);
     }
 
     @Override

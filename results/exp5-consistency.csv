@@ -1,0 +1,5 @@
+mode,replicas_down,writes,failed_writes,write_p50_ms,write_p95_ms,stale_reads,convergence_ms
+strong,0,500,0,6.31,7.40,0,3
+strong,1,500,0,57.08,58.47,0,0
+eventual,0,500,0,0.01,0.02,500,94
+eventual,1,500,0,0.00,0.01,500,112

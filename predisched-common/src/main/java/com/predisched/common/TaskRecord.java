@@ -89,6 +89,35 @@ public final class TaskRecord {
         return new TaskRecord(builder);
     }
 
+    /**
+     * Rebuilds a record exactly as another node held it, every field included. Only for codecs
+     * that move records between nodes (replication, persistence); it skips the state machine,
+     * because the record already went through it where it was written.
+     */
+    public static TaskRecord restore(
+            String id, TaskType type, String input, int priority, TaskStatus status,
+            String workerId, String result, long submittedAt, long startedAt, long completedAt,
+            long execTimeMs, String traceId, long timeoutMs, int maxRetries,
+            List<TaskAttempt> attempts) {
+        Builder builder = new Builder();
+        builder.id = id;
+        builder.type = type;
+        builder.input = input;
+        builder.priority = priority;
+        builder.status = status;
+        builder.workerId = workerId;
+        builder.result = result;
+        builder.submittedAt = submittedAt;
+        builder.startedAt = startedAt;
+        builder.completedAt = completedAt;
+        builder.execTimeMs = execTimeMs;
+        builder.traceId = traceId;
+        builder.timeoutMs = timeoutMs;
+        builder.maxRetries = maxRetries;
+        builder.attempts = new ArrayList<>(attempts);
+        return new TaskRecord(builder);
+    }
+
     public String id() {
         return id;
     }
