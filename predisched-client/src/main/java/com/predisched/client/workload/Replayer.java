@@ -15,13 +15,19 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Replays a saved trace against a scheduler with the original timing, then writes one CSV row per
  * task (submit, start, end, worker, status) and prints a per-type summary.
  *
- * <p>{@code speed} scales the clock: 2.0 replays twice as fast. {@code start_ms} is the first
- * poll that saw the task leave QUEUED; a task that finished between polls gets
+ * <p>{@code speed} scales the clock: 2.0 replays twice as fast. A poller thread runs from the
+ * first submit, so each task is timed while the rest of the trace is still being submitted:
+ * {@code start_ms} is the first poll that saw the task leave QUEUED and {@code end_ms} the first
+ * terminal poll, both accurate to one {@code pollMs}. A task that finished between two polls gets
  * {@code start_ms == end_ms}.
  */
 public final class Replayer {
@@ -111,24 +117,60 @@ public final class Replayer {
         List<TaskResult> results = new ArrayList<>(trace.size());
         long start = System.currentTimeMillis();
         long deadline = start + overallTimeoutMs;
-        List<Pending> pending = new ArrayList<>(trace.size());
-        for (TraceEntry entry : trace) {
-            long dueAt = start + (long) (entry.offsetMs() / speed);
-            sleepUntil(dueAt);
-            String traceId = TraceContext.newTraceId();
-            TaskResponse response = gateway.submit(entry.taskId(), entry.type(), entry.input(),
-                    entry.priority(), traceId, entry.timeoutMs(), -1);
-            long submittedAt = System.currentTimeMillis() - start;
-            if (!response.getAccepted()) {
-                results.add(new TaskResult(entry.taskId(), entry.type(), entry.priority(),
-                        entry.offsetMs(), submittedAt, submittedAt, submittedAt,
-                        TaskStatus.FAILED, "", 0));
-            } else {
-                pending.add(new Pending(entry, submittedAt));
+        // Rule 5: accepted tasks reach the poller only through this queue. Every Pending is then
+        // confined to the poller thread, and join() publishes its fields back to this one.
+        BlockingQueue<Pending> accepted = new LinkedBlockingQueue<>();
+        AtomicBoolean submitDone = new AtomicBoolean();
+        AtomicReference<RuntimeException> pollFailure = new AtomicReference<>();
+        List<Pending> watched = new ArrayList<>(trace.size());
+        Thread poller = new Thread(() -> {
+            try {
+                pollUntilDone(accepted, submitDone, watched, gateway, start, pollMs, deadline);
+            } catch (RuntimeException e) {
+                pollFailure.set(e);
             }
+        }, "replay-poller");
+        poller.setDaemon(true);
+        poller.start();
+        try {
+            for (TraceEntry entry : trace) {
+                if (pollFailure.get() != null) {
+                    break;
+                }
+                sleepUntil(start + (long) (entry.offsetMs() / speed));
+                String traceId = TraceContext.newTraceId();
+                TaskResponse response = gateway.submit(entry.taskId(), entry.type(),
+                        entry.input(), entry.priority(), traceId, entry.timeoutMs(), -1);
+                long submittedAt = System.currentTimeMillis() - start;
+                if (!response.getAccepted()) {
+                    results.add(new TaskResult(entry.taskId(), entry.type(), entry.priority(),
+                            entry.offsetMs(), submittedAt, submittedAt, submittedAt,
+                            TaskStatus.FAILED, "", 0));
+                } else {
+                    accepted.add(new Pending(entry, submittedAt));
+                }
+            }
+        } catch (RuntimeException e) {
+            poller.interrupt();
+            throw e;
+        } finally {
+            submitDone.set(true);
         }
-        for (Pending task : pending) {
-            results.add(awaitTerminal(task, start, gateway, pollMs, deadline));
+        try {
+            poller.join();
+        } catch (InterruptedException e) {
+            poller.interrupt();
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted while waiting for replayed tasks", e);
+        }
+        if (pollFailure.get() != null) {
+            throw pollFailure.get();
+        }
+        // Tasks accepted after the poller hit the deadline were never polled; report them too.
+        accepted.drainTo(watched);
+        long now = System.currentTimeMillis() - start;
+        for (Pending task : watched) {
+            results.add(task.toResult(now));
         }
         results.sort((a, b) -> a.taskId().compareTo(b.taskId()));
         writeCsv(csvOut, results);
@@ -139,43 +181,76 @@ public final class Replayer {
         return summary;
     }
 
-    private record Pending(TraceEntry entry, long submittedAt) {}
+    /** An accepted task. Its mutable fields are written by the poller thread only. */
+    private static final class Pending {
+        final TraceEntry entry;
+        final long submittedAt;
+        long startMs = -1;
+        long endMs = -1;
+        TaskStatus status = TaskStatus.QUEUED;
+        String worker = "";
+        long execMs;
 
-    private static TaskResult awaitTerminal(
-            Pending task, long start, SchedulerGateway gateway, long pollMs, long deadline) {
-        long firstActive = -1;
+        Pending(TraceEntry entry, long submittedAt) {
+            this.entry = entry;
+            this.submittedAt = submittedAt;
+        }
+
+        /** A task the poller never saw finish is reported FAILED at {@code now}. */
+        TaskResult toResult(long now) {
+            boolean finished = endMs >= 0;
+            long end = finished ? endMs : now;
+            return new TaskResult(entry.taskId(), entry.type(), entry.priority(),
+                    entry.offsetMs(), submittedAt, startMs >= 0 ? startMs : end, end,
+                    finished ? status : TaskStatus.FAILED, worker, execMs);
+        }
+    }
+
+    /**
+     * Polls every accepted, unfinished task each {@code pollMs} until the submit loop is done and
+     * every task is terminal, the deadline passes, or the thread is interrupted.
+     */
+    private static void pollUntilDone(
+            BlockingQueue<Pending> accepted,
+            AtomicBoolean submitDone,
+            List<Pending> watched,
+            SchedulerGateway gateway,
+            long start,
+            long pollMs,
+            long deadline) {
         while (true) {
-            TaskStatusResponse response = gateway.status(task.entry().taskId());
-            TaskStatus status = response.getStatus();
-            long now = System.currentTimeMillis() - start;
-            if (firstActive == -1 && status != TaskStatus.QUEUED) {
-                firstActive = now;
+            // Read the flag before draining: once it is true, every task is already in the queue.
+            boolean lastSweep = submitDone.get();
+            accepted.drainTo(watched);
+            boolean unfinished = false;
+            for (Pending task : watched) {
+                if (task.endMs >= 0) {
+                    continue;
+                }
+                TaskStatusResponse response = gateway.status(task.entry.taskId());
+                long now = System.currentTimeMillis() - start;
+                TaskStatus status = response.getStatus();
+                task.worker = response.getWorkerId();
+                task.execMs = response.getExecTimeMs();
+                if (task.startMs < 0 && status != TaskStatus.QUEUED) {
+                    task.startMs = now;
+                }
+                if (status == TaskStatus.COMPLETED
+                        || status == TaskStatus.FAILED
+                        || status == TaskStatus.CANCELLED) {
+                    task.status = status;
+                    task.endMs = now;
+                } else {
+                    unfinished = true;
+                }
             }
-            if (status == TaskStatus.COMPLETED
-                    || status == TaskStatus.FAILED
-                    || status == TaskStatus.CANCELLED) {
-                return new TaskResult(
-                        task.entry().taskId(), task.entry().type(), task.entry().priority(),
-                        task.entry().offsetMs(), task.submittedAt(),
-                        firstActive == -1 ? now : firstActive, now, status,
-                        response.getWorkerId(), response.getExecTimeMs());
-            }
-            if (System.currentTimeMillis() > deadline) {
-                return new TaskResult(
-                        task.entry().taskId(), task.entry().type(), task.entry().priority(),
-                        task.entry().offsetMs(), task.submittedAt(),
-                        firstActive == -1 ? now : firstActive, now, TaskStatus.FAILED,
-                        response.getWorkerId(), response.getExecTimeMs());
+            if ((lastSweep && !unfinished) || System.currentTimeMillis() > deadline) {
+                return;
             }
             try {
                 Thread.sleep(pollMs);
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                long at = System.currentTimeMillis() - start;
-                return new TaskResult(
-                        task.entry().taskId(), task.entry().type(), task.entry().priority(),
-                        task.entry().offsetMs(), task.submittedAt(),
-                        firstActive == -1 ? at : firstActive, at, TaskStatus.FAILED, "", 0);
+                return;
             }
         }
     }

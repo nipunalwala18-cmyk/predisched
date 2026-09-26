@@ -14,16 +14,16 @@ Ten types have an executor, one class each in `predisched-worker`, all registere
 
 | Type | Profile | Input (required, then optional with default) | Verifiable output | Mean exec ms* |
 | --- | --- | --- | --- | --- |
-| `CPU_TASK` | `CPU_BOUND` | `n` (2–1e8) | `primes_below_<n>=<count>` | 22.0 |
-| `SLEEP_TASK` | `IO_BOUND` | `ms` (0–60000), `failRate`, `seed` | `slept_ms=<ms>` | 375.0 |
-| `MATRIX_TASK` | `PARALLEL` | `size` (1–1000), `threads=1` | `size=.. threads=.. checksum=<hex>` | 42.1 |
-| `HASH_TASK` | `CPU_BOUND` | `rounds` (1–2e7) | `rounds=.. digest=<sha256>` | 69.9 |
-| `MONTE_CARLO_TASK` | `CPU_BOUND` | `samples` (1–5e8), `seed=42` | `samples=.. inside=.. pi_estimate=<6dp>` | 318.7 |
-| `SORT_TASK` | `MEMORY_BOUND` | `n` (2–2e7), `type=random\|sorted\|reversed` | `n=.. type=.. sorted=true sum=.. first=.. last=..` | 66.6 |
-| `COMPRESS_TASK` | `MEMORY_BOUND` | `size_mb` (1–512), `level=6` | `raw_bytes=.. compressed_bytes=.. ratio=.. sha256=..` | 417.0 |
-| `GRAPH_TASK` | `MEMORY_BOUND` | `nodes` (2–5e6), `algo=bfs\|pagerank`, `seed=42` | `visited=..` or `rank_sum=1.000000 top_node=.. top_rank=..` | 102.7 |
-| `FILE_IO_TASK` | `IO_BOUND` | `size_mb` (1–2048), `mode=write\|read\|both` | `written_bytes=.. read_bytes=.. sha256=..` | 100.3 |
-| `HTTP_TASK` | `NETWORK_BOUND` | `url` (http/https), `timeout` (1–120000 ms) | `status=.. bytes=.. sha256=..` | 188.6 |
+| `CPU_TASK` | `CPU_BOUND` | `n` (2–1e8) | `primes_below_<n>=<count>` | 7.9 |
+| `SLEEP_TASK` | `IO_BOUND` | `ms` (0–60000), `failRate`, `seed` | `slept_ms=<ms>` | 367.8 |
+| `MATRIX_TASK` | `PARALLEL` | `size` (1–1000), `threads=1` | `size=.. threads=.. checksum=<hex>` | 19.0 |
+| `HASH_TASK` | `CPU_BOUND` | `rounds` (1–2e7) | `rounds=.. digest=<sha256>` | 28.5 |
+| `MONTE_CARLO_TASK` | `CPU_BOUND` | `samples` (1–5e8), `seed=42` | `samples=.. inside=.. pi_estimate=<6dp>` | 105.1 |
+| `SORT_TASK` | `MEMORY_BOUND` | `n` (2–2e7), `type=random\|sorted\|reversed` | `n=.. type=.. sorted=true sum=.. first=.. last=..` | 28.6 |
+| `COMPRESS_TASK` | `MEMORY_BOUND` | `size_mb` (1–512), `level=6` | `raw_bytes=.. compressed_bytes=.. ratio=.. sha256=..` | 152.4 |
+| `GRAPH_TASK` | `MEMORY_BOUND` | `nodes` (2–5e6), `algo=bfs\|pagerank`, `seed=42` | `visited=..` or `rank_sum=1.000000 top_node=.. top_rank=..` | 39.3 |
+| `FILE_IO_TASK` | `IO_BOUND` | `size_mb` (1–2048), `mode=write\|read\|both` | `written_bytes=.. read_bytes=.. sha256=..` | 32.6 |
+| `HTTP_TASK` | `NETWORK_BOUND` | `url` (http/https), `timeout` (1–120000 ms) | `status=.. bytes=.. sha256=..` | 162.5 |
 
 \* Measured on this machine (Intel Core i3-8130U, 2 cores / 4 logical, 23.9 GB RAM, project bytecode
 target 17, run on OpenJDK 21.0.12) during the 300-task bursty replay below, with a worker pool of 4.
@@ -120,13 +120,14 @@ row per task to `results/<trace>-replay.csv`:
 
 ```
 task_id,task_type,priority,offset_ms,submit_ms,start_ms,end_ms,latency_ms,status,worker,exec_ms
-mixed-42-00000,FILE_IO_TASK,9,828,1568,60067,60067,58499,COMPLETED,worker-1,149
+mixed-42-00000,FILE_IO_TASK,9,828,1180,1228,1373,193,COMPLETED,worker-1,75
 ```
 
-`start_ms` is the first poll that saw the task leave `QUEUED`, so `start_ms == end_ms` means the task
-finished between two polls; `latency_ms` is `end_ms - submit_ms`, which includes the queue wait the
-scheduler imposed. The first row above is the burst doing its job: submitted at 1.5 s, still waiting
-at 60.1 s, because 270 other tasks were submitted in the same instant.
+A poller thread runs from the first submit, so tasks are timed while the rest of the trace is still
+being submitted. `start_ms` is the first poll that saw the task leave `QUEUED` and `end_ms` the first
+terminal poll, so both are accurate to one `--poll-ms` (100 ms by default); `start_ms == end_ms`
+means the task finished between two polls. `latency_ms` is `end_ms - submit_ms` and includes the
+queue wait. `exec_ms` is the worker's own measurement and is exact.
 
 ## How to run and demo
 
@@ -176,23 +177,25 @@ Replay of that trace against one scheduler and one worker (acceptance check 2):
 
 ```
 replay summary:
-  CPU_TASK: completed=29 failed=0 mean_exec_ms=22.0
-  MATRIX_TASK: completed=29 failed=0 mean_exec_ms=42.1
-  SLEEP_TASK: completed=27 failed=0 mean_exec_ms=375.0
-  SORT_TASK: completed=27 failed=0 mean_exec_ms=66.6
-  HASH_TASK: completed=32 failed=0 mean_exec_ms=69.9
-  COMPRESS_TASK: completed=35 failed=0 mean_exec_ms=417.0
-  MONTE_CARLO_TASK: completed=27 failed=0 mean_exec_ms=318.7
-  FILE_IO_TASK: completed=29 failed=0 mean_exec_ms=100.3
-  HTTP_TASK: completed=25 failed=0 mean_exec_ms=188.6
-  GRAPH_TASK: completed=40 failed=0 mean_exec_ms=102.7
+  CPU_TASK: completed=29 failed=0 mean_exec_ms=7.9
+  MATRIX_TASK: completed=29 failed=0 mean_exec_ms=19.0
+  SLEEP_TASK: completed=27 failed=0 mean_exec_ms=367.8
+  SORT_TASK: completed=27 failed=0 mean_exec_ms=28.6
+  HASH_TASK: completed=32 failed=0 mean_exec_ms=28.5
+  COMPRESS_TASK: completed=35 failed=0 mean_exec_ms=152.4
+  MONTE_CARLO_TASK: completed=27 failed=0 mean_exec_ms=105.1
+  FILE_IO_TASK: completed=29 failed=0 mean_exec_ms=32.6
+  HTTP_TASK: completed=25 failed=0 mean_exec_ms=162.5
+  GRAPH_TASK: completed=40 failed=0 mean_exec_ms=39.3
 overall: completed=300 failed=0
 results written to results\mixed-bursty-42-replay.csv
 ```
 
-All 300 tasks completed, mean wait in the queue 15100 ms against a mean execution time of 169.8 ms,
-makespan 60954 ms for a 60 s trace: with a pool of 4 on 2 physical cores, 300 tasks arriving at one
-instant is a queueing problem, not a scheduling-strategy problem, and that is the point of a burst.
+All 300 tasks completed; the replay took 62 s wall time for a trace whose last arrival is at 60.0 s.
+From `results/mixed-bursty-42-replay.csv`: mean queue wait (`start_ms - submit_ms`) 66 ms, max 172 ms;
+mean latency 158 ms, max 847 ms; mean execution 90.5 ms. The bursty pattern trickles the first 10 %
+of tasks over 0–36 s and the other 270 over 36–60 s (about 11 tasks/s), which one worker with a pool
+of 4 keeps up with at these sizes: waits stay within about one poll interval.
 
 One task of each new type, submitted individually against the same running cluster:
 
