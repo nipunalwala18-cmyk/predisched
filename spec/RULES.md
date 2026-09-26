@@ -46,6 +46,7 @@ prompt names before writing code.
 | JUnit | 5.10.x |
 | Mockito | 5.x |
 | Spring Boot | 3.3.x |
+| jjwt (JWT, F9) | 0.12.6 (added in prompt 09) |
 | Python | 3.10+ |
 | grpcio / grpcio-tools | 1.66.x |
 | PySpark | 3.5.x |

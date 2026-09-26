@@ -129,6 +129,18 @@ public final class LamportInterceptors {
     }
 
     /** Sets the MDC for this node from the installed clocks, for threads outside a gRPC call. */
+    /** An interceptor that does nothing, for optional links in a server's chain. */
+    public static ServerInterceptor none() {
+        return new ServerInterceptor() {
+            @Override
+            public <ReqT, RespT> ServerCall.Listener<ReqT> interceptCall(
+                    ServerCall<ReqT, RespT> call, Metadata headers,
+                    ServerCallHandler<ReqT, RespT> next) {
+                return next.startCall(call, headers);
+            }
+        };
+    }
+
     public static void applyMdc() {
         applyMdc(Clocks.nodeId(), Clocks.lamport().current(), TraceContext.current());
     }

@@ -32,6 +32,8 @@ public final class TaskRecord {
     private final long timeoutMs;
     private final int maxRetries;
     private final List<TaskAttempt> attempts;
+    private final String clientId;
+    private final String workflowId;
 
     private TaskRecord(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id");
@@ -51,6 +53,8 @@ public final class TaskRecord {
         this.attempts = builder.attempts == null
                 ? List.of()
                 : Collections.unmodifiableList(new ArrayList<>(builder.attempts));
+        this.clientId = builder.clientId == null ? "" : builder.clientId;
+        this.workflowId = builder.workflowId == null ? "" : builder.workflowId;
     }
 
     public static TaskRecord createQueued(String id, TaskType type, String input, int priority) {
@@ -186,6 +190,48 @@ public final class TaskRecord {
         return attempts.size();
     }
 
+    /** The authenticated client that submitted the task (F9); empty with auth off. */
+    public String clientId() {
+        return clientId;
+    }
+
+    /** The workflow the task belongs to (F1); empty for a standalone task. */
+    public String workflowId() {
+        return workflowId;
+    }
+
+    public TaskRecord withClientId(String newClientId) {
+        Builder builder = copy();
+        builder.clientId = newClientId;
+        return new TaskRecord(builder);
+    }
+
+    public TaskRecord withWorkflowId(String newWorkflowId) {
+        Builder builder = copy();
+        builder.workflowId = newWorkflowId;
+        return new TaskRecord(builder);
+    }
+
+    /** New input, for a workflow child whose input names a parent's result (F1). */
+    public TaskRecord withInput(String newInput) {
+        Builder builder = copy();
+        builder.input = newInput;
+        return new TaskRecord(builder);
+    }
+
+    /**
+     * A freshly created task that must wait for its parents (F1) starts BLOCKED instead of
+     * QUEUED. Only valid on a new record: there is no transition into BLOCKED.
+     */
+    public TaskRecord asBlocked() {
+        if (status != TaskStatus.QUEUED || !attempts.isEmpty()) {
+            throw new IllegalStateException("only a new QUEUED task can start BLOCKED: " + id);
+        }
+        Builder builder = copy();
+        builder.status = TaskStatus.BLOCKED;
+        return new TaskRecord(builder);
+    }
+
     /** Returns a copy with a new status after checking the transition. Timestamps are updated. */
     public TaskRecord withStatus(TaskStatus newStatus) {
         TaskStateMachine.checkTransition(this.status, newStatus);
@@ -258,6 +304,8 @@ public final class TaskRecord {
         builder.timeoutMs = timeoutMs;
         builder.maxRetries = maxRetries;
         builder.attempts = new ArrayList<>(attempts);
+        builder.clientId = clientId;
+        builder.workflowId = workflowId;
         return builder;
     }
 
@@ -277,6 +325,8 @@ public final class TaskRecord {
         private long timeoutMs;
         private int maxRetries = -1;
         private List<TaskAttempt> attempts = new ArrayList<>();
+        private String clientId;
+        private String workflowId;
     }
 
     @Override
@@ -301,7 +351,9 @@ public final class TaskRecord {
                 && workerId.equals(that.workerId)
                 && result.equals(that.result)
                 && traceId.equals(that.traceId)
-                && attempts.equals(that.attempts);
+                && attempts.equals(that.attempts)
+                && clientId.equals(that.clientId)
+                && workflowId.equals(that.workflowId);
     }
 
     @Override
@@ -309,7 +361,7 @@ public final class TaskRecord {
         return Objects.hash(
                 id, type, input, priority, status, workerId, result,
                 submittedAt, startedAt, completedAt, execTimeMs, traceId,
-                timeoutMs, maxRetries, attempts);
+                timeoutMs, maxRetries, attempts, clientId, workflowId);
     }
 
     @Override

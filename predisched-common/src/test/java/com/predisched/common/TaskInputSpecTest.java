@@ -76,7 +76,8 @@ class TaskInputSpecTest {
                         TaskType.COMPRESS_TASK,
                         TaskType.GRAPH_TASK,
                         TaskType.FILE_IO_TASK,
-                        TaskType.HTTP_TASK),
+                        TaskType.HTTP_TASK,
+                        TaskType.WORKFLOW_TASK),
                 TaskInputSpec.knownTypes());
     }
 
@@ -117,7 +118,11 @@ class TaskInputSpecTest {
 
     @Test
     void reservedTypesSayWhereTheyArrive() {
-        assertTrue(TaskInputSpec.reservedReason(TaskType.WORKFLOW_TASK).contains("prompt 09"));
+        // WORKFLOW_TASK arrived in prompt 09: known, and it needs a dag file.
+        assertTrue(TaskInputSpec.isKnown(TaskType.WORKFLOW_TASK));
+        assertTrue(TaskInputSpec.validate(TaskType.WORKFLOW_TASK, "dag=x.json").isEmpty());
+        assertTrue(TaskInputSpec.validate(TaskType.WORKFLOW_TASK, "x=1").get(0)
+                .contains("requires 'dag="));
         assertTrue(TaskInputSpec.reservedReason(TaskType.DB_QUERY_TASK).contains("prompt 11"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.MAPREDUCE_TASK).contains("prompt 12"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.ML_INFER_TASK).contains("prompt 16"));

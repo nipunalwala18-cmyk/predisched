@@ -6,6 +6,7 @@ import com.predisched.proto.TaskStatus;
  * The only place that knows legal task transitions (spec section 3.3).
  *
  * <pre>
+ * BLOCKED -&gt; QUEUED (every parent completed) | CANCELLED (a parent failed or was cancelled)
  * QUEUED -&gt; RUNNING | CANCELLED
  * RUNNING -&gt; COMPLETED | FAILED | QUEUED (worker died, reassign)
  * COMPLETED, FAILED, CANCELLED are terminal.
@@ -23,6 +24,8 @@ public final class TaskStateMachine {
             return false;
         }
         switch (from) {
+            case BLOCKED:
+                return to == TaskStatus.QUEUED || to == TaskStatus.CANCELLED;
             case QUEUED:
                 return to == TaskStatus.RUNNING || to == TaskStatus.CANCELLED;
             case RUNNING:

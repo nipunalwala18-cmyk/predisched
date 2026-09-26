@@ -27,6 +27,14 @@ public class TaskValidator {
     }
 
     public List<String> validate(TaskRequest request, TaskStore store) {
+        return validate(request, store, true);
+    }
+
+    /**
+     * @param checkInput false for a workflow child whose input still holds a
+     *      {@code ${task.result}} reference: its input is checked when it is released instead
+     */
+    public List<String> validate(TaskRequest request, TaskStore store, boolean checkInput) {
         List<String> errors = new ArrayList<>();
         if (request == null) {
             errors.add("request must not be null");
@@ -58,7 +66,9 @@ public class TaskValidator {
                         "input exceeds size limit of " + maxInputChars + " chars (got "
                                 + input.length() + ")");
             }
-            errors.addAll(TaskInputSpec.validate(type, input));
+            if (checkInput) {
+                errors.addAll(TaskInputSpec.validate(type, input));
+            }
         }
         int priority = request.getPriority();
         if (priority < 1 || priority > 10) {

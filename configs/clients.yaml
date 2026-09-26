@@ -1,0 +1,18 @@
+# Clients allowed to call the scheduler when auth.enabled is true (F9, FR30).
+# Keys are stored only as SHA-256 hashes: sha256("dev-key-1"), and so on. The dev keys below
+# are for local demos only; replace the file (and never commit real keys) anywhere else.
+#   ratePerSecond / burst: token bucket per client (RESOURCE_EXHAUSTED when empty)
+#   maxQueued: unfinished tasks a client may have at once (submit refused beyond it)
+# Nodes present the node key (auth.nodeKeyFile or PREDISCHED_NODE_KEY) and are never limited.
+nodeKeySha256: "8bbcb21bc1f0f7014487b14e101bdf214fa7540e489cc58d68873e34fb0c0c44"
+clients:
+  - id: dev-client-1          # key: dev-key-1
+    keySha256: "1bcefe2243eced99cd5044a51f237faf4dcc7d845d20d6922f12a5b03912ed46"
+    ratePerSecond: 10
+    burst: 10
+    maxQueued: 200
+  - id: dev-client-2          # key: dev-key-2
+    keySha256: "966c44be82076d2c2ad29390d50c34034a35056007f29606f6457b02af023402"
+    ratePerSecond: 100
+    burst: 50
+    maxQueued: 1000

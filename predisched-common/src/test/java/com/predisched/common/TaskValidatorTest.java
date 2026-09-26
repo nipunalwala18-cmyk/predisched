@@ -93,7 +93,7 @@ public class TaskValidatorTest {
     @Test
     public void unregisteredTypesAreRejectedWithWhereTheyArrive() {
         for (TaskType type : new TaskType[] {
-                TaskType.WORKFLOW_TASK, TaskType.DB_QUERY_TASK, TaskType.MAPREDUCE_TASK,
+                TaskType.DB_QUERY_TASK, TaskType.MAPREDUCE_TASK,
                 TaskType.ML_INFER_TASK, TaskType.IMAGE_TASK}) {
             TaskRequest req = valid("t-" + type.name()).toBuilder().setType(type).build();
             List<String> errors = validator.validate(req, store);
@@ -101,9 +101,11 @@ public class TaskValidatorTest {
             assertTrue(errors.stream().anyMatch(e -> e.contains("not executable yet")),
                     type + " should say it is not executable yet, got: " + errors);
         }
-        TaskRequest workflow = valid("t-wf").toBuilder().setType(TaskType.WORKFLOW_TASK).build();
-        assertTrue(validator.validate(workflow, store).stream()
-                .anyMatch(e -> e.contains("prompt 09")));
+        TaskRequest workflow = valid("t-wf").toBuilder()
+                .setType(TaskType.WORKFLOW_TASK).setInput("dag=workloads/dags/map-reduce.json")
+                .build();
+        assertTrue(validator.validate(workflow, store).isEmpty(),
+                "WORKFLOW_TASK is supported since prompt 09");
     }
 
     @Test

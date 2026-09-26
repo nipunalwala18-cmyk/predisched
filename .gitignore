@@ -37,3 +37,6 @@ ml/models/*.joblib
 .DS_Store
 Thumbs.db
 dependency-reduced-pom.xml
+
+# TLS material (docs/components/auth.md)
+certs/

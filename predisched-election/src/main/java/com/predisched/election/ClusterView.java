@@ -1,11 +1,11 @@
 package com.predisched.election;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.common.net.Transport;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.time.LamportClock;
 import com.predisched.proto.ElectionServiceGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -48,10 +48,8 @@ public class ClusterView implements AutoCloseable {
         }
         return new ClusterView(selfId, byId.keySet(), id -> {
             NodeConfig.PeerConfig peer = byId.get(id);
-            return ManagedChannelBuilder.forAddress(peer.getHost(), peer.getPort())
-                    .usePlaintext()
-                    .intercept(LamportInterceptors.client(clock))
-                    .build();
+            return Transport.get().channel(
+                    peer.getHost(), peer.getPort(), LamportInterceptors.client(clock));
         });
     }
 

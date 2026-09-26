@@ -1,0 +1,10 @@
+{
+  "tasks": [
+    {"id": "map-1", "type": "CPU_TASK", "input": "n=3000000", "priority": 5},
+    {"id": "map-2", "type": "CPU_TASK", "input": "n=3000000", "priority": 5},
+    {"id": "map-3", "type": "CPU_TASK", "input": "n=3000000", "priority": 5},
+    {"id": "map-4", "type": "CPU_TASK", "input": "n=3000000", "priority": 5},
+    {"id": "reduce", "type": "SORT_TASK", "input": "n=400000, type=random", "priority": 5,
+     "depends_on": ["map-1", "map-2", "map-3", "map-4"]}
+  ]
+}

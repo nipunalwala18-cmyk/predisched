@@ -15,3 +15,5 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [election.md](election.md) | Bully and Ring leader election across 5 schedulers | 06 |
 | [replication.md](replication.md) | Replicated task state: strong quorum and eventual consistency | 07 |
 | [strategies.md](strategies.md) | Round Robin, Random, Least Loaded, Resource-Aware worker selection | 08 |
+| [workflows.md](workflows.md) | Task DAGs: dependencies, release order, result passing, WORKFLOW_TASK | 09 |
+| [auth.md](auth.md) | API keys, JWT, node credentials, rate limits, quotas, optional TLS | 09 |

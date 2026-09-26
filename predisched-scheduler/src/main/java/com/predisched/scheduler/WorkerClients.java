@@ -1,10 +1,10 @@
 package com.predisched.scheduler;
 
+import com.predisched.common.net.Transport;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.time.Clocks;
 import com.predisched.proto.WorkerServiceGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -19,10 +19,8 @@ public class WorkerClients implements WorkerStubs, AutoCloseable {
     @Override
     public WorkerServiceGrpc.WorkerServiceBlockingStub stubFor(WorkerInfo worker) {
         ManagedChannel channel = channels.computeIfAbsent(worker.address(), address ->
-                ManagedChannelBuilder.forAddress(worker.host(), worker.port())
-                        .usePlaintext()
-                        .intercept(LamportInterceptors.client(Clocks.lamport()))
-                        .build());
+                Transport.get().channel(worker.host(), worker.port(),
+                        LamportInterceptors.client(Clocks.lamport())));
         return WorkerServiceGrpc.newBlockingStub(channel);
     }
 

@@ -29,6 +29,9 @@ enum TaskStatus {
   COMPLETED = 2;
   CANCELLED = 3;
   FAILED = 4;
+  // Waiting on the tasks it depends on (F1): released to QUEUED when they all complete,
+  // CANCELLED when any of them fails or is cancelled.
+  BLOCKED = 5;
 }
 
 message TaskRequest {
@@ -43,6 +46,25 @@ message TaskRequest {
   int64 timeout_ms = 7;
   // Negative means the scheduler's configured default (FR25).
   int32 max_retries = 8;
+  // Task ids that must complete before this one runs (F1). Only meaningful in a workflow.
+  repeated string depends_on = 9;
+}
+
+// A DAG of tasks submitted together (F1). Every depends_on must name a task in the same
+// workflow. A child's input may contain ${<taskId>.result}, replaced by that parent's result.
+message WorkflowRequest {
+  string workflow_id = 1;
+  repeated TaskRequest tasks = 2;
+}
+
+message WorkflowStatusRequest {
+  string workflow_id = 1;
+}
+
+message WorkflowStatusResponse {
+  string workflow_id = 1;
+  repeated TaskStatusResponse tasks = 2;   // in topological order
+  bool found = 3;
 }
 
 message TaskResponse {
@@ -114,6 +136,8 @@ message TaskRecordProto {
   int64 timeout_ms = 13;
   int32 max_retries = 14;
   repeated TaskAttemptProto attempts = 15;
+  string client_id = 16;
+  string workflow_id = 17;
 }
 
 service SchedulerService {
@@ -123,4 +147,7 @@ service SchedulerService {
   // Dead-letter queue: tasks that exhausted their retries (F4).
   rpc ListDeadLetters (DeadLetterRequest) returns (DeadLetterList);
   rpc RetryDeadLetter (TaskStatusRequest) returns (TaskResponse);
+  // Workflows (F1): accepted as a whole or not at all; task_id in the reply is the workflow id.
+  rpc SubmitWorkflow (WorkflowRequest) returns (TaskResponse);
+  rpc GetWorkflowStatus (WorkflowStatusRequest) returns (WorkflowStatusResponse);
 }

@@ -36,6 +36,8 @@ public final class TaskInputSpec {
     private static final Map<TaskType, List<EnumKey>> REQUIRED_ENUMS = new LinkedHashMap<>();
     private static final Map<TaskType, List<EnumKey>> OPTIONAL_ENUMS = new LinkedHashMap<>();
     private static final Map<TaskType, List<UrlKey>> REQUIRED_URLS = new LinkedHashMap<>();
+    /** Keys whose value is free text, such as a file path; only presence is checked. */
+    private static final Map<TaskType, List<String>> REQUIRED_TEXT = new LinkedHashMap<>();
 
     /**
      * Types with no executor yet: four arrive with later prompts and one stays reserved.
@@ -70,7 +72,8 @@ public final class TaskInputSpec {
                 List.of(new EnumKey("mode", List.of("write", "read", "both"))));
         REQUIRED.put(TaskType.HTTP_TASK, List.of(new NumericKey("timeout", 1, 120_000L)));
         REQUIRED_URLS.put(TaskType.HTTP_TASK, List.of(new UrlKey("url")));
-        RESERVED.put(TaskType.WORKFLOW_TASK, "arrives in prompt 09 (workflows, F1)");
+        // Workflows (prompt 09, F1): the scheduler expands it; no worker runs it.
+        REQUIRED_TEXT.put(TaskType.WORKFLOW_TASK, List.of("dag"));
         RESERVED.put(TaskType.DB_QUERY_TASK, "arrives in prompt 11 (PostgreSQL persistence)");
         RESERVED.put(TaskType.MAPREDUCE_TASK, "arrives in prompt 12 (Spark MapReduce)");
         RESERVED.put(TaskType.ML_INFER_TASK, "arrives in prompt 16 (ML models)");
@@ -81,7 +84,7 @@ public final class TaskInputSpec {
 
     /** True when this type has an executor's input rules registered. */
     public static boolean isKnown(TaskType type) {
-        return REQUIRED.containsKey(type);
+        return REQUIRED.containsKey(type) || REQUIRED_TEXT.containsKey(type);
     }
 
     /**
@@ -94,7 +97,9 @@ public final class TaskInputSpec {
 
     /** The types that have an executor, for error messages. */
     public static List<TaskType> knownTypes() {
-        return List.copyOf(REQUIRED.keySet());
+        List<TaskType> known = new ArrayList<>(REQUIRED.keySet());
+        known.addAll(REQUIRED_TEXT.keySet());
+        return List.copyOf(known);
     }
 
     /**
@@ -149,6 +154,12 @@ public final class TaskInputSpec {
                 continue;
             }
             checkUrl(raw, required, errors);
+        }
+        for (String required : REQUIRED_TEXT.getOrDefault(type, List.of())) {
+            String raw = params.get(required);
+            if (raw == null || raw.isEmpty()) {
+                errors.add(type + " requires '" + required + "=<value>'");
+            }
         }
         return errors;
     }

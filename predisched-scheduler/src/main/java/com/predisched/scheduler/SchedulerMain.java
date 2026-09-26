@@ -4,6 +4,8 @@ import com.predisched.common.InMemoryTaskStore;
 import com.predisched.common.NodeConfig;
 import com.predisched.common.TaskStore;
 import com.predisched.common.TaskValidator;
+import com.predisched.common.auth.NodeSecurity;
+import com.predisched.common.net.Transport;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.time.BerkeleyDaemon;
@@ -13,6 +15,8 @@ import com.predisched.common.time.Clocks;
 import com.predisched.common.time.LamportClock;
 import com.predisched.common.time.PhysicalClock;
 import com.predisched.proto.ClockServiceGrpc;
+import com.predisched.scheduler.auth.ClientLimits;
+import com.predisched.scheduler.auth.RateLimiter;
 import com.predisched.scheduler.queue.AgeingPriorityQueue;
 import com.predisched.scheduler.queue.DeadLetterQueue;
 import com.predisched.scheduler.queue.RetryCoordinator;
@@ -22,7 +26,6 @@ import com.predisched.scheduler.queue.TaskQueue;
 import com.predisched.scheduler.strategy.SchedulingStrategy;
 import com.predisched.scheduler.strategy.StrategyRegistry;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import java.nio.file.Paths;
@@ -68,6 +71,11 @@ public class SchedulerMain {
         Clocks.install(id, physicalClock, lamportClock);
         LamportInterceptors.applyMdc(id, 0L, null);
         EventLog events = EventLog.install(id);
+        // Auth and TLS (F9): installs the transport every channel below uses. Null with auth off.
+        NodeSecurity.Security security = NodeSecurity.install(config, true);
+        ClientLimits limits = security == null
+                ? null
+                : new ClientLimits(security.clients(), new RateLimiter());
 
         config.getReplication().setMode(
                 opts.getOrDefault("--replication-mode", config.getReplication().getMode()));
@@ -120,8 +128,9 @@ public class SchedulerMain {
                 workers, config.getScheduler().getClusterReportIntervalMs());
         reporter.start();
 
-        ServerBuilder<?> builder = ServerBuilder.forPort(port)
-                .addService(new SchedulerServiceImpl(store, validator, queue, retries, leadership))
+        ServerBuilder<?> builder = Transport.get().server(port)
+                .addService(new SchedulerServiceImpl(
+                        store, validator, queue, retries, leadership, limits))
                 .addService(new RegistryServiceImpl(workers))
                 .addService(new ClockServiceImpl(id, physicalClock));
         if (node != null) {
@@ -132,6 +141,10 @@ public class SchedulerMain {
         }
         Server server = builder
                 .intercept(LamportInterceptors.server(id, lamportClock))
+                // Interceptors run last-added first: authenticate, then rate-limit, then Lamport.
+                .intercept(limits == null ? LamportInterceptors.none() : limits)
+                .intercept(security == null
+                        ? LamportInterceptors.none() : security.interceptor())
                 .build()
                 .start();
         if (node != null) {
@@ -180,9 +193,7 @@ public class SchedulerMain {
         List<ClockPeer> peers = new ArrayList<>();
         for (WorkerInfo worker : workers.healthy()) {
             ManagedChannel channel = channels.computeIfAbsent(worker.address(), address ->
-                    ManagedChannelBuilder.forAddress(worker.host(), worker.port())
-                            .usePlaintext()
-                            .build());
+                    Transport.get().channel(worker.host(), worker.port()));
             peers.add(new ClockPeer(worker.id(), ClockServiceGrpc.newBlockingStub(channel)));
         }
         return peers;

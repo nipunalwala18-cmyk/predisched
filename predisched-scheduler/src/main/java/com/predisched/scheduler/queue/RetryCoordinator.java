@@ -7,10 +7,13 @@ import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.time.Clocks;
 import com.predisched.proto.TaskStatus;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +40,7 @@ public class RetryCoordinator implements AutoCloseable {
     private final RetryPolicy policy;
     private final DeadLetterQueue deadLetters;
     private final ScheduledExecutorService scheduler;
+    private final List<Consumer<TaskRecord>> terminalListeners = new CopyOnWriteArrayList<>();
 
     public RetryCoordinator(
             TaskStore store, TaskQueue queue, RetryPolicy policy, DeadLetterQueue deadLetters) {
@@ -51,13 +55,33 @@ public class RetryCoordinator implements AutoCloseable {
         });
     }
 
+    /**
+     * Called with the final record whenever a task reaches COMPLETED, FAILED or CANCELLED:
+     * workflows release or cancel children, quotas give the slot back (prompt 09).
+     */
+    public void addTerminalListener(Consumer<TaskRecord> listener) {
+        terminalListeners.add(listener);
+    }
+
+    /** Tells the listeners a task ended; every path that ends a task calls this once. */
+    public void notifyTerminal(TaskRecord record) {
+        for (Consumer<TaskRecord> listener : terminalListeners) {
+            try {
+                listener.accept(record);
+            } catch (RuntimeException e) {
+                log.warn("Terminal listener failed for {}: {}", record.id(), e.toString());
+            }
+        }
+    }
+
     /** Records a successful attempt and completes the task. */
     public void succeeded(String taskId, TaskAttempt attempt, String output, long execMs) {
-        store.update(taskId, record -> record
+        TaskRecord done = store.update(taskId, record -> record
                 .withAttempt(attempt)
                 .withResult(output)
                 .withExecTimeMs(execMs)
                 .withStatus(TaskStatus.COMPLETED));
+        notifyTerminal(done);
     }
 
     /**
@@ -94,9 +118,10 @@ public class RetryCoordinator implements AutoCloseable {
         // would otherwise be able to list the dead letters before the task had arrived there.
         TaskRecord parked = updated.withResult(output).withStatus(TaskStatus.FAILED);
         deadLetters.add(parked, attempt.reason(), Clocks.now());
-        store.update(taskId, record -> record
+        TaskRecord failed = store.update(taskId, record -> record
                 .withResult(output)
                 .withStatus(TaskStatus.FAILED));
+        notifyTerminal(failed);
         log.warn("Task {} exhausted {} retries after {} attempts; parked in the dead-letter queue",
                 taskId, maxRetries, parked.attemptCount());
         EventLog.get().event("DEAD_LETTER", taskId, Map.of(
@@ -114,7 +139,9 @@ public class RetryCoordinator implements AutoCloseable {
             TaskRecord parked = entry.record();
             store.replace(TaskRecord.createQueued(
                     parked.id(), parked.type(), parked.input(), parked.priority(),
-                    parked.traceId(), parked.timeoutMs(), parked.maxRetries()));
+                    parked.traceId(), parked.timeoutMs(), parked.maxRetries())
+                    .withClientId(parked.clientId())
+                    .withWorkflowId(parked.workflowId()));
             queue.add(parked.id(), parked.priority(), Clocks.now());
             log.info("Task {} taken out of the dead-letter queue and re-queued", taskId);
             return true;

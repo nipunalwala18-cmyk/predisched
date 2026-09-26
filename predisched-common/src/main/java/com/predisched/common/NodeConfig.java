@@ -17,6 +17,24 @@ public class NodeConfig {
     private ElectionConfig election = new ElectionConfig();
     private ReplicationConfig replication = new ReplicationConfig();
     private SchedulingConfig scheduling = new SchedulingConfig();
+    private AuthConfig auth = new AuthConfig();
+    private TlsConfig tls = new TlsConfig();
+
+    public AuthConfig getAuth() {
+        return auth;
+    }
+
+    public void setAuth(AuthConfig auth) {
+        this.auth = auth;
+    }
+
+    public TlsConfig getTls() {
+        return tls;
+    }
+
+    public void setTls(TlsConfig tls) {
+        this.tls = tls;
+    }
 
     public SchedulingConfig getScheduling() {
         return scheduling;
@@ -426,6 +444,106 @@ public class NodeConfig {
 
         public void setPeers(java.util.List<PeerConfig> peers) {
             this.peers = peers;
+        }
+    }
+
+    /**
+     * Client authentication and limits (F9, FR30). Off by default so local development needs no
+     * keys. When on, every call must carry {@code authorization: ApiKey <key>} or
+     * {@code Bearer <jwt>}; nodes present the node key, which is not rate limited.
+     */
+    public static class AuthConfig {
+        private boolean enabled = false;
+        private String clientsFile = "configs/clients.yaml";
+        private String jwtSecretEnv = "PREDISCHED_JWT_SECRET";
+        private String nodeKeyEnv = "PREDISCHED_NODE_KEY";
+        private String nodeKeyFile = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /** Client ids, SHA-256 hashes of their keys, rate limits and quotas. */
+        public String getClientsFile() {
+            return clientsFile;
+        }
+
+        public void setClientsFile(String clientsFile) {
+            this.clientsFile = clientsFile;
+        }
+
+        /** Env var holding the HS256 secret; JWTs are refused when it is unset. */
+        public String getJwtSecretEnv() {
+            return jwtSecretEnv;
+        }
+
+        public void setJwtSecretEnv(String jwtSecretEnv) {
+            this.jwtSecretEnv = jwtSecretEnv;
+        }
+
+        /** Env var holding the node key this process presents on internal calls. */
+        public String getNodeKeyEnv() {
+            return nodeKeyEnv;
+        }
+
+        public void setNodeKeyEnv(String nodeKeyEnv) {
+            this.nodeKeyEnv = nodeKeyEnv;
+        }
+
+        /** File holding the node key, used when the env var is unset (local demos). */
+        public String getNodeKeyFile() {
+            return nodeKeyFile;
+        }
+
+        public void setNodeKeyFile(String nodeKeyFile) {
+            this.nodeKeyFile = nodeKeyFile;
+        }
+    }
+
+    /** Optional TLS on every gRPC server and channel (F9). Off by default. */
+    public static class TlsConfig {
+        private boolean enabled = false;
+        private String certChain = "";
+        private String privateKey = "";
+        private String trustCert = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /** PEM certificate chain this node serves. */
+        public String getCertChain() {
+            return certChain;
+        }
+
+        public void setCertChain(String certChain) {
+            this.certChain = certChain;
+        }
+
+        /** PEM PKCS#8 private key for {@link #getCertChain()}. */
+        public String getPrivateKey() {
+            return privateKey;
+        }
+
+        public void setPrivateKey(String privateKey) {
+            this.privateKey = privateKey;
+        }
+
+        /** PEM CA certificate channels trust when connecting out. */
+        public String getTrustCert() {
+            return trustCert;
+        }
+
+        public void setTrustCert(String trustCert) {
+            this.trustCert = trustCert;
         }
     }
 

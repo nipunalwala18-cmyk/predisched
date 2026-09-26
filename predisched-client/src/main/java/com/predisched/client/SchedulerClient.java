@@ -22,10 +22,8 @@ public class SchedulerClient implements AutoCloseable, SchedulerGateway {
     private final LamportClock clock = Clocks.lamport();
 
     public SchedulerClient(String host, int port) {
-        this.channel = io.grpc.ManagedChannelBuilder.forAddress(host, port)
-                .usePlaintext()
-                .intercept(LamportInterceptors.client(clock))
-                .build();
+        this.channel = com.predisched.common.net.Transport.get().channel(
+                host, port, LamportInterceptors.client(clock));
         this.stub = SchedulerServiceGrpc.newBlockingStub(channel);
     }
 
@@ -104,6 +102,16 @@ public class SchedulerClient implements AutoCloseable, SchedulerGateway {
     @Override
     public TaskStatusResponse status(String taskId) {
         return getStatus(taskId);
+    }
+
+    public TaskResponse submitWorkflow(com.predisched.proto.WorkflowRequest request) {
+        return stub.submitWorkflow(request);
+    }
+
+    public com.predisched.proto.WorkflowStatusResponse workflowStatus(String workflowId) {
+        return stub.getWorkflowStatus(com.predisched.proto.WorkflowStatusRequest.newBuilder()
+                .setWorkflowId(workflowId)
+                .build());
     }
 
     public TaskResponse cancelTask(String taskId) {

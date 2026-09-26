@@ -1,6 +1,8 @@
 package com.predisched.worker;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.common.auth.NodeSecurity;
+import com.predisched.common.net.Transport;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.time.ClockServiceImpl;
@@ -11,9 +13,7 @@ import com.predisched.common.time.PhysicalClock;
 import com.predisched.proto.ClockServiceGrpc;
 import com.predisched.proto.RegistryServiceGrpc;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,24 +51,26 @@ public class WorkerMain {
         Clocks.install(id, physicalClock, lamportClock);
         LamportInterceptors.applyMdc(id, 0L, null);
         EventLog events = EventLog.install(id);
+        // Auth and TLS (F9): only other nodes may call a worker. Null with auth off.
+        NodeSecurity.Security security = NodeSecurity.install(config, false);
 
         ExecutorRegistry registry = new ExecutorRegistry(resolveFileIoDir(id, workerConfig));
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
                 registry, metrics, id, poolSize, workerConfig.getQueueCapacity());
 
-        Server server = ServerBuilder.forPort(port)
+        Server server = Transport.get().server(port)
                 .addService(new WorkerServiceImpl(engine, id))
                 .addService(new ClockServiceImpl(id, physicalClock))
                 .intercept(LamportInterceptors.server(id, lamportClock))
+                .intercept(security == null
+                        ? LamportInterceptors.none() : security.interceptor())
                 .build()
                 .start();
 
-        ManagedChannel schedulerChannel = ManagedChannelBuilder
-                .forAddress(config.getScheduler().getHost(), config.getScheduler().getPort())
-                .usePlaintext()
-                .intercept(LamportInterceptors.client(lamportClock))
-                .build();
+        ManagedChannel schedulerChannel = Transport.get().channel(
+                config.getScheduler().getHost(), config.getScheduler().getPort(),
+                LamportInterceptors.client(lamportClock));
 
         // Cristian's algorithm is this worker pulling the scheduler's time; with Berkeley the
         // scheduler pushes corrections instead and this side only serves ClockService.
@@ -91,11 +93,9 @@ public class WorkerMain {
             registryChannels.add(schedulerChannel);
         } else {
             for (NodeConfig.PeerConfig scheduler : schedulers) {
-                registryChannels.add(ManagedChannelBuilder
-                        .forAddress(scheduler.getHost(), scheduler.getPort())
-                        .usePlaintext()
-                        .intercept(LamportInterceptors.client(lamportClock))
-                        .build());
+                registryChannels.add(Transport.get().channel(
+                        scheduler.getHost(), scheduler.getPort(),
+                        LamportInterceptors.client(lamportClock)));
             }
         }
         List<RegistrationClient> registrations = new ArrayList<>();

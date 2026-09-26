@@ -1,6 +1,8 @@
 package com.predisched.client;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.common.WorkflowDag;
+import com.predisched.common.net.Transport;
 import com.predisched.proto.Ack;
 import com.predisched.proto.DeadLetterEntry;
 import com.predisched.proto.DeadLetterList;
@@ -13,8 +15,8 @@ import com.predisched.proto.TaskResponse;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusResponse;
 import com.predisched.proto.TaskType;
+import com.predisched.proto.WorkflowStatusResponse;
 import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -40,7 +42,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Dlq.class,
             PredischedCli.Workload.class,
             PredischedCli.Cluster.class,
-            PredischedCli.Replica.class
+            PredischedCli.Replica.class,
+            PredischedCli.Workflow.class
         })
 public class PredischedCli implements Runnable {
 
@@ -52,6 +55,31 @@ public class PredischedCli implements Runnable {
 
     @Option(names = "--config", description = "Config YAML (default: ${DEFAULT-VALUE})")
     String config = "configs/local.yaml";
+
+    @Option(names = "--api-key", defaultValue = "${env:PREDISCHED_API_KEY}",
+            description = "API key sent as 'authorization: ApiKey <key>' (env PREDISCHED_API_KEY)")
+    String apiKey;
+
+    @Option(names = "--token", defaultValue = "${env:PREDISCHED_TOKEN}",
+            description = "JWT sent as 'authorization: Bearer <jwt>' (env PREDISCHED_TOKEN)")
+    String token;
+
+    @Option(names = "--tls-trust",
+            description = "PEM CA certificate: connect over TLS and trust this CA")
+    String tlsTrust;
+
+    /** Every channel this CLI opens carries the credential and TLS setting given (F9). */
+    void installTransport() {
+        String authorization = apiKey != null && !apiKey.isBlank()
+                ? "ApiKey " + apiKey
+                : token != null && !token.isBlank() ? "Bearer " + token : null;
+        NodeConfig.TlsConfig tls = new NodeConfig.TlsConfig();
+        if (tlsTrust != null) {
+            tls.setEnabled(true);
+            tls.setTrustCert(tlsTrust);
+        }
+        Transport.install(new Transport(tls, authorization));
+    }
 
     @Override
     public void run() {
@@ -76,7 +104,13 @@ public class PredischedCli implements Runnable {
     }
 
     public static void main(String[] args) {
-        int exit = new CommandLine(new PredischedCli()).execute(args);
+        PredischedCli cli = new PredischedCli();
+        int exit = new CommandLine(cli)
+                .setExecutionStrategy(parsed -> {
+                    cli.installTransport();
+                    return new CommandLine.RunLast().execute(parsed);
+                })
+                .execute(args);
         System.exit(exit);
     }
 
@@ -109,8 +143,16 @@ public class PredischedCli implements Runnable {
                 description = "Retries after a failure (default: scheduler setting)")
         int maxRetries = -1;
 
+        @Option(names = "--repeat",
+                description = "Submit this many copies back to back and print a summary"
+                        + " (load and rate-limit demos)")
+        int repeat = 1;
+
         @Override
         public Integer call() {
+            if (repeat > 1) {
+                return burst();
+            }
             TaskType taskType;
             try {
                 taskType = TaskType.valueOf(type);
@@ -137,6 +179,33 @@ public class PredischedCli implements Runnable {
                 System.out.println("submit failed: " + e.getMessage());
                 return 1;
             }
+        }
+
+        /** {@code repeat} submits as fast as one connection allows; counts outcomes by reason. */
+        private int burst() {
+            TaskType taskType = TaskType.valueOf(type);
+            java.util.Map<String, Integer> outcomes = new java.util.TreeMap<>();
+            long start = System.nanoTime();
+            try (SchedulerClient client = parent.newClient()) {
+                for (int i = 0; i < repeat; i++) {
+                    String taskId = "task-" + UUID.randomUUID().toString().substring(0, 8);
+                    String outcome;
+                    try {
+                        TaskResponse response = client.submitTask(taskId, taskType, input,
+                                priority, com.predisched.common.obs.TraceContext.newTraceId(),
+                                timeoutMs, maxRetries);
+                        outcome = response.getAccepted() ? "accepted" : "refused: "
+                                + response.getMessage();
+                    } catch (io.grpc.StatusRuntimeException e) {
+                        outcome = e.getStatus().getCode().toString();
+                    }
+                    outcomes.merge(outcome, 1, Integer::sum);
+                }
+            }
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            System.out.println(repeat + " submits in " + ms + " ms:");
+            outcomes.forEach((outcome, count) -> System.out.println("  " + count + " " + outcome));
+            return 0;
         }
     }
 
@@ -473,10 +542,7 @@ public class PredischedCli implements Runnable {
                 int answered = 0;
                 for (NodeConfig.PeerConfig peer : peers) {
                     String address = peer.getHost() + ":" + peer.getPort();
-                    ManagedChannel channel = ManagedChannelBuilder
-                            .forAddress(peer.getHost(), peer.getPort())
-                            .usePlaintext()
-                            .build();
+                    ManagedChannel channel = Transport.get().channel(peer.getHost(), peer.getPort());
                     try {
                         Ack reply = ElectionServiceGrpc.newBlockingStub(channel)
                                 .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
@@ -547,10 +613,7 @@ public class PredischedCli implements Runnable {
                     System.out.println("no scheduler " + node + " in the config");
                     return 1;
                 }
-                ManagedChannel channel = ManagedChannelBuilder
-                        .forAddress(peer.getHost(), peer.getPort())
-                        .usePlaintext()
-                        .build();
+                ManagedChannel channel = Transport.get().channel(peer.getHost(), peer.getPort());
                 try {
                     ReadResponse reply = ReplicationServiceGrpc.newBlockingStub(channel)
                             .withDeadlineAfter(5, TimeUnit.SECONDS)
@@ -577,6 +640,86 @@ public class PredischedCli implements Runnable {
                     return 1;
                 } finally {
                     channel.shutdownNow();
+                }
+            }
+        }
+    }
+
+    @Command(name = "workflow", description = "Submit and track task DAGs (F1).",
+            subcommands = {Workflow.Submit.class, Workflow.StatusOf.class})
+    static class Workflow implements Runnable {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Override
+        public void run() {
+            new CommandLine(this).usage(System.out);
+        }
+
+        @Command(name = "submit", description = "Submit a workflow JSON file.")
+        static class Submit implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Workflow parent;
+
+            @Parameters(index = "0", description = "Workflow file, e.g. workloads/dags/map-reduce.json")
+            String file;
+
+            @Option(names = "--id", description = "Workflow id (default: wf-<random>)")
+            String workflowId;
+
+            @Override
+            public Integer call() {
+                String id = workflowId != null
+                        ? workflowId
+                        : "wf-" + UUID.randomUUID().toString().substring(0, 8);
+                try (SchedulerClient client = parent.parent.newClient()) {
+                    WorkflowDag dag = WorkflowDag.load(Paths.get(file));
+                    TaskResponse response = client.submitWorkflow(
+                            dag.toRequest(id, UUID.randomUUID().toString().substring(0, 8)));
+                    System.out.println("accepted=" + response.getAccepted()
+                            + " workflow_id=" + response.getTaskId()
+                            + " message='" + response.getMessage() + "'");
+                    return response.getAccepted() ? 0 : 1;
+                } catch (StatusRuntimeException e) {
+                    System.out.println("workflow submit failed: " + e.getStatus().getCode()
+                            + " (" + e.getStatus().getDescription() + ")");
+                    return 1;
+                } catch (Exception e) {
+                    System.out.println("workflow submit failed: " + e.getMessage());
+                    return 1;
+                }
+            }
+        }
+
+        @Command(name = "status", description = "Show every task of a workflow, in order.")
+        static class StatusOf implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Workflow parent;
+
+            @Parameters(index = "0", description = "Workflow id")
+            String workflowId;
+
+            @Override
+            public Integer call() {
+                try (SchedulerClient client = parent.parent.newClient()) {
+                    WorkflowStatusResponse status = client.workflowStatus(workflowId);
+                    if (!status.getFound()) {
+                        System.out.println("unknown workflow: " + workflowId);
+                        return 1;
+                    }
+                    System.out.println("workflow " + workflowId + ":");
+                    for (TaskStatusResponse task : status.getTasksList()) {
+                        String result = task.getResult();
+                        System.out.printf(Locale.ROOT, "  %-28s %-9s %-9s %s%n", task.getTaskId(),
+                                task.getStatus(),
+                                task.getWorkerId().isEmpty() ? "-" : task.getWorkerId(),
+                                result.length() > 60 ? result.substring(0, 60) + "..." : result);
+                    }
+                    return 0;
+                } catch (StatusRuntimeException e) {
+                    System.out.println("workflow status failed: " + e.getStatus().getCode()
+                            + " (" + e.getStatus().getDescription() + ")");
+                    return 1;
                 }
             }
         }
