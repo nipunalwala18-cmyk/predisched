@@ -16,6 +16,15 @@ public class NodeConfig {
     private QueueConfig queue = new QueueConfig();
     private ElectionConfig election = new ElectionConfig();
     private ReplicationConfig replication = new ReplicationConfig();
+    private SchedulingConfig scheduling = new SchedulingConfig();
+
+    public SchedulingConfig getScheduling() {
+        return scheduling;
+    }
+
+    public void setScheduling(SchedulingConfig scheduling) {
+        this.scheduling = scheduling;
+    }
 
     public ReplicationConfig getReplication() {
         return replication;
@@ -417,6 +426,58 @@ public class NodeConfig {
 
         public void setPeers(java.util.List<PeerConfig> peers) {
             this.peers = peers;
+        }
+    }
+
+    /** How the scheduler picks a worker (FR11, spec section 11, Exp 6). */
+    public static class SchedulingConfig {
+        private String strategy = "round_robin";
+        private long seed = 42;
+        private double cpuWeight = 0.4;
+        private double memWeight = 0.2;
+        private double queueWeight = 0.4;
+
+        /** round_robin, random, least_loaded or resource_aware. */
+        public String getStrategy() {
+            return strategy;
+        }
+
+        public void setStrategy(String strategy) {
+            this.strategy = strategy;
+        }
+
+        /** Seed for the random strategy (rule 8). */
+        public long getSeed() {
+            return seed;
+        }
+
+        public void setSeed(long seed) {
+            this.seed = seed;
+        }
+
+        /** Resource-aware weights: CPU %, memory %, and load relative to pool size. */
+        public double getCpuWeight() {
+            return cpuWeight;
+        }
+
+        public void setCpuWeight(double cpuWeight) {
+            this.cpuWeight = cpuWeight;
+        }
+
+        public double getMemWeight() {
+            return memWeight;
+        }
+
+        public void setMemWeight(double memWeight) {
+            this.memWeight = memWeight;
+        }
+
+        public double getQueueWeight() {
+            return queueWeight;
+        }
+
+        public void setQueueWeight(double queueWeight) {
+            this.queueWeight = queueWeight;
         }
     }
 

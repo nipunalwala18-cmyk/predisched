@@ -19,6 +19,8 @@ import com.predisched.scheduler.queue.RetryCoordinator;
 import com.predisched.scheduler.queue.RetryPolicy;
 import com.predisched.scheduler.queue.RunningTasks;
 import com.predisched.scheduler.queue.TaskQueue;
+import com.predisched.scheduler.strategy.SchedulingStrategy;
+import com.predisched.scheduler.strategy.StrategyRegistry;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
@@ -97,12 +99,19 @@ public class SchedulerMain {
 
         WorkerRegistry workers = new WorkerRegistry(config.getScheduler().getWorkerStaleAfterMs());
         WorkerClients clients = new WorkerClients();
+        // An unknown strategy name stops the scheduler here, listing the valid ones.
+        NodeConfig.SchedulingConfig scheduling = config.getScheduling();
+        SchedulingStrategy strategy = StrategyRegistry.standard().create(
+                opts.getOrDefault("--strategy", scheduling.getStrategy()),
+                new StrategyRegistry.Settings(scheduling.getSeed(), scheduling.getCpuWeight(),
+                        scheduling.getMemWeight(), scheduling.getQueueWeight()));
         Dispatcher dispatcher = new Dispatcher(
                 store, queue, workers, clients, retries, running,
                 queueConfig.getDefaultTimeoutMs(),
                 config.getScheduler().getOutstandingPerWorkerFactor(),
                 config.getScheduler().getDispatchThreads(),
-                config.getScheduler().getNoWorkerRetryMs());
+                config.getScheduler().getNoWorkerRetryMs(),
+                strategy);
         dispatcher.start();
         TimeoutWatcher timeouts = new TimeoutWatcher(
                 running, workers, clients, queueConfig.getTimeoutCheckMs());
@@ -154,8 +163,8 @@ public class SchedulerMain {
             clockChannels.values().forEach(ManagedChannel::shutdownNow);
             events.close();
         }));
-        log.info("Scheduler {} listening on {} (dispatch threads {})",
-                id, port, config.getScheduler().getDispatchThreads());
+        log.info("Scheduler {} listening on {} (dispatch threads {}, strategy {})",
+                id, port, config.getScheduler().getDispatchThreads(), strategy.name());
         System.out.println("Scheduler " + id + " listening on " + port
                 + (node == null ? "" : " as election node " + electionId + " ("
                         + electionConfig.getAlgorithm() + ")")

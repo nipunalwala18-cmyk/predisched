@@ -15,6 +15,13 @@ import com.predisched.proto.WorkerServiceGrpc;
 import com.predisched.scheduler.queue.RetryCoordinator;
 import com.predisched.scheduler.queue.RunningTasks;
 import com.predisched.scheduler.queue.TaskQueue;
+import com.predisched.scheduler.strategy.DecisionLog;
+import com.predisched.scheduler.strategy.RoundRobinStrategy;
+import com.predisched.scheduler.strategy.SchedulingDecision;
+import com.predisched.scheduler.strategy.SchedulingStrategy;
+import java.util.ArrayList;
+import java.util.Locale;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +41,9 @@ import org.slf4j.LoggerFactory;
  * how it ended and hands the outcome to the {@link RetryCoordinator}, which decides between a retry
  * and the dead-letter queue (F4).
  *
- * <p>Worker choice is still "the first healthy one"; strategies arrive in prompt 08.
+ * <p>Which worker gets a task is a {@link SchedulingStrategy} (prompt 08), held in an
+ * {@link AtomicReference} so it can be swapped while running. Every choice is recorded as a
+ * {@link SchedulingDecision} in the {@link DecisionLog} and the event log.
  */
 public class Dispatcher implements AutoCloseable {
 
@@ -49,6 +59,8 @@ public class Dispatcher implements AutoCloseable {
     private final double outstandingPerWorkerFactor;
     private final ExecutorService dispatchPool;
     private final long noWorkerRetryMs;
+    private final AtomicReference<SchedulingStrategy> strategy;
+    private final DecisionLog decisions = new DecisionLog(1000);
     private volatile boolean active;
     private Thread thread;
 
@@ -63,6 +75,24 @@ public class Dispatcher implements AutoCloseable {
             double outstandingPerWorkerFactor,
             int dispatchThreads,
             long noWorkerRetryMs) {
+        this(store, queue, registry, clients, retries, running, defaultTimeoutMs,
+                outstandingPerWorkerFactor, dispatchThreads, noWorkerRetryMs,
+                new RoundRobinStrategy());
+    }
+
+    public Dispatcher(
+            TaskStore store,
+            TaskQueue queue,
+            WorkerRegistry registry,
+            WorkerStubs clients,
+            RetryCoordinator retries,
+            RunningTasks running,
+            long defaultTimeoutMs,
+            double outstandingPerWorkerFactor,
+            int dispatchThreads,
+            long noWorkerRetryMs,
+            SchedulingStrategy strategy) {
+        this.strategy = new AtomicReference<>(strategy);
         this.store = store;
         this.queue = queue;
         this.registry = registry;
@@ -102,20 +132,20 @@ public class Dispatcher implements AutoCloseable {
         while (active) {
             try {
                 String taskId = queue.take();
-                Optional<WorkerInfo> worker = chooseWorker();
+                TaskRecord next = store.get(taskId);
+                if (next == null) {
+                    continue;
+                }
+                Optional<WorkerInfo> worker = chooseWorker(next);
                 if (worker.isEmpty()) {
                     // Nothing to dispatch to yet: put it back and pause rather than spin.
-                    TaskRecord record = store.get(taskId);
-                    if (record != null) {
-                        queue.add(taskId, record.priority(), record.submittedAt());
-                    }
+                    queue.add(taskId, next.priority(), next.submittedAt());
                     Thread.sleep(noWorkerRetryMs);
                     continue;
                 }
                 WorkerInfo chosen = worker.get();
                 // Logged on the queue thread: the dispatch pool finishes tasks out of order, so
                 // this is the only place that shows what the queue actually chose next (F2).
-                TaskRecord next = store.get(taskId);
                 log.info("Next from queue: {} (priority {}, waited {} ms, {} still queued)",
                         taskId,
                         next == null ? "?" : next.priority(),
@@ -132,25 +162,87 @@ public class Dispatcher implements AutoCloseable {
     }
 
     /**
-     * First healthy worker with spare capacity. Prompt 08 replaces the choice itself with
-     * pluggable strategies, but the capacity rule stays.
+     * Asks the strategy to pick among the healthy workers with spare capacity, and records the
+     * decision. Empty when no worker has room.
      *
      * <p>Capacity matters for more than politeness: a worker accepts far more tasks than it can
      * run at once (its pool queue holds 100), so dispatching eagerly would empty the scheduler's
      * queue into the worker's, and the scheduler's priority ordering would decide nothing. Holding
-     * work back until a worker has room is what makes priority and ageing real (F2).
-     *
-     * <p>The count comes from this scheduler's own in-flight map, not from heartbeats, so it is
-     * exact and immediate rather than up to a heartbeat old.
+     * work back until a worker has room is what makes priority and ageing real (F2). The count
+     * comes from this scheduler's own in-flight map, so it is exact and immediate.
      */
-    Optional<WorkerInfo> chooseWorker() {
+    Optional<WorkerInfo> chooseWorker(TaskRecord task) {
+        List<WorkerInfo> candidates = candidates(task);
+        if (candidates.isEmpty()) {
+            return Optional.empty();
+        }
+        SchedulingStrategy current = strategy.get();
+        long started = System.nanoTime();
+        WorkerInfo chosen = current.select(task, candidates);
+        long micros = (System.nanoTime() - started) / 1_000;
+        Map<String, Double> scores = current.scores(task, candidates);
+        decisions.add(new SchedulingDecision(
+                task.id(), current.name(), chosen.id(), scores, micros, Clocks.now()));
+        EventLog.get().event(EventLog.SCHEDULE_DECISION, task.id(), Map.of(
+                "strategy", current.name(),
+                "worker", chosen.id(),
+                "candidates", String.valueOf(candidates.size()),
+                "decision_us", String.valueOf(micros),
+                "scores", scores.entrySet().stream()
+                        .map(entry -> entry.getKey() + "="
+                                + String.format(Locale.ROOT, "%.3f", entry.getValue()))
+                        .collect(Collectors.joining(" "))));
+        return Optional.of(chosen);
+    }
+
+    /**
+     * Healthy workers under their outstanding limit, their load raised to this scheduler's
+     * in-flight count. A task whose last attempt timed out or was rejected avoids that worker
+     * when another one has room, so a retry is not sent straight back to the same trouble.
+     */
+    List<WorkerInfo> candidates(TaskRecord task) {
+        List<WorkerInfo> open = new ArrayList<>();
         for (WorkerInfo worker : registry.healthy()) {
             int limit = Math.max(1, (int) Math.round(worker.poolSize() * outstandingPerWorkerFactor));
-            if (running.countFor(worker.id()) < limit) {
-                return Optional.of(worker);
+            int inFlight = running.countFor(worker.id());
+            if (inFlight < limit) {
+                open.add(worker.withLiveLoad(inFlight));
             }
         }
-        return Optional.empty();
+        String avoid = lastTroubledWorker(task);
+        if (avoid != null && open.size() > 1) {
+            List<WorkerInfo> others = open.stream()
+                    .filter(worker -> !worker.id().equals(avoid))
+                    .toList();
+            if (!others.isEmpty()) {
+                return others;
+            }
+        }
+        return open;
+    }
+
+    private static String lastTroubledWorker(TaskRecord task) {
+        if (task.attempts().isEmpty()) {
+            return null;
+        }
+        TaskAttempt last = task.attempts().get(task.attempts().size() - 1);
+        boolean troubled = last.outcome() == TaskAttempt.Outcome.TIMED_OUT
+                || last.outcome() == TaskAttempt.Outcome.REJECTED;
+        return troubled ? last.workerId() : null;
+    }
+
+    /** Swaps the strategy for every later dispatch (the admin API in prompt 22 calls this). */
+    public void setStrategy(SchedulingStrategy next) {
+        SchedulingStrategy previous = strategy.getAndSet(next);
+        log.info("Scheduling strategy changed from {} to {}", previous.name(), next.name());
+    }
+
+    public SchedulingStrategy strategy() {
+        return strategy.get();
+    }
+
+    public DecisionLog decisions() {
+        return decisions;
     }
 
     void process(String taskId, WorkerInfo worker) {

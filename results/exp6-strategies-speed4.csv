@@ -1,0 +1,5 @@
+strategy,tasks,completed,failed,tasks_w1_pool2,tasks_w2_pool4,tasks_w3_pool8,imbalance_stddev,mean_latency_ms,p95_latency_ms,throughput_per_s,makespan_ms,mean_decision_us
+round_robin,400,400,0,110,133,157,19.19,431.9,1417,20.09,19914,54.2
+random,400,400,0,116,129,155,16.21,214.8,663,20.05,19952,33.2
+least_loaded,400,400,0,159,139,102,23.61,174.1,569,19.95,20051,22.7
+resource_aware,400,400,0,76,129,195,48.68,184.1,607,20.05,19955,16.3

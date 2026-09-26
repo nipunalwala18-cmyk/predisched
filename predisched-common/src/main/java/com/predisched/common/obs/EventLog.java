@@ -37,6 +37,8 @@ public class EventLog implements AutoCloseable {
     /** Election events (prompt 06): a node starts an election, and a node learns the leader. */
     public static final String ELECTION_START = "ELECTION_START";
     public static final String LEADER_ELECTED = "LEADER_ELECTED";
+    /** A scheduling strategy picked a worker for a task (prompt 08). */
+    public static final String SCHEDULE_DECISION = "SCHEDULE_DECISION";
 
     private static volatile EventLog instance = new EventLog();
 

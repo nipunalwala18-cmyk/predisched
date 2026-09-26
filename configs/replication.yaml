@@ -66,3 +66,12 @@ replication:
   # Demo lag: replication traffic to node 1 is held back 5 s, so node 1 is the stale replica.
   delayMs:
     1: 5000
+scheduling:
+  # How the scheduler picks a worker (FR11, Exp 6): round_robin, random, least_loaded or
+  # resource_aware. Override per run with --strategy. Seed and weights feed random and
+  # resource_aware (score = cpu*cpu% + mem*mem% + queue*load/pool, lowest wins).
+  strategy: "round_robin"
+  seed: 42
+  cpuWeight: 0.4
+  memWeight: 0.2
+  queueWeight: 0.4

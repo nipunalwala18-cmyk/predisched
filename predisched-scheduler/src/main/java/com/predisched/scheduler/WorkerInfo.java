@@ -55,9 +55,22 @@ public record WorkerInfo(
         return nowMs - lastHeartbeatMs <= staleAfterMs;
     }
 
-    /** Queued plus running work, the simple load signal until prompt 08 scores workers properly. */
+    /** Queued plus running work ({@code queue_len + active_threads}). */
     public int load() {
         return activeThreads + queueLen;
+    }
+
+    /**
+     * This record with its load raised to at least what this scheduler has in flight there. A
+     * heartbeat is up to a second old, so without this a burst would all go to whichever worker
+     * looked idle at the last heartbeat; the in-flight count is exact and immediate.
+     */
+    public WorkerInfo withLiveLoad(int inFlight) {
+        int running = Math.max(activeThreads, Math.min(inFlight, poolSize));
+        int waiting = Math.max(queueLen, inFlight - poolSize);
+        return new WorkerInfo(
+                id, host, port, cores, memoryMb, poolSize, cpuPct, memPct,
+                running, waiting, tasksCompleted, avgExecMs, registeredAtMs, lastHeartbeatMs);
     }
 
     public String address() {

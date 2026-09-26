@@ -20,6 +20,7 @@ public class BenchmarkMain {
             case "pool-size" -> PoolSizeBenchmark.main(rest);
             case "election-compare" -> ElectionCompare.main(rest);
             case "consistency-compare" -> ConsistencyCompare.main(rest);
+            case "strategy-compare" -> StrategyCompare.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -44,6 +45,11 @@ public class BenchmarkMain {
                               Strong (W=2 R=2 of 3) vs eventual replication: write latency,
                               failed writes, stale reads, convergence, 0 and 1 replica down
                               [--writes 500] [--out results/exp5-consistency.csv]
+                  strategy-compare
+                              Replay one trace per scheduling strategy against workers with
+                              pools 2/4/8 (needs scripts/mock-http.py for HTTP_TASK)
+                              [--trace workloads/mixed-steady-7.jsonl] [--speed 1.0]
+                              [--seed 42] [--out results/exp6-strategies.csv]
                 """);
     }
 }

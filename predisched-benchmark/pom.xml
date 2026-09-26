@@ -39,6 +39,11 @@
             <artifactId>predisched-replication</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.predisched</groupId>
+            <artifactId>predisched-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-inprocess</artifactId>
         </dependency>
