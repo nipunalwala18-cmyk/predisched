@@ -40,9 +40,11 @@ class StrategiesTest {
         List<String> second = new ArrayList<>();
         RandomStrategy one = new RandomStrategy(7);
         RandomStrategy two = new RandomStrategy(7);
+        List<WorkerInfo> reversed = new ArrayList<>(workers);
+        java.util.Collections.reverse(reversed);
         for (int i = 0; i < 60; i++) {
             first.add(one.select(TASK, workers).id());
-            second.add(two.select(TASK, workers.reversed()).id());
+            second.add(two.select(TASK, reversed).id());
         }
         assertEquals(first, second, "same seed must give the same picks, in any list order");
         assertEquals(3, first.stream().distinct().count());

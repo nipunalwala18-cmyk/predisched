@@ -136,8 +136,9 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <source>17</source>
-                        <target>17</target>
+                        <!-- release, not source/target: a newer JDK then rejects Java 21 APIs
+                             too, so local builds catch what CI on Java 17 would. -->
+                        <release>17</release>
                         <encoding>UTF-8</encoding>
                     </configuration>
                 </plugin>
