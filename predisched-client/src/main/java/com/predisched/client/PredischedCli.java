@@ -1,17 +1,24 @@
 package com.predisched.client;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.proto.Ack;
 import com.predisched.proto.DeadLetterEntry;
 import com.predisched.proto.DeadLetterList;
+import com.predisched.proto.ElectionServiceGrpc;
 import com.predisched.proto.TaskResponse;
 import com.predisched.proto.TaskStatus;
 import com.predisched.proto.TaskStatusResponse;
 import com.predisched.proto.TaskType;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
+import io.grpc.StatusRuntimeException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -27,7 +34,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Cancel.class,
             PredischedCli.Watch.class,
             PredischedCli.Dlq.class,
-            PredischedCli.Workload.class
+            PredischedCli.Workload.class,
+            PredischedCli.Cluster.class
         })
 public class PredischedCli implements Runnable {
 
@@ -425,6 +433,74 @@ public class PredischedCli implements Runnable {
                     }
                     Thread.sleep(200L);
                 }
+            }
+        }
+    }
+
+    @Command(name = "cluster", description = "Inspect the scheduler cluster.",
+            subcommands = {Cluster.Leader.class})
+    static class Cluster implements Runnable {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Override
+        public void run() {
+            new CommandLine(this).usage(System.out);
+        }
+
+        @Command(name = "leader",
+                description = "Ask every scheduler in the cluster who it thinks the leader is.")
+        static class Leader implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Cluster parent;
+
+            @Option(names = "--timeout-ms", description = "Per-node deadline (default: ${DEFAULT-VALUE})")
+            long timeoutMs = 1000;
+
+            @Override
+            public Integer call() throws Exception {
+                List<NodeConfig.PeerConfig> peers = peers(parent.parent.config);
+                if (peers.isEmpty()) {
+                    System.out.println("no election peers in " + parent.parent.config
+                            + " or configs/cluster.yaml");
+                    return 1;
+                }
+                int answered = 0;
+                for (NodeConfig.PeerConfig peer : peers) {
+                    String address = peer.getHost() + ":" + peer.getPort();
+                    ManagedChannel channel = ManagedChannelBuilder
+                            .forAddress(peer.getHost(), peer.getPort())
+                            .usePlaintext()
+                            .build();
+                    try {
+                        Ack reply = ElectionServiceGrpc.newBlockingStub(channel)
+                                .withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
+                                .ping(Ack.getDefaultInstance());
+                        System.out.printf(Locale.ROOT, "scheduler %d (%s): %s%n",
+                                peer.getId(), address, reply.getMessage());
+                        answered++;
+                    } catch (StatusRuntimeException e) {
+                        System.out.printf(Locale.ROOT, "scheduler %d (%s): unreachable (%s)%n",
+                                peer.getId(), address, e.getStatus().getCode());
+                    } finally {
+                        channel.shutdownNow();
+                    }
+                }
+                return answered > 0 ? 0 : 1;
+            }
+
+            /** The peers in the given config, else in configs/cluster.yaml. */
+            static List<NodeConfig.PeerConfig> peers(String config) throws Exception {
+                for (String path : List.of(config, "configs/cluster.yaml")) {
+                    if (Files.exists(Paths.get(path))) {
+                        List<NodeConfig.PeerConfig> peers =
+                                NodeConfig.load(Paths.get(path)).getElection().getPeers();
+                        if (!peers.isEmpty()) {
+                            return peers;
+                        }
+                    }
+                }
+                return List.of();
             }
         }
     }

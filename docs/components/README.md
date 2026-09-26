@@ -12,3 +12,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [clocks.md](clocks.md) | Lamport clocks, Berkeley and Cristian sync, event log | 03 |
 | [queue.md](queue.md) | Priority ageing, retries, dead-letter queue, timeouts | 04 |
 | [tasks-and-workloads.md](tasks-and-workloads.md) | Task catalogue, executors, workload generator and replay | 05 |
+| [election.md](election.md) | Bully and Ring leader election across 5 schedulers | 06 |

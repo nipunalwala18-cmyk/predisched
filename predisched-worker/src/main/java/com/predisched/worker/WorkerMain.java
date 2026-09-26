@@ -18,7 +18,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,21 +83,41 @@ public class WorkerMain {
             cristian.start();
         }
         final CristianClient cristianClient = cristian;
-        RegistrationClient registration = new RegistrationClient(
-                RegistryServiceGrpc.newBlockingStub(schedulerChannel),
-                engine,
-                metrics,
-                id,
-                opts.getOrDefault("--host", workerConfig.getHost()),
-                port,
-                workerConfig.getHeartbeatIntervalMs());
-        registration.start();
+        // In a scheduler cluster the worker registers with every scheduler, so whichever node
+        // wins an election already knows it. Alone, it registers with the one configured.
+        List<ManagedChannel> registryChannels = new ArrayList<>();
+        List<NodeConfig.PeerConfig> schedulers = config.getElection().getPeers();
+        if (schedulers.isEmpty()) {
+            registryChannels.add(schedulerChannel);
+        } else {
+            for (NodeConfig.PeerConfig scheduler : schedulers) {
+                registryChannels.add(ManagedChannelBuilder
+                        .forAddress(scheduler.getHost(), scheduler.getPort())
+                        .usePlaintext()
+                        .intercept(LamportInterceptors.client(lamportClock))
+                        .build());
+            }
+        }
+        List<RegistrationClient> registrations = new ArrayList<>();
+        for (ManagedChannel channel : registryChannels) {
+            RegistrationClient registration = new RegistrationClient(
+                    RegistryServiceGrpc.newBlockingStub(channel),
+                    engine,
+                    metrics,
+                    id,
+                    opts.getOrDefault("--host", workerConfig.getHost()),
+                    port,
+                    workerConfig.getHeartbeatIntervalMs());
+            registration.start();
+            registrations.add(registration);
+        }
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (cristianClient != null) {
                 cristianClient.close();
             }
-            registration.close();
+            registrations.forEach(RegistrationClient::close);
             engine.close();
+            registryChannels.forEach(ManagedChannel::shutdownNow);
             schedulerChannel.shutdownNow();
             events.close();
         }));
@@ -105,7 +127,10 @@ public class WorkerMain {
         System.out.println("Worker " + id + " listening on " + port
                 + " (pool " + poolSize + ", clock offset " + clockOffsetMs
                 + " ms, clock sync " + clockAlgorithm + ", registering with "
-                + config.getScheduler().getHost() + ":" + config.getScheduler().getPort() + ")");
+                + (schedulers.isEmpty()
+                        ? config.getScheduler().getHost() + ":" + config.getScheduler().getPort()
+                        : schedulers.size() + " schedulers")
+                + ")");
         Path done = Paths.get(opts.getOrDefault("--ready-file", ""));
         if (!done.toString().isEmpty()) {
             try {

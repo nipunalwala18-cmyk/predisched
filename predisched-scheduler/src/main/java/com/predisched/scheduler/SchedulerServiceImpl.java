@@ -45,20 +45,42 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
     private final TaskValidator validator;
     private final TaskQueue dispatchQueue;
     private final RetryCoordinator retries;
+    private final Leadership leadership;
 
     public SchedulerServiceImpl(
             TaskStore store,
             TaskValidator validator,
             TaskQueue dispatchQueue,
             RetryCoordinator retries) {
+        this(store, validator, dispatchQueue, retries, Leadership.ALONE);
+    }
+
+    public SchedulerServiceImpl(
+            TaskStore store,
+            TaskValidator validator,
+            TaskQueue dispatchQueue,
+            RetryCoordinator retries,
+            Leadership leadership) {
         this.store = store;
         this.validator = validator;
         this.dispatchQueue = dispatchQueue;
         this.retries = retries;
+        this.leadership = leadership;
     }
 
     @Override
     public void submitTask(TaskRequest request, StreamObserver<TaskResponse> observer) {
+        if (!leadership.isLeader()) {
+            String leader = leadership.leader().map(String::valueOf).orElse("unknown");
+            observer.onNext(TaskResponse.newBuilder()
+                    .setTaskId(request == null ? "" : request.getTaskId())
+                    .setAccepted(false)
+                    .setMessage("not the leader; leader=" + leader)
+                    .setLamportTime(0L)
+                    .build());
+            observer.onCompleted();
+            return;
+        }
         List<String> errors = validator.validate(request, store);
         if (!errors.isEmpty()) {
             observer.onNext(TaskResponse.newBuilder()

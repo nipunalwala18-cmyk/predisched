@@ -14,6 +14,15 @@ public class NodeConfig {
     private ValidationConfig validation = new ValidationConfig();
     private ClockConfig clock = new ClockConfig();
     private QueueConfig queue = new QueueConfig();
+    private ElectionConfig election = new ElectionConfig();
+
+    public ElectionConfig getElection() {
+        return election;
+    }
+
+    public void setElection(ElectionConfig election) {
+        this.election = election;
+    }
 
     public QueueConfig getQueue() {
         return queue;
@@ -343,6 +352,93 @@ public class NodeConfig {
 
         public void setOutlierMs(long outlierMs) {
             this.outlierMs = outlierMs;
+        }
+    }
+
+    /**
+     * The scheduler cluster and how it elects a coordinator (spec section 11, Exp 4). With no
+     * peers the node runs alone and is always its own leader.
+     */
+    public static class ElectionConfig {
+        private String algorithm = "bully";
+        private long timeoutMs = 1000;
+        private long pingIntervalMs = 500;
+        private int pingMisses = 3;
+        private java.util.List<PeerConfig> peers = new java.util.ArrayList<>();
+
+        /** bully (default) or ring. */
+        public String getAlgorithm() {
+            return algorithm;
+        }
+
+        public void setAlgorithm(String algorithm) {
+            this.algorithm = algorithm;
+        }
+
+        /** How long an election waits for OK replies, and then for a Coordinator message. */
+        public long getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+
+        public long getPingIntervalMs() {
+            return pingIntervalMs;
+        }
+
+        public void setPingIntervalMs(long pingIntervalMs) {
+            this.pingIntervalMs = pingIntervalMs;
+        }
+
+        /** Consecutive failed pings to the leader before a follower starts an election. */
+        public int getPingMisses() {
+            return pingMisses;
+        }
+
+        public void setPingMisses(int pingMisses) {
+            this.pingMisses = pingMisses;
+        }
+
+        /** Every scheduler in the cluster, this node included. */
+        public java.util.List<PeerConfig> getPeers() {
+            return peers;
+        }
+
+        public void setPeers(java.util.List<PeerConfig> peers) {
+            this.peers = peers;
+        }
+    }
+
+    /** One scheduler node: numeric election id (1-5) and its gRPC address. */
+    public static class PeerConfig {
+        private int id;
+        private String host = "localhost";
+        private int port;
+
+        public int getId() {
+            return id;
+        }
+
+        public void setId(int id) {
+            this.id = id;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
         }
     }
 

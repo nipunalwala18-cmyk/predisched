@@ -1,0 +1,62 @@
+scheduler:
+  id: "scheduler-1"   # overridden per node by --id scheduler-N
+  host: "localhost"
+  port: 51051
+  # gRPC calls to workers run on this pool, so one slow task cannot block the queue.
+  dispatchThreads: 4
+  # A worker that has not sent a heartbeat within this long is not dispatched to.
+  workerStaleAfterMs: 5000
+  noWorkerRetryMs: 200
+  # Tasks kept outstanding on one worker, as a multiple of its pool size. Holding work in the
+  # scheduler's queue instead is what lets priority and ageing decide anything (F2).
+  outstandingPerWorkerFactor: 2.0
+  # One log line per worker per interval with its latest heartbeat metrics; 0 turns it off.
+  clusterReportIntervalMs: 5000
+worker:
+  id: "worker-1"
+  host: "localhost"
+  port: 51061
+  poolSize: 4
+  queueCapacity: 100
+  heartbeatIntervalMs: 1000
+queue:
+  # Effective priority = priority + ageingPerSecond * secondsWaiting, capped at maxPriority (F2).
+  ageingPerSecond: 0.1
+  maxPriority: 10
+  # Retries with exponential backoff, then the dead-letter queue (F4).
+  maxRetries: 3
+  retryBaseDelayMs: 200
+  retryMaxDelayMs: 30000
+  retryJitter: 0.2
+  # 0 means tasks only time out when they ask to, with --timeout (F5).
+  defaultTimeoutMs: 0
+  timeoutCheckMs: 250
+  seed: 42
+clock:
+  # Artificial skew so clock synchronisation has something to correct on one machine.
+  # Override per node with --clock-offset; drift is parts per million.
+  offsetMs: 0
+  driftPpm: 0
+  # berkeley: the scheduler polls and corrects everyone. cristian: this worker pulls the
+  # scheduler's time and corrects itself. none: no physical sync.
+  algorithm: "berkeley"
+  syncIntervalMs: 10000
+  outlierMs: 1000
+validation:
+  maxInputChars: 4096
+election:
+  # Five schedulers elect a coordinator (FR9, Exp 4). Only the leader accepts tasks and
+  # dispatches; followers answer SubmitTask with accepted=false and a leader=<id> hint.
+  # bully (default) or ring; override per run with --election-algorithm.
+  algorithm: "bully"
+  # How long an election waits for OK replies, then for the winner's Coordinator message.
+  timeoutMs: 1000
+  # Followers ping the leader; this many misses in a row starts an election.
+  pingIntervalMs: 500
+  pingMisses: 3
+  peers:
+    - { id: 1, host: "localhost", port: 51051 }
+    - { id: 2, host: "localhost", port: 51052 }
+    - { id: 3, host: "localhost", port: 51053 }
+    - { id: 4, host: "localhost", port: 51054 }
+    - { id: 5, host: "localhost", port: 51055 }

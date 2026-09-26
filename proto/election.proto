@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package predisched;
+
+import "common.proto";
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+// Bully: sender_id is the node calling an election. Ring: ring_ids accumulates the
+// ids of every live node the message has passed, starting with the initiator.
+message ElectionMsg {
+  int32 sender_id = 1;
+  repeated int32 ring_ids = 2;
+}
+
+// origin_id is the node that first announced this leader. Ring forwards the message
+// around the ring until the next hop would be the origin; Bully sends it directly.
+message CoordinatorMsg {
+  int32 leader_id = 1;
+  int32 origin_id = 2;
+}
+
+// Served by every scheduler node (spec 10.3).
+service ElectionService {
+  rpc Election    (ElectionMsg)    returns (Ack);  // Bully: a successful Ack is the "OK" reply
+  rpc RingPass    (ElectionMsg)    returns (Ack);  // Ring: forward the id list
+  rpc Coordinator (CoordinatorMsg) returns (Ack);
+  rpc Ping        (Ack)            returns (Ack);  // leader liveness; the reply names the leader
+}

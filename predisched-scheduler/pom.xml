@@ -19,6 +19,10 @@
             <artifactId>predisched-common</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.predisched</groupId>
+            <artifactId>predisched-election</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.grpc</groupId>
             <artifactId>grpc-inprocess</artifactId>
             <scope>test</scope>

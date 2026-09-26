@@ -18,6 +18,7 @@ public class BenchmarkMain {
         String[] rest = Arrays.copyOfRange(args, 1, args.length);
         switch (command) {
             case "pool-size" -> PoolSizeBenchmark.main(rest);
+            case "election-compare" -> ElectionCompare.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -34,6 +35,10 @@ public class BenchmarkMain {
                   pool-size   Throughput and latency for worker pool sizes 1, 2, 4, 8
                               [--tasks 40] [--input n=20000000] [--reps 3]
                               [--out results/exp2-pool-size.csv]
+                  election-compare
+                              Bully vs Ring on 5 in-process nodes: kill the leader, count
+                              messages, time the failover [--runs 5]
+                              [--out results/exp4-election.csv]
                 """);
     }
 }

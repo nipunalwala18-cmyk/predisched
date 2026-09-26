@@ -42,8 +42,19 @@ public class SchedulerMain {
         String configPath = opts.getOrDefault("--config", "configs/local.yaml");
         NodeConfig config = NodeConfig.load(Paths.get(configPath));
         String id = opts.getOrDefault("--id", config.getScheduler().getId());
-        int port = Integer.parseInt(opts.getOrDefault("--port",
-                String.valueOf(config.getScheduler().getPort())));
+        NodeConfig.ElectionConfig electionConfig = config.getElection();
+        electionConfig.setAlgorithm(
+                opts.getOrDefault("--election-algorithm", electionConfig.getAlgorithm()));
+        // In a cluster the node's election id picks its own entry, and so its port, from peers.
+        boolean clustered = !electionConfig.getPeers().isEmpty();
+        int electionId = clustered ? SchedulerNode.electionId(opts.get("--node-id"), id) : 0;
+        int configuredPort = config.getScheduler().getPort();
+        for (NodeConfig.PeerConfig peer : electionConfig.getPeers()) {
+            if (peer.getId() == electionId) {
+                configuredPort = peer.getPort();
+            }
+        }
+        int port = Integer.parseInt(opts.getOrDefault("--port", String.valueOf(configuredPort)));
 
         // Clocks and logging first: every line from here on carries node id and Lamport time.
         NodeConfig.ClockConfig clockConfig = config.getClock();
@@ -91,26 +102,41 @@ public class SchedulerMain {
                 workers, config.getScheduler().getClusterReportIntervalMs());
         reporter.start();
 
-        Server server = ServerBuilder.forPort(port)
-                .addService(new SchedulerServiceImpl(store, validator, queue, retries))
+        SchedulerNode node = clustered
+                ? SchedulerNode.fromConfig(electionId, electionConfig, lamportClock)
+                : null;
+        Leadership leadership = node == null ? Leadership.ALONE : node;
+        ServerBuilder<?> builder = ServerBuilder.forPort(port)
+                .addService(new SchedulerServiceImpl(store, validator, queue, retries, leadership))
                 .addService(new RegistryServiceImpl(workers))
-                .addService(new ClockServiceImpl(id, physicalClock))
+                .addService(new ClockServiceImpl(id, physicalClock));
+        if (node != null) {
+            builder.addService(node.service());
+        }
+        Server server = builder
                 .intercept(LamportInterceptors.server(id, lamportClock))
                 .build()
                 .start();
+        if (node != null) {
+            node.start();
+        }
 
-        // Berkeley: this node is the time daemon for every worker that has registered.
+        // Berkeley: the leader is the time daemon for every worker that has registered.
+        // Followers run the daemon too but give it no peers, so it does nothing until elected.
         Map<String, ManagedChannel> clockChannels = new ConcurrentHashMap<>();
         BerkeleyDaemon berkeley = new BerkeleyDaemon(
                 id,
                 physicalClock,
-                () -> clockPeers(workers, clockChannels),
+                () -> leadership.isLeader() ? clockPeers(workers, clockChannels) : List.of(),
                 "berkeley".equalsIgnoreCase(clockConfig.getAlgorithm())
                         ? clockConfig.getSyncIntervalMs()
                         : 0,
                 clockConfig.getOutlierMs());
         berkeley.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (node != null) {
+                node.close();
+            }
             timeouts.close();
             retries.close();
             berkeley.close();
@@ -123,6 +149,8 @@ public class SchedulerMain {
         log.info("Scheduler {} listening on {} (dispatch threads {})",
                 id, port, config.getScheduler().getDispatchThreads());
         System.out.println("Scheduler " + id + " listening on " + port
+                + (node == null ? "" : " as election node " + electionId + " ("
+                        + electionConfig.getAlgorithm() + ")")
                 + ", waiting for workers to register"
                 + " (clock offset " + clockOffsetMs + " ms, sync "
                 + clockConfig.getAlgorithm() + ")");
