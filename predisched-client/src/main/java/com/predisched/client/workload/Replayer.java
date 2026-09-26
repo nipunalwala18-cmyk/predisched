@@ -108,6 +108,19 @@ public final class Replayer {
             long pollMs,
             long overallTimeoutMs,
             PrintStream out) throws IOException {
+        return replay(trace, speed, gateway, csvOut, pollMs, overallTimeoutMs, 0L, out);
+    }
+
+    /** As above, every task carrying a deadline {@code deadlineMs} after its submit (F3). */
+    public static Summary replay(
+            List<TraceEntry> trace,
+            double speed,
+            SchedulerGateway gateway,
+            Path csvOut,
+            long pollMs,
+            long overallTimeoutMs,
+            long deadlineMs,
+            PrintStream out) throws IOException {
         if (trace.isEmpty()) {
             throw new IllegalArgumentException("trace is empty");
         }
@@ -140,7 +153,8 @@ public final class Replayer {
                 sleepUntil(start + (long) (entry.offsetMs() / speed));
                 String traceId = TraceContext.newTraceId();
                 TaskResponse response = gateway.submit(entry.taskId(), entry.type(),
-                        entry.input(), entry.priority(), traceId, entry.timeoutMs(), -1);
+                        entry.input(), entry.priority(), traceId, entry.timeoutMs(), -1,
+                        deadlineMs);
                 long submittedAt = System.currentTimeMillis() - start;
                 if (!response.getAccepted()) {
                     results.add(new TaskResult(entry.taskId(), entry.type(), entry.priority(),

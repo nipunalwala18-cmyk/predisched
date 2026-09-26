@@ -1,5 +1,6 @@
 package com.predisched.common.obs;
 
+import com.predisched.common.db.History;
 import com.predisched.common.time.Clocks;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -94,6 +95,9 @@ public class EventLog implements AutoCloseable {
         if (details != null) {
             details.forEach(fields::put);
         }
+        // The database copy (prompt 11); a node without one reports to a sink that drops it.
+        History.get().event(nodeId, lamport, (Long) fields.get("physical_ms"), type,
+                taskId, TraceContext.current(), details);
         String line = toJson(fields);
         synchronized (this) {
             try {

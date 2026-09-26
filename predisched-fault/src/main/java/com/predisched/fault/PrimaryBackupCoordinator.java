@@ -1,6 +1,8 @@
 package com.predisched.fault;
 
 import com.predisched.common.TaskStore;
+import com.predisched.common.db.History;
+import com.predisched.common.time.Clocks;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.election.ElectionAlgorithm;
@@ -51,6 +53,8 @@ public class PrimaryBackupCoordinator implements AutoCloseable {
     private volatile boolean primary;
     private volatile boolean liveBackup;
     private volatile long lastPromotionMs = -1;
+    /** The leader before the current one; confined to the transitions thread. */
+    private int previousLeader = -1;
 
     /**
      * @param replication the primary-backup log, or null when the cluster replicates another way
@@ -110,8 +114,14 @@ public class PrimaryBackupCoordinator implements AutoCloseable {
 
     private void onLeader(int leader, long changeGeneration, long changedAtMs) {
         LamportInterceptors.applyMdc();
+        int lost = previousLeader;
+        previousLeader = leader;
         try {
             if (leader == selfId) {
+                if (lost > 0 && lost != selfId) {
+                    History.get().failure("scheduler-" + lost, "PRIMARY_LOST", Clocks.now(),
+                            "scheduler " + selfId + " promoted in its place");
+                }
                 promote(changeGeneration, changedAtMs);
             } else {
                 if (primary) {

@@ -1,6 +1,7 @@
 package com.predisched.common;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -77,6 +78,7 @@ class TaskInputSpecTest {
                         TaskType.GRAPH_TASK,
                         TaskType.FILE_IO_TASK,
                         TaskType.HTTP_TASK,
+                        TaskType.DB_QUERY_TASK,
                         TaskType.WORKFLOW_TASK),
                 TaskInputSpec.knownTypes());
     }
@@ -123,7 +125,11 @@ class TaskInputSpecTest {
         assertTrue(TaskInputSpec.validate(TaskType.WORKFLOW_TASK, "dag=x.json").isEmpty());
         assertTrue(TaskInputSpec.validate(TaskType.WORKFLOW_TASK, "x=1").get(0)
                 .contains("requires 'dag="));
-        assertTrue(TaskInputSpec.reservedReason(TaskType.DB_QUERY_TASK).contains("prompt 11"));
+        // DB_QUERY_TASK arrived in prompt 11.
+        assertTrue(TaskInputSpec.isKnown(TaskType.DB_QUERY_TASK));
+        assertTrue(TaskInputSpec.validate(TaskType.DB_QUERY_TASK, "rows=1000").isEmpty());
+        assertFalse(TaskInputSpec.validate(TaskType.DB_QUERY_TASK, "rows=0").isEmpty());
+        assertEquals(1000, TaskInputSpec.inputSize(TaskType.DB_QUERY_TASK, "rows=1000"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.MAPREDUCE_TASK).contains("prompt 12"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.ML_INFER_TASK).contains("prompt 16"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.IMAGE_TASK).contains("reserved"));

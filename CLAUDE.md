@@ -49,6 +49,11 @@ prompt names before writing code.
 | Mockito | 5.x |
 | Spring Boot | 3.3.x |
 | jjwt (JWT, F9) | 0.12.6 (added in prompt 09) |
+| PostgreSQL JDBC | 42.7.4 (added in prompt 11) |
+| HikariCP | 5.1.0 (added in prompt 11) |
+| Flyway | 10.17.3 (added in prompt 11) |
+| Caffeine | 3.1.8 (added in prompt 11) |
+| Testcontainers | 1.20.1 (added in prompt 11) |
 | Python | 3.10+ |
 | grpcio / grpcio-tools | 1.66.x |
 | PySpark | 3.5.x |
@@ -64,6 +69,8 @@ Change a version only when a prompt says so, and update this table in the same c
 | --- | --- |
 | Build + unit tests (Java) | `mvn -q verify` |
 | Python tests | `python -m pytest` (from `ml/`, `spark/` or `mpi/`) |
+| PostgreSQL | `docker run -d --name predisched-pg -e POSTGRES_PASSWORD=predisched -e POSTGRES_DB=predisched -p 5432:5432 postgres:16` |
+| DB tests without Docker | set `PREDISCHED_TEST_DB_URL=jdbc:postgresql://localhost:5432/postgres` before `mvn verify` (else they use Testcontainers, or skip) |
 | Regenerate Python stubs | `python -m grpc_tools.protoc -I proto --python_out=ml/generated --grpc_python_out=ml/generated proto/*.proto` |
 | Start local cluster | `scripts/start-cluster.ps1` (Windows) / `scripts/start-cluster.sh` |
 | Whole stack | `docker compose -f docker/docker-compose.yml up --build` |

@@ -43,7 +43,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Workload.class,
             PredischedCli.Cluster.class,
             PredischedCli.Replica.class,
-            PredischedCli.Workflow.class
+            PredischedCli.Workflow.class,
+            PredischedCli.Report.class
         })
 public class PredischedCli implements Runnable {
 
@@ -157,6 +158,13 @@ public class PredischedCli implements Runnable {
                         + " (load and rate-limit demos)")
         int repeat = 1;
 
+        @Option(names = "--deadline-ms",
+                description = "Should complete within this many ms of submit (SLA, F3)")
+        long deadlineMs = 0;
+
+        @Option(names = "--no-cache", description = "Run it even if the result is cached (F6)")
+        boolean noCache;
+
         @Override
         public Integer call() {
             if (repeat > 1) {
@@ -176,8 +184,8 @@ public class PredischedCli implements Runnable {
                     ? com.predisched.common.obs.TraceContext.newTraceId()
                     : trace;
             try (SchedulerClient client = parent.newClient()) {
-                TaskResponse response = client.submitTask(
-                        taskId, taskType, input, priority, traceId, timeoutMs, maxRetries);
+                TaskResponse response = client.submitTask(taskId, taskType, input, priority,
+                        traceId, timeoutMs, maxRetries, deadlineMs, noCache);
                 System.out.println("accepted=" + response.getAccepted()
                         + " task_id=" + response.getTaskId()
                         + " trace=" + traceId
@@ -202,7 +210,7 @@ public class PredischedCli implements Runnable {
                     try {
                         TaskResponse response = client.submitTask(taskId, taskType, input,
                                 priority, com.predisched.common.obs.TraceContext.newTraceId(),
-                                timeoutMs, maxRetries);
+                                timeoutMs, maxRetries, deadlineMs, noCache);
                         outcome = response.getAccepted() ? "accepted" : "refused: "
                                 + response.getMessage();
                     } catch (io.grpc.StatusRuntimeException e) {
@@ -236,6 +244,8 @@ public class PredischedCli implements Runnable {
                         + " exec_ms=" + response.getExecTimeMs()
                         + " trace=" + response.getTraceId()
                         + " attempts=" + response.getAttempt()
+                        + (response.getDeadlineAt() > 0
+                                ? " sla=" + (response.getSlaMet() ? "met" : "not met") : "")
                         + " result='" + response.getResult() + "'");
                 for (String attempt : response.getAttemptHistoryList()) {
                     System.out.println("  attempt " + attempt);
@@ -428,6 +438,15 @@ public class PredischedCli implements Runnable {
             @Option(names = "--timeout-ms", description = "Give up waiting after this long (default: ${DEFAULT-VALUE})")
             long timeoutMs = 600_000;
 
+            @Option(names = "--deadline-ms",
+                    description = "Give every task a deadline this many ms after its submit (F3)")
+            long deadlineMs = 0;
+
+            @Option(names = "--id-suffix",
+                    description = "Append this to every task id, to replay a trace again as new"
+                            + " tasks (a repeated id is the same task)")
+            String idSuffix = "";
+
             @Override
             public Integer call() throws Exception {
                 java.util.List<com.predisched.client.workload.TraceEntry> entries;
@@ -438,6 +457,11 @@ public class PredischedCli implements Runnable {
                     System.out.println("cannot read trace: " + e.getMessage());
                     return 1;
                 }
+                if (!idSuffix.isEmpty()) {
+                    entries = entries.stream().map(e -> new com.predisched.client.workload
+                            .TraceEntry(e.offsetMs(), e.taskId() + idSuffix, e.type(), e.input(),
+                                    e.priority(), e.timeoutMs())).toList();
+                }
                 String base = java.nio.file.Paths.get(trace).getFileName().toString()
                         .replaceFirst("\\.jsonl$", "");
                 String out = output != null ? output : "results/" + base + "-replay.csv";
@@ -445,7 +469,7 @@ public class PredischedCli implements Runnable {
                     com.predisched.client.workload.Replayer.Summary summary =
                             com.predisched.client.workload.Replayer.replay(
                                     entries, speed, client, java.nio.file.Paths.get(out),
-                                    pollMs, timeoutMs, System.out);
+                                    pollMs, timeoutMs, deadlineMs, System.out);
                     return summary.totalFailed() == 0 ? 0 : 1;
                 } catch (Exception e) {
                     System.out.println("replay failed: " + e.getMessage());
@@ -730,6 +754,80 @@ public class PredischedCli implements Runnable {
                             + " (" + e.getStatus().getDescription() + ")");
                     return 1;
                 }
+            }
+        }
+    }
+    @Command(name = "report", description = "Reports computed from the database (prompt 11).",
+            subcommands = {Report.Sla.class})
+    static class Report implements Runnable {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Override
+        public void run() {
+            new CommandLine(this).usage(System.out);
+        }
+
+        @Command(name = "sla",
+                description = "On-time % of tasks with a deadline, per strategy and task type.")
+        static class Sla implements Callable<Integer> {
+            @CommandLine.ParentCommand
+            Report parent;
+
+            @Option(names = "--since",
+                    description = "Only tasks submitted in this last period: 30m, 2h, 1d"
+                            + " (default: all)")
+            String since;
+
+            @Override
+            public Integer call() {
+                NodeConfig.DbConfig db;
+                try {
+                    db = Files.exists(Paths.get(parent.parent.config))
+                            ? NodeConfig.load(Paths.get(parent.parent.config)).getDb()
+                            : new NodeConfig.DbConfig();
+                } catch (Exception e) {
+                    System.out.println("cannot read " + parent.parent.config + ": "
+                            + e.getMessage());
+                    return 1;
+                }
+                java.time.Instant from;
+                try {
+                    from = since == null ? java.time.Instant.EPOCH
+                            : java.time.Instant.now().minus(period(since));
+                } catch (IllegalArgumentException e) {
+                    System.out.println(e.getMessage());
+                    return 2;
+                }
+                try (com.predisched.common.db.Db database =
+                        com.predisched.common.db.Db.open(db, 1, "report", false)) {
+                    System.out.println("SLA report from " + db.getUrl()
+                            + (since == null ? "" : ", tasks submitted in the last " + since));
+                    System.out.print(com.predisched.common.db.SlaReport.format(
+                            com.predisched.common.db.SlaReport.byStrategy(
+                                    database.dataSource(), from),
+                            com.predisched.common.db.SlaReport.byTaskType(
+                                    database.dataSource(), from)));
+                    return 0;
+                } catch (Exception e) {
+                    System.out.println("report failed: " + e.getMessage());
+                    return 1;
+                }
+            }
+
+            static java.time.Duration period(String text) {
+                java.util.regex.Matcher m =
+                        java.util.regex.Pattern.compile("(\\d+)([smhd])").matcher(text.trim());
+                if (!m.matches()) {
+                    throw new IllegalArgumentException("--since must look like 30m, 2h or 1d");
+                }
+                long n = Long.parseLong(m.group(1));
+                return switch (m.group(2)) {
+                    case "s" -> java.time.Duration.ofSeconds(n);
+                    case "m" -> java.time.Duration.ofMinutes(n);
+                    case "h" -> java.time.Duration.ofHours(n);
+                    default -> java.time.Duration.ofDays(n);
+                };
             }
         }
     }

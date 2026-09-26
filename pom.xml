@@ -39,6 +39,11 @@
         <maven-shade-plugin.version>3.6.0</maven-shade-plugin.version>
         <picocli.version>4.7.6</picocli.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <postgresql.version>42.7.4</postgresql.version>
+        <hikaricp.version>5.1.0</hikaricp.version>
+        <flyway.version>10.17.3</flyway.version>
+        <caffeine.version>3.1.8</caffeine.version>
+        <testcontainers.version>1.20.1</testcontainers.version>
     </properties>
 
     <dependencyManagement>
@@ -150,6 +155,45 @@
                 <groupId>org.yaml</groupId>
                 <artifactId>snakeyaml</artifactId>
                 <version>${snakeyaml.version}</version>
+            </dependency>
+            <!-- Storage (prompt 11) -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.zaxxer</groupId>
+                <artifactId>HikariCP</artifactId>
+                <version>${hikaricp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-core</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-database-postgresql</artifactId>
+                <version>${flyway.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${testcontainers.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.predisched</groupId>
+                <artifactId>predisched-common</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

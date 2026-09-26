@@ -39,6 +39,10 @@ the logs.
   progress, or gets the recorded outcome of the last 10 000 finished ones. `QueryExecution` reports
   a dispatch as RUNNING, FINISHED (with its result) or UNKNOWN. A newly promoted primary uses both
   to settle work the old one started; see [fault-tolerance.md](fault-tolerance.md).
+- **Results describe themselves** (prompt 11). `ExecuteResult.cacheable` comes from the executor's
+  `deterministic()`, and `resource_profile` from its profile, so the scheduler can cache results
+  and record features without importing worker classes. With `db.enabled` the worker also runs
+  `DB_QUERY_TASK` on its own two-connection pool; see [storage.md](storage.md).
 
 ## Metrics
 

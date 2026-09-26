@@ -24,6 +24,7 @@ import com.predisched.proto.WorkflowRequest;
 import com.predisched.proto.WorkflowStatusRequest;
 import com.predisched.proto.WorkflowStatusResponse;
 import com.predisched.scheduler.auth.ClientLimits;
+import com.predisched.scheduler.cache.ResultCache;
 import com.predisched.scheduler.queue.DeadLetterQueue;
 import com.predisched.scheduler.queue.RetryCoordinator;
 import com.predisched.scheduler.queue.TaskQueue;
@@ -52,6 +53,8 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
     private final Leadership leadership;
     private final WorkflowManager workflows;
     private final ClientLimits limits;
+    private final ArrivalRate arrivals = new ArrivalRate();
+    private volatile ResultCache cache;
 
     public SchedulerServiceImpl(
             TaskStore store,
@@ -92,6 +95,16 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
 
     public WorkflowManager workflows() {
         return workflows;
+    }
+
+    /** Accepted submits per second, for the dispatcher's ML features (prompt 11). */
+    public ArrivalRate arrivals() {
+        return arrivals;
+    }
+
+    /** Serves identical deterministic work from this cache (F6); null turns it off. */
+    public void useResultCache(ResultCache resultCache) {
+        this.cache = resultCache;
     }
 
     @Override
@@ -142,6 +155,13 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                 // in the CLI.
                 request.getMaxRetries() == 0 ? -1 : request.getMaxRetries())
                 .withClientId(clientId);
+        if (request.getDeadlineMs() > 0) {
+            record = record.withDeadlineAt(record.submittedAt() + request.getDeadlineMs());
+        }
+        ResultCache resultCache = cache;
+        java.util.Optional<String> cached = resultCache == null || request.getNoCache()
+                ? java.util.Optional.empty()
+                : resultCache.lookup(record.type(), record.input());
         try {
             store.put(record);
         } catch (IllegalStateException e) {
@@ -160,11 +180,38 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                 "task_type", record.type().name(),
                 "priority", String.valueOf(record.priority()),
                 "client", clientId));
+        arrivals.record();
+        if (cached.isPresent()) {
+            completeFromCache(record, cached.get());
+            reply(observer, record.id(), true, "completed from the result cache");
+            return;
+        }
         dispatchQueue.add(record.id(), record.priority(), record.submittedAt());
         EventLog.get().event(EventLog.ENQUEUE, record.id(),
                 Map.of("queue_len", String.valueOf(dispatchQueue.size())));
         log.info("Accepted {} ({}) and queued it", record.id(), record.type());
         reply(observer, record.id(), true, "queued");
+    }
+
+    /**
+     * A cache hit (F6): the task is stored and completed at once, by worker "cache", with one
+     * SUCCEEDED attempt, so it looks like any other finished task to status, SLA and quotas.
+     */
+    private void completeFromCache(TaskRecord record, String output) {
+        long now = Clocks.now();
+        TaskRecord done = store.update(record.id(), r -> r
+                .withWorkerId(ResultCache.WORKER)
+                .withStrategy(ResultCache.WORKER)
+                .withStatus(TaskStatus.RUNNING)
+                .withAttempt(new TaskAttempt(1, ResultCache.WORKER,
+                        TaskAttempt.Outcome.SUCCEEDED, "cache hit", now, now, 0L))
+                .withResult(output)
+                .withExecTimeMs(0L)
+                .withStatus(TaskStatus.COMPLETED));
+        EventLog.get().event("CACHE_HIT", record.id(), Map.of("task_type", record.type().name()));
+        log.info("Accepted {} ({}) and completed it from the result cache", record.id(),
+                record.type());
+        retries.notifyTerminal(done);
     }
 
     @Override
@@ -262,6 +309,8 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
                 .setTraceId(record.traceId())
                 .setLamportTime(Clocks.lamport().current())
                 .setAttempt(record.attemptCount())
+                .setDeadlineAt(record.deadlineAt())
+                .setSlaMet(record.slaMet())
                 .addAllAttemptHistory(record.attempts().stream()
                         .map(TaskAttempt::toString)
                         .toList())

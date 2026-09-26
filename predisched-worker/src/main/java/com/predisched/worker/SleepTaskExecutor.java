@@ -28,6 +28,12 @@ public class SleepTaskExecutor implements TaskExecutor {
         return TaskType.SLEEP_TASK;
     }
 
+    /** Its output depends on the seeded failure draw, not only the input (F6: never served from the result cache). */
+    @Override
+    public boolean deterministic() {
+        return false;
+    }
+
     @Override
     public ResourceProfile profile() {
         return ResourceProfile.IO_BOUND;

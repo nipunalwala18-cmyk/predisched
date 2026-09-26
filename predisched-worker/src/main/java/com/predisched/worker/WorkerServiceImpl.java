@@ -31,9 +31,18 @@ public class WorkerServiceImpl extends WorkerServiceGrpc.WorkerServiceImplBase {
         engine.submit(taskId, request.getDispatchId(), request.getTask().getType(),
                         request.getTask().getInput(), request.getTask().getTraceId())
                 .thenAccept(outcome -> {
-                    observer.onNext(toResult(taskId, outcome));
+                    observer.onNext(describe(toResult(taskId, outcome), request.getTask().getType()));
                     observer.onCompleted();
                 });
+    }
+
+    /** Adds what the executor says about its result: cacheable (F6) and resource profile. */
+    private ExecuteResult describe(ExecuteResult result, com.predisched.proto.TaskType type) {
+        ExecuteResult.Builder described = result.toBuilder()
+                .setCacheable(result.getSuccess() && engine.registry().deterministic(type));
+        engine.registry().executor(type)
+                .ifPresent(executor -> described.setResourceProfile(executor.profile().name()));
+        return described.build();
     }
 
     @Override

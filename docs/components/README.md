@@ -18,3 +18,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [workflows.md](workflows.md) | Task DAGs: dependencies, release order, result passing, WORKFLOW_TASK | 09 |
 | [auth.md](auth.md) | API keys, JWT, node credentials, rate limits, quotas, optional TLS | 09 |
 | [fault-tolerance.md](fault-tolerance.md) | Primary-backup failover, in-doubt dispatches, worker failure detection, client failover | 10 |
+| [storage.md](storage.md) | PostgreSQL history, result cache, deadlines and SLA report, DB_QUERY_TASK | 11 |

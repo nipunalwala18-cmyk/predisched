@@ -1,6 +1,8 @@
 package com.predisched.replication;
 
+import com.predisched.common.db.History;
 import com.predisched.common.obs.EventLog;
+import com.predisched.common.time.Clocks;
 import com.predisched.proto.Ack;
 import com.predisched.proto.JoinRequest;
 import com.predisched.proto.JoinResponse;
@@ -142,6 +144,7 @@ public class PrimaryBackupReplication implements ConsistencyMode {
                             node, last, new TreeSet<>(live));
                     EventLog.get().event("BACKUP_JOINED", "", Map.of(
                             "backup", String.valueOf(node), "seq", String.valueOf(last)));
+                    History.get().recovered("scheduler-" + node, Clocks.now());
                     return reply.setJoined(true).setMessage("joined at seq " + last).build();
                 }
                 return reply.setJoined(true).setMessage("already live").build();

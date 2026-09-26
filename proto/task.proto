@@ -48,6 +48,10 @@ message TaskRequest {
   int32 max_retries = 8;
   // Task ids that must complete before this one runs (F1). Only meaningful in a workflow.
   repeated string depends_on = 9;
+  // Deadline in ms after submit (F3); 0 means none. Completion by then counts as SLA met.
+  int64 deadline_ms = 10;
+  // Skip the result cache for this submit (F6).
+  bool no_cache = 11;
 }
 
 // A DAG of tasks submitted together (F1). Every depends_on must name a task in the same
@@ -90,6 +94,10 @@ message TaskStatusResponse {
   int32 attempt = 8;
   // One line per try, oldest first, for `status` and the dashboard.
   repeated string attempt_history = 9;
+  // Absolute deadline, physical ms (F3); 0 means none.
+  int64 deadline_at = 10;
+  // Completed by its deadline. False while running, or with no deadline.
+  bool sla_met = 11;
 }
 
 message DeadLetterRequest {
@@ -140,6 +148,8 @@ message TaskRecordProto {
   string workflow_id = 17;
   // Parents of a workflow task (F1), so a promoted primary can rebuild BLOCKED tasks (prompt 10).
   repeated string depends_on = 18;
+  int64 deadline_at = 19;   // F3; 0 means none
+  string strategy = 20;     // the scheduling strategy that placed the last attempt
 }
 
 service SchedulerService {

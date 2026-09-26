@@ -1,5 +1,7 @@
 package com.predisched.replication;
 
+import com.predisched.common.db.History;
+import com.predisched.common.time.Clocks;
 import com.predisched.common.time.LamportClock;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,8 +44,9 @@ public class LocalReplica {
             if (!incoming.isNewerThan(held)) {
                 return held;
             }
-            log.append(incoming);
+            long seq = log.append(incoming);
             applied[0] = true;
+            record(seq, incoming);
             return incoming;
         });
         return applied[0];
@@ -58,6 +61,13 @@ public class LocalReplica {
         clock.update(record.lamportTime());
         log.appendAt(seqNo, record);
         records.put(record.taskId(), record);
+        record(seqNo, record);
+    }
+
+    /** The change's row in {@code replication_log} (prompt 11); a no-op without a database. */
+    private void record(long seqNo, VersionedRecord change) {
+        History.get().replication(seqNo, nodeName, change.op(), change.taskId(), change.version(),
+                change.lamportTime(), Clocks.now());
     }
 
     /** Forgets every record and the whole log, before a resync from scratch. */

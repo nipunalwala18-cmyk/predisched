@@ -32,7 +32,9 @@ public final class TaskCodec {
                 .setMaxRetries(record.maxRetries())
                 .setClientId(record.clientId())
                 .setWorkflowId(record.workflowId())
-                .addAllDependsOn(record.dependsOn());
+                .addAllDependsOn(record.dependsOn())
+                .setDeadlineAt(record.deadlineAt())
+                .setStrategy(record.strategy());
         for (TaskAttempt attempt : record.attempts()) {
             proto.addAttempts(TaskAttemptProto.newBuilder()
                     .setAttempt(attempt.attempt())
@@ -71,6 +73,8 @@ public final class TaskCodec {
                 proto.getTraceId(), proto.getTimeoutMs(), proto.getMaxRetries(), attempts)
                 .withClientId(proto.getClientId())
                 .withWorkflowId(proto.getWorkflowId())
-                .withDependsOn(proto.getDependsOnList());
+                .withDependsOn(proto.getDependsOnList())
+                .withDeadlineAt(proto.getDeadlineAt())
+                .withStrategy(proto.getStrategy());
     }
 }

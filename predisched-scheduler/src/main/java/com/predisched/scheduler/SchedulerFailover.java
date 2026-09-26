@@ -3,6 +3,7 @@ package com.predisched.scheduler;
 import com.predisched.common.TaskAttempt;
 import com.predisched.common.TaskRecord;
 import com.predisched.common.TaskStore;
+import com.predisched.common.db.History;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.time.Clocks;
 import com.predisched.fault.InDoubtActions;
@@ -189,6 +190,10 @@ public class SchedulerFailover
         List<RunningTasks.Running> lost = running.settleAllOn(workerId);
         log.warn("Worker {} missed {} heartbeats ({} ms silent): marked DEAD; re-queueing its {}"
                 + " running tasks", workerId, missed, silentMs, lost.size());
+        worker.ifPresent(dead -> History.get().worker(dead.id(), dead.host(), dead.port(),
+                dead.cores(), dead.memoryMb(), dead.poolSize(), "DEAD", dead.lastHeartbeatMs()));
+        History.get().failure(workerId, "WORKER_DEAD", Clocks.now(),
+                "missed " + missed + " heartbeats, " + lost.size() + " tasks re-queued");
         EventLog.get().event("WORKER_DEAD", "", Map.of(
                 "worker", workerId,
                 "silent_ms", String.valueOf(silentMs),

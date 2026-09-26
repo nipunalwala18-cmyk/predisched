@@ -141,6 +141,33 @@ public class SchedulerClient implements AutoCloseable, SchedulerGateway {
             String traceId,
             long timeoutMs,
             int maxRetries) {
+        return submitTask(taskId, type, input, priority, traceId, timeoutMs, maxRetries, 0L, false);
+    }
+
+    /** Replayer entry point with a deadline (F3). */
+    @Override
+    public TaskResponse submit(String taskId, TaskType type, String input, int priority,
+            String traceId, long timeoutMs, int maxRetries, long deadlineMs) {
+        return submitTask(taskId, type, input, priority, traceId, timeoutMs, maxRetries,
+                deadlineMs, false);
+    }
+
+    /**
+     * Full submit.
+     *
+     * @param deadlineMs ms after submit by which it should complete (F3); 0 for none
+     * @param noCache    run it even if an identical result is cached (F6)
+     */
+    public TaskResponse submitTask(
+            String taskId,
+            TaskType type,
+            String input,
+            int priority,
+            String traceId,
+            long timeoutMs,
+            int maxRetries,
+            long deadlineMs,
+            boolean noCache) {
         TraceContext.set(traceId);
         try {
             return call("submit " + taskId, stub -> stub.submitTask(TaskRequest.newBuilder()
@@ -152,6 +179,8 @@ public class SchedulerClient implements AutoCloseable, SchedulerGateway {
                     .setTraceId(traceId)
                     .setTimeoutMs(timeoutMs)
                     .setMaxRetries(maxRetries)
+                    .setDeadlineMs(deadlineMs)
+                    .setNoCache(noCache)
                     .build()), SchedulerClient::refusal);
         } finally {
             TraceContext.clear();

@@ -38,6 +38,7 @@ final class SchedulerHarness implements AutoCloseable {
     final Dispatcher dispatcher;
     final SchedulerServiceGrpc.SchedulerServiceBlockingStub client;
     final TimeoutWatcher timeouts;
+    final SchedulerServiceImpl service;
 
     private final List<Server> servers = new ArrayList<>();
     private final List<ManagedChannel> channels = new ArrayList<>();
@@ -85,8 +86,9 @@ final class SchedulerHarness implements AutoCloseable {
                 options.timeoutCheckMs);
 
         String schedulerName = "sched-" + UUID.randomUUID();
+        service = new SchedulerServiceImpl(store, new TaskValidator(4096), queue, retries);
         servers.add(InProcessServerBuilder.forName(schedulerName)
-                .addService(new SchedulerServiceImpl(store, new TaskValidator(4096), queue, retries))
+                .addService(service)
                 .build().start());
         ManagedChannel schedulerChannel = InProcessChannelBuilder.forName(schedulerName).build();
         channels.add(schedulerChannel);

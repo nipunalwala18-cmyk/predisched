@@ -242,6 +242,11 @@ public class ExecutionEngine implements AutoCloseable {
         return true;
     }
 
+    /** The registry's executors, for what a result says about itself (cacheable, profile). */
+    public ExecutorRegistry registry() {
+        return registry;
+    }
+
     public int activeThreads() {
         return pool.getActiveCount();
     }

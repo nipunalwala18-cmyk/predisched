@@ -74,7 +74,8 @@ public final class TaskInputSpec {
         REQUIRED_URLS.put(TaskType.HTTP_TASK, List.of(new UrlKey("url")));
         // Workflows (prompt 09, F1): the scheduler expands it; no worker runs it.
         REQUIRED_TEXT.put(TaskType.WORKFLOW_TASK, List.of("dag"));
-        RESERVED.put(TaskType.DB_QUERY_TASK, "arrives in prompt 11 (PostgreSQL persistence)");
+        // Prompt 11: an aggregate over the first `rows` rows of the seeded db_query_data table.
+        REQUIRED.put(TaskType.DB_QUERY_TASK, List.of(new NumericKey("rows", 1, 200_000L)));
         RESERVED.put(TaskType.MAPREDUCE_TASK, "arrives in prompt 12 (Spark MapReduce)");
         RESERVED.put(TaskType.ML_INFER_TASK, "arrives in prompt 16 (ML models)");
         RESERVED.put(TaskType.IMAGE_TASK, "reserved: in the enum but not in the catalogue (spec 7.2)");
@@ -93,6 +94,25 @@ public final class TaskInputSpec {
      */
     public static String reservedReason(TaskType type) {
         return RESERVED.get(type);
+    }
+
+    /**
+     * The size of the work, for the ML features (spec §12.1): the value of the type's first
+     * required numeric key (n, size, ms, rounds, samples, ...), else the input's length.
+     */
+    public static long inputSize(TaskType type, String input) {
+        List<NumericKey> keys = REQUIRED.get(type);
+        if (keys != null && !keys.isEmpty()) {
+            try {
+                String value = InputParser.parse(input).get(keys.get(0).key());
+                if (value != null) {
+                    return Long.parseLong(value.trim());
+                }
+            } catch (RuntimeException e) {
+                // Fall through to the length.
+            }
+        }
+        return input == null ? 0 : input.length();
     }
 
     /** The types that have an executor, for error messages. */

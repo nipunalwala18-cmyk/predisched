@@ -55,6 +55,9 @@ illegal move throws instead of silently corrupting a record.
   (same type, input, priority and client) is answered `accepted=true`, `already accepted
   (<status>)`, and stores nothing. That is what makes a client's retry after a failover safe. A
   different task under a taken id is still refused with `task_id already exists` (FR2).
+- **Deadlines and the cache** (prompt 11). `TaskRequest.deadline_ms` sets a deadline relative to
+  submit; `status` then shows `sla=met|not met`. `no_cache` skips the result cache. See
+  [storage.md](storage.md).
 
 ## Task types in this prompt
 

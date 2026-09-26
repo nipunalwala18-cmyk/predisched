@@ -25,6 +25,10 @@ message ExecuteResult {
   // True when the worker's pool queue was full and nothing ran, so the
   // scheduler may place the task elsewhere instead of failing it.
   bool rejected = 7;
+  // The executor is deterministic, so this output may be served from the result cache (F6).
+  bool cacheable = 8;
+  // The executor's ResourceProfile (CPU_BOUND, ...), for the execution history (prompt 11).
+  string resource_profile = 9;
 }
 
 message RegisterRequest {

@@ -185,6 +185,9 @@ public class WorkflowManager {
                     .withClientId(clientId)
                     .withWorkflowId(workflowId)
                     .withDependsOn(dependsOn.get(id));
+            if (task.getDeadlineMs() > 0) {
+                record = record.withDeadlineAt(record.submittedAt() + task.getDeadlineMs());
+            }
             if (dependsOn.get(id).isEmpty()) {
                 roots.add(id);
                 store.put(record);

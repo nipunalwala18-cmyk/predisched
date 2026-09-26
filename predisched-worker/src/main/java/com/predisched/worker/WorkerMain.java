@@ -55,6 +55,14 @@ public class WorkerMain {
         NodeSecurity.Security security = NodeSecurity.install(config, false);
 
         ExecutorRegistry registry = new ExecutorRegistry(resolveFileIoDir(id, workerConfig));
+        // DB_QUERY_TASK (prompt 11) needs the database; its own small pool, no migrations here.
+        com.predisched.common.db.Db queryDb = null;
+        if (config.getDb().isEnabled()) {
+            queryDb = com.predisched.common.db.Db.open(config.getDb(),
+                    config.getDb().getQueryPoolSize(), id + "-db-query", false);
+            registry.register(new DbQueryTaskExecutor(queryDb.dataSource()));
+        }
+        final com.predisched.common.db.Db queryPool = queryDb;
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
                 registry, metrics, id, poolSize, workerConfig.getQueueCapacity());
@@ -117,6 +125,9 @@ public class WorkerMain {
             }
             registrations.forEach(RegistrationClient::close);
             engine.close();
+            if (queryPool != null) {
+                queryPool.close();
+            }
             registryChannels.forEach(ManagedChannel::shutdownNow);
             schedulerChannel.shutdownNow();
             events.close();

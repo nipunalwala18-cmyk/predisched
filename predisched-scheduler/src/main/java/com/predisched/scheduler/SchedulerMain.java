@@ -5,6 +5,10 @@ import com.predisched.common.NodeConfig;
 import com.predisched.common.TaskStore;
 import com.predisched.common.TaskValidator;
 import com.predisched.common.auth.NodeSecurity;
+import com.predisched.common.db.Db;
+import com.predisched.common.db.History;
+import com.predisched.common.db.HistoryWriter;
+import com.predisched.common.db.PostgresTaskStore;
 import com.predisched.common.net.Transport;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
@@ -18,6 +22,7 @@ import com.predisched.fault.WorkerFailureDetector;
 import com.predisched.proto.ClockServiceGrpc;
 import com.predisched.scheduler.auth.ClientLimits;
 import com.predisched.scheduler.auth.RateLimiter;
+import com.predisched.scheduler.cache.ResultCache;
 import com.predisched.scheduler.queue.AgeingPriorityQueue;
 import com.predisched.scheduler.queue.DeadLetterQueue;
 import com.predisched.scheduler.queue.RetryCoordinator;
@@ -78,6 +83,19 @@ public class SchedulerMain {
                 ? null
                 : new ClientLimits(security.clients(), new RateLimiter());
 
+        // Storage (prompt 11): history and the tasks table go to PostgreSQL through one
+        // asynchronous, batched writer, so nothing on the dispatch path waits for the database.
+        NodeConfig.DbConfig dbConfig = config.getDb();
+        Db db = null;
+        HistoryWriter history = null;
+        if (dbConfig.isEnabled()) {
+            db = Db.open(dbConfig, dbConfig.getPoolSize(), id + "-db", true);
+            history = new HistoryWriter(db.dataSource(), dbConfig.getHistoryQueueCapacity(),
+                    dbConfig.getHistoryBatchSize(), dbConfig.getHistoryFlushMs());
+            history.start();
+            History.install(history);
+        }
+
         config.getReplication().setMode(
                 opts.getOrDefault("--replication-mode", config.getReplication().getMode()));
         SchedulerNode node = clustered
@@ -85,9 +103,12 @@ public class SchedulerMain {
                 : null;
         Leadership leadership = node == null ? Leadership.ALONE : node;
         // The rest of the scheduler sees only the TaskStore interface, replicated or not.
-        TaskStore store = node == null
+        TaskStore memoryOrReplicated = node == null
                 ? new InMemoryTaskStore()
                 : node.taskStore(new InMemoryTaskStore());
+        TaskStore store = history == null
+                ? memoryOrReplicated
+                : new PostgresTaskStore(memoryOrReplicated, history);
         TaskValidator validator = new TaskValidator(config.getValidation().getMaxInputChars());
 
         NodeConfig.QueueConfig queueConfig = config.getQueue();
@@ -123,6 +144,16 @@ public class SchedulerMain {
                 strategy);
         SchedulerServiceImpl schedulerService = new SchedulerServiceImpl(
                 store, validator, queue, retries, leadership, limits);
+        dispatcher.useArrivalRate(schedulerService.arrivals());
+        ResultCache resultCache = null;
+        if (config.getCache().isEnabled()) {
+            resultCache = new ResultCache(config.getCache().getMaxEntries(),
+                    db == null ? null : db.dataSource(), History.get());
+            schedulerService.useResultCache(resultCache);
+            dispatcher.useResultCache(resultCache);
+        }
+        // F3: every task with a deadline says whether it made it.
+        retries.addTerminalListener(SchedulerMain::reportSla);
         // Prompt 10: what a promotion rebuilds, and what a dead worker's tasks go through.
         SchedulerFailover failover = new SchedulerFailover(
                 store, queue, running, dispatcher, workers, clients, retries,
@@ -147,7 +178,7 @@ public class SchedulerMain {
 
         ServerBuilder<?> builder = Transport.get().server(port)
                 .addService(schedulerService)
-                .addService(new RegistryServiceImpl(workers))
+                .addService(new RegistryServiceImpl(workers, leadership::isLeader))
                 .addService(new ClockServiceImpl(id, physicalClock));
         if (node != null) {
             builder.addService(node.service());
@@ -179,6 +210,8 @@ public class SchedulerMain {
                         : 0,
                 clockConfig.getOutlierMs());
         berkeley.start();
+        final HistoryWriter historyWriter = history;
+        final Db database = db;
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (node != null) {
                 node.close();
@@ -191,6 +224,12 @@ public class SchedulerMain {
             dispatcher.close();
             clients.close();
             clockChannels.values().forEach(ManagedChannel::shutdownNow);
+            if (historyWriter != null) {
+                historyWriter.close();
+            }
+            if (database != null) {
+                database.close();
+            }
             events.close();
         }));
         log.info("Scheduler {} listening on {} (dispatch threads {}, strategy {})",
@@ -200,8 +239,27 @@ public class SchedulerMain {
                         + electionConfig.getAlgorithm() + ")")
                 + ", waiting for workers to register"
                 + " (clock offset " + clockOffsetMs + " ms, sync "
-                + clockConfig.getAlgorithm() + ")");
+                + clockConfig.getAlgorithm() + ")"
+                + (db == null ? "" : "; history in " + dbConfig.getUrl())
+                + (resultCache == null ? "" : "; result cache on"));
         server.awaitTermination();
+    }
+
+    /** Logs and records whether a finished task with a deadline made it (F3). */
+    static void reportSla(com.predisched.common.TaskRecord task) {
+        if (task.deadlineAt() <= 0) {
+            return;
+        }
+        boolean met = task.slaMet();
+        long overMs = (task.completedAt() > 0 ? task.completedAt() : Clocks.now())
+                - task.deadlineAt();
+        EventLog.get().event(met ? "SLA_MET" : "SLA_MISSED", task.id(), Map.of(
+                "status", task.status().name(),
+                "over_ms", String.valueOf(overMs)));
+        if (!met) {
+            log.info("Task {} missed its deadline: {} {} ms after it", task.id(), task.status(),
+                    overMs);
+        }
     }
 
     /** A clock stub per registered worker, channels cached across rounds. */

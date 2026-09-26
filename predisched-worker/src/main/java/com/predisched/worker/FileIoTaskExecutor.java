@@ -49,6 +49,12 @@ public class FileIoTaskExecutor implements TaskExecutor {
         return TaskType.FILE_IO_TASK;
     }
 
+    /** Its output depends on the disk (F6: never served from the result cache). */
+    @Override
+    public boolean deterministic() {
+        return false;
+    }
+
     @Override
     public ResourceProfile profile() {
         return ResourceProfile.IO_BOUND;

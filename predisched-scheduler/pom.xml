@@ -31,6 +31,10 @@
             <artifactId>predisched-fault</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        <dependency>
             <!-- Tests only: the failover test drives the cluster through the real failover client. -->
             <groupId>com.predisched</groupId>
             <artifactId>predisched-client</artifactId>
@@ -40,6 +44,16 @@
             <groupId>io.grpc</groupId>
             <artifactId>grpc-inprocess</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.predisched</groupId>
+            <artifactId>predisched-common</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

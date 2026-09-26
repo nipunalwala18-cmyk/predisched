@@ -20,4 +20,20 @@ public interface SchedulerGateway {
             int maxRetries);
 
     TaskStatusResponse status(String taskId);
+
+    /**
+     * Submit with a deadline (F3, prompt 11), {@code deadlineMs} after submit, 0 for none. A
+     * gateway without deadlines ignores it.
+     */
+    default TaskResponse submit(
+            String taskId,
+            TaskType type,
+            String input,
+            int priority,
+            String traceId,
+            long timeoutMs,
+            int maxRetries,
+            long deadlineMs) {
+        return submit(taskId, type, input, priority, traceId, timeoutMs, maxRetries);
+    }
 }

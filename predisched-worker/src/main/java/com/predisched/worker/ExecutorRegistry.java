@@ -4,6 +4,7 @@ import com.predisched.common.ExecutionResult;
 import com.predisched.common.TaskExecutor;
 import com.predisched.proto.TaskType;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,6 +39,17 @@ public class ExecutorRegistry {
 
     public void register(TaskExecutor executor) {
         executors.put(executor.type(), executor);
+    }
+
+    /** The executor for a type, if this worker has one. */
+    public Optional<TaskExecutor> executor(TaskType type) {
+        return Optional.ofNullable(executors.get(type));
+    }
+
+    /** Whether results of this type may be cached (F6); false for types this worker lacks. */
+    public boolean deterministic(TaskType type) {
+        TaskExecutor executor = executors.get(type);
+        return executor != null && executor.deterministic();
     }
 
     public ExecutionResult execute(TaskType type, String input) {

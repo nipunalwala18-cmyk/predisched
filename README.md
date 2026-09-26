@@ -27,7 +27,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 08 | Load-balancing strategies | [x] |
 | 09 | Workflows and client auth | [x] |
 | 10 | Primary-backup fault tolerance | [x] |
-| 11 | PostgreSQL persistence and result cache | [ ] |
+| 11 | PostgreSQL persistence and result cache | [x] |
 | 12 | Spark MapReduce | [ ] |
 | 13 | MPI collectives | [ ] |
 | 14 | MPI matrix multiplication | [ ] |

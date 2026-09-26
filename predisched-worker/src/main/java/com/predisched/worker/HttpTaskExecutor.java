@@ -39,6 +39,12 @@ public class HttpTaskExecutor implements TaskExecutor {
         return TaskType.HTTP_TASK;
     }
 
+    /** Its output depends on the remote server (F6: never served from the result cache). */
+    @Override
+    public boolean deterministic() {
+        return false;
+    }
+
     @Override
     public ResourceProfile profile() {
         return ResourceProfile.NETWORK_BOUND;

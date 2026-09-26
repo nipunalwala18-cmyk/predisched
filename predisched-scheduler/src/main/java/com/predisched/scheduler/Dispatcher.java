@@ -2,7 +2,10 @@ package com.predisched.scheduler;
 
 import com.predisched.common.TaskAttempt;
 import com.predisched.common.TaskRecord;
+import com.predisched.common.TaskInputSpec;
 import com.predisched.common.TaskStore;
+import com.predisched.common.db.ExecutionRow;
+import com.predisched.common.db.History;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.common.obs.TraceContext;
@@ -15,6 +18,7 @@ import com.predisched.proto.TaskStatus;
 import com.predisched.proto.WorkerServiceGrpc;
 import com.predisched.scheduler.queue.RetryCoordinator;
 import com.predisched.scheduler.queue.RunningTasks;
+import com.predisched.scheduler.cache.ResultCache;
 import com.predisched.scheduler.queue.TaskQueue;
 import com.predisched.scheduler.strategy.DecisionLog;
 import com.predisched.scheduler.strategy.RoundRobinStrategy;
@@ -70,6 +74,20 @@ public class Dispatcher implements AutoCloseable {
     private final DecisionLog decisions = new DecisionLog(1000);
     private volatile boolean active;
     private Thread thread;
+    private volatile ResultCache cache;
+    private volatile ArrivalRate arrivals = new ArrivalRate();
+
+    /**
+     * What the scheduler knew when it sent an attempt: the ML features of spec §12.1, written
+     * with the attempt's outcome to {@code execution_history} (prompt 11). Boxed fields are null
+     * when unknown.
+     */
+    private record Features(String strategy, Integer workerCores, Integer concurrent,
+            Double cpuPct, Double memPct, Integer activeThreads, Integer queueLen,
+            Double arrivalRate, Double avgExecRecent) {
+        static final Features UNKNOWN =
+                new Features(null, null, null, null, null, null, null, null, null);
+    }
 
     public Dispatcher(
             TaskStore store,
@@ -195,6 +213,8 @@ public class Dispatcher implements AutoCloseable {
         Map<String, Double> scores = current.scores(task, candidates);
         decisions.add(new SchedulingDecision(
                 task.id(), current.name(), chosen.id(), scores, micros, Clocks.now()));
+        History.get().decision(task.id(), current.name(), chosen.id(), scores.get(chosen.id()),
+                scores, micros, Clocks.now());
         EventLog.get().event(EventLog.SCHEDULE_DECISION, task.id(), Map.of(
                 "strategy", current.name(),
                 "worker", chosen.id(),
@@ -244,6 +264,16 @@ public class Dispatcher implements AutoCloseable {
         return troubled ? last.workerId() : null;
     }
 
+    /** Stores cacheable results here (F6); null turns it off. */
+    public void useResultCache(ResultCache resultCache) {
+        this.cache = resultCache;
+    }
+
+    /** Where the arrival-rate feature comes from: the scheduler service's submits. */
+    public void useArrivalRate(ArrivalRate rate) {
+        this.arrivals = rate;
+    }
+
     /** Swaps the strategy for every later dispatch (the admin API in prompt 22 calls this). */
     public void setStrategy(SchedulingStrategy next) {
         SchedulingStrategy previous = strategy.getAndSet(next);
@@ -273,7 +303,9 @@ public class Dispatcher implements AutoCloseable {
             return;
         }
         try {
-            store.update(taskId, r -> r.withWorkerId(worker.id()).withStatus(TaskStatus.RUNNING));
+            String placedBy = strategy.get().name();
+            store.update(taskId, r -> r.withWorkerId(worker.id()).withStrategy(placedBy)
+                    .withStatus(TaskStatus.RUNNING));
         } catch (Exception e) {
             log.warn("Dispatch skipped for {}: {}", taskId, e.getMessage());
             return;
@@ -300,7 +332,8 @@ public class Dispatcher implements AutoCloseable {
         long now = Clocks.now();
         RunningTasks.Running entry = running.start(record.id(), record.workerId(), attempt, now, 0L);
         if (running.finish(entry)) {
-            recordOutcome(record.id(), record.workerId(), entry, attempt, now, result);
+            recordOutcome(record.id(), record.workerId(), entry, attempt, now, result,
+                    Features.UNKNOWN);
         }
     }
 
@@ -309,6 +342,7 @@ public class Dispatcher implements AutoCloseable {
         String taskId = record.id();
         long startedAtMs = Clocks.now();
         long timeoutMs = record.timeoutMs() > 0 ? record.timeoutMs() : defaultTimeoutMs;
+        Features features = featuresAt(worker);
         RunningTasks.Running inFlight = running.start(
                 taskId, worker.id(), attemptNumber, startedAtMs,
                 timeoutMs > 0 ? startedAtMs + timeoutMs : 0L);
@@ -346,7 +380,8 @@ public class Dispatcher implements AutoCloseable {
                         taskId, worker.id());
                 return;
             }
-            recordOutcome(taskId, worker.id(), inFlight, attemptNumber, startedAtMs, result);
+            recordOutcome(taskId, worker.id(), inFlight, attemptNumber, startedAtMs, result,
+                    features);
         } catch (Exception e) {
             if (!running.finish(inFlight)) {
                 // Settled already: the worker was declared dead and the task re-queued.
@@ -371,14 +406,24 @@ public class Dispatcher implements AutoCloseable {
         }
     }
 
+    /** The worker's state and the scheduler's load as this attempt is sent (spec §12.1). */
+    private Features featuresAt(WorkerInfo chosen) {
+        WorkerInfo worker = registry.get(chosen.id()).orElse(chosen);
+        return new Features(strategy.get().name(), worker.cores(), running.countFor(worker.id()),
+                worker.cpuPct(), worker.memPct(), worker.activeThreads(), worker.queueLen(),
+                arrivals.perSecond(), worker.avgExecMs());
+    }
+
     private void recordOutcome(
             String taskId,
             String workerId,
             RunningTasks.Running inFlight,
             int attemptNumber,
             long startedAtMs,
-            ExecuteResult result) {
+            ExecuteResult result,
+            Features features) {
         long endedAtMs = Clocks.now();
+        recordHistory(taskId, workerId, attemptNumber, startedAtMs, result, features);
         EventLog.get().event(EventLog.RESULT, taskId, Map.of(
                 "worker", workerId,
                 "attempt", String.valueOf(attemptNumber),
@@ -395,6 +440,11 @@ public class Dispatcher implements AutoCloseable {
             return;
         }
         if (result.getSuccess()) {
+            ResultCache resultCache = cache;
+            TaskRecord finished = store.get(taskId);
+            if (resultCache != null && result.getCacheable() && finished != null) {
+                resultCache.store(finished.type(), finished.input(), result.getOutput());
+            }
             TaskAttempt attempt = new TaskAttempt(
                     attemptNumber, workerId, TaskAttempt.Outcome.SUCCEEDED, "",
                     startedAtMs, endedAtMs, result.getExecTimeMs());
@@ -409,6 +459,25 @@ public class Dispatcher implements AutoCloseable {
                 timedOut ? "TIMEOUT" : result.getOutput(),
                 startedAtMs, endedAtMs, result.getExecTimeMs());
         safeFail(taskId, attempt, result.getOutput());
+    }
+
+    /** One {@code execution_history} row per attempt that ran (a rejection never ran). */
+    private void recordHistory(String taskId, String workerId, int attempt, long dispatchedAtMs,
+            ExecuteResult result, Features f) {
+        if (result.getRejected()) {
+            return;
+        }
+        TaskRecord task = store.get(taskId);
+        if (task == null) {
+            return;
+        }
+        History.get().execution(new ExecutionRow(taskId, task.type().name(),
+                result.getResourceProfile().isEmpty() ? null : result.getResourceProfile(),
+                attempt, result.getSuccess() ? "COMPLETED" : "FAILED", f.strategy(),
+                task.priority(), TaskInputSpec.inputSize(task.type(), task.input()), workerId,
+                f.workerCores(), f.concurrent(), f.cpuPct(), f.memPct(), f.activeThreads(),
+                f.queueLen(), f.arrivalRate(), f.avgExecRecent(), dispatchedAtMs,
+                result.getWaitTimeMs(), result.getExecTimeMs()));
     }
 
     /**

@@ -19,6 +19,24 @@ public class NodeConfig {
     private SchedulingConfig scheduling = new SchedulingConfig();
     private AuthConfig auth = new AuthConfig();
     private TlsConfig tls = new TlsConfig();
+    private DbConfig db = new DbConfig();
+    private CacheConfig cache = new CacheConfig();
+
+    public DbConfig getDb() {
+        return db;
+    }
+
+    public void setDb(DbConfig db) {
+        this.db = db;
+    }
+
+    public CacheConfig getCache() {
+        return cache;
+    }
+
+    public void setCache(CacheConfig cache) {
+        this.cache = cache;
+    }
 
     public AuthConfig getAuth() {
         return auth;
@@ -723,6 +741,122 @@ public class NodeConfig {
 
         public void setPort(int port) {
             this.port = port;
+        }
+    }
+
+    /**
+     * PostgreSQL (spec §14, prompt 11). Off by default: nodes then keep everything in memory. The
+     * url and credentials match the documented {@code docker run postgres:16} command, and the
+     * CLI's {@code report} commands read them even when {@code enabled} is false.
+     */
+    public static class DbConfig {
+        private boolean enabled = false;
+        private String url = "jdbc:postgresql://localhost:5432/predisched";
+        private String user = "postgres";
+        private String password = "predisched";
+        private int poolSize = 4;
+        /** Rows the history writer buffers before it starts dropping the oldest metrics. */
+        private int historyQueueCapacity = 50_000;
+        private int historyBatchSize = 500;
+        private long historyFlushMs = 200;
+        /** Connections a worker keeps for DB_QUERY_TASK, apart from any other pool. */
+        private int queryPoolSize = 2;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getUrl() {
+            return url;
+        }
+
+        public void setUrl(String url) {
+            this.url = url;
+        }
+
+        public String getUser() {
+            return user;
+        }
+
+        public void setUser(String user) {
+            this.user = user;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+
+        public int getPoolSize() {
+            return poolSize;
+        }
+
+        public void setPoolSize(int poolSize) {
+            this.poolSize = poolSize;
+        }
+
+        public int getHistoryQueueCapacity() {
+            return historyQueueCapacity;
+        }
+
+        public void setHistoryQueueCapacity(int historyQueueCapacity) {
+            this.historyQueueCapacity = historyQueueCapacity;
+        }
+
+        public int getHistoryBatchSize() {
+            return historyBatchSize;
+        }
+
+        public void setHistoryBatchSize(int historyBatchSize) {
+            this.historyBatchSize = historyBatchSize;
+        }
+
+        public long getHistoryFlushMs() {
+            return historyFlushMs;
+        }
+
+        public void setHistoryFlushMs(long historyFlushMs) {
+            this.historyFlushMs = historyFlushMs;
+        }
+
+        public int getQueryPoolSize() {
+            return queryPoolSize;
+        }
+
+        public void setQueryPoolSize(int queryPoolSize) {
+            this.queryPoolSize = queryPoolSize;
+        }
+    }
+
+    /**
+     * Result cache (F6, prompt 11). Off by default, so benchmarks that replay identical inputs
+     * measure scheduling rather than cache hits.
+     */
+    public static class CacheConfig {
+        private boolean enabled = false;
+        private long maxEntries = 10_000;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public long getMaxEntries() {
+            return maxEntries;
+        }
+
+        public void setMaxEntries(long maxEntries) {
+            this.maxEntries = maxEntries;
         }
     }
 

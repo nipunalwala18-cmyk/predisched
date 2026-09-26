@@ -1,5 +1,6 @@
 package com.predisched.common.time;
 
+import com.predisched.common.db.History;
 import com.predisched.common.obs.EventLog;
 import com.predisched.common.obs.LamportInterceptors;
 import com.predisched.proto.ClockAdjust;
@@ -190,6 +191,9 @@ public class BerkeleyDaemon implements AutoCloseable {
         }
         log.info("Berkeley round: corrections {}, offsets after {} (spread {} ms)",
                 corrections, result.offsetsAfterMs(), result.spreadAfterMs());
+        long roundAt = ownClock.now();
+        result.offsetsAfterMs().forEach((node, after) -> History.get().clockSync(
+                node, roundAt, offsets.get(node), after, "berkeley"));
         EventLog.get().event(EventLog.CLOCK_SYNC, "", Map.of(
                 "algorithm", "berkeley",
                 "spread_before_ms", String.valueOf(result.spreadBeforeMs()),

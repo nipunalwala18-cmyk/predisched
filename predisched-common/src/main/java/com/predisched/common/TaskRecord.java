@@ -35,6 +35,8 @@ public final class TaskRecord {
     private final String clientId;
     private final String workflowId;
     private final List<String> dependsOn;
+    private final long deadlineAt;
+    private final String strategy;
 
     private TaskRecord(Builder builder) {
         this.id = Objects.requireNonNull(builder.id, "id");
@@ -57,6 +59,8 @@ public final class TaskRecord {
         this.clientId = builder.clientId == null ? "" : builder.clientId;
         this.workflowId = builder.workflowId == null ? "" : builder.workflowId;
         this.dependsOn = builder.dependsOn == null ? List.of() : List.copyOf(builder.dependsOn);
+        this.deadlineAt = builder.deadlineAt;
+        this.strategy = builder.strategy == null ? "" : builder.strategy;
     }
 
     public static TaskRecord createQueued(String id, TaskType type, String input, int priority) {
@@ -210,6 +214,33 @@ public final class TaskRecord {
         return dependsOn;
     }
 
+    /** Absolute deadline in physical ms (F3); 0 means none. */
+    public long deadlineAt() {
+        return deadlineAt;
+    }
+
+    public TaskRecord withDeadlineAt(long newDeadlineAt) {
+        Builder builder = copy();
+        builder.deadlineAt = newDeadlineAt;
+        return new TaskRecord(builder);
+    }
+
+    /** True once the task COMPLETED no later than its deadline (F3). */
+    public boolean slaMet() {
+        return deadlineAt > 0 && status == TaskStatus.COMPLETED && completedAt <= deadlineAt;
+    }
+
+    /** The scheduling strategy that placed the last attempt; empty until dispatched. */
+    public String strategy() {
+        return strategy;
+    }
+
+    public TaskRecord withStrategy(String newStrategy) {
+        Builder builder = copy();
+        builder.strategy = newStrategy;
+        return new TaskRecord(builder);
+    }
+
     public TaskRecord withDependsOn(List<String> parents) {
         Builder builder = copy();
         builder.dependsOn = parents;
@@ -323,6 +354,8 @@ public final class TaskRecord {
         builder.clientId = clientId;
         builder.workflowId = workflowId;
         builder.dependsOn = dependsOn;
+        builder.deadlineAt = deadlineAt;
+        builder.strategy = strategy;
         return builder;
     }
 
@@ -345,6 +378,8 @@ public final class TaskRecord {
         private String clientId;
         private String workflowId;
         private List<String> dependsOn;
+        private long deadlineAt;
+        private String strategy;
     }
 
     @Override
@@ -372,7 +407,9 @@ public final class TaskRecord {
                 && attempts.equals(that.attempts)
                 && clientId.equals(that.clientId)
                 && workflowId.equals(that.workflowId)
-                && dependsOn.equals(that.dependsOn);
+                && dependsOn.equals(that.dependsOn)
+                && deadlineAt == that.deadlineAt
+                && strategy.equals(that.strategy);
     }
 
     @Override
@@ -380,7 +417,8 @@ public final class TaskRecord {
         return Objects.hash(
                 id, type, input, priority, status, workerId, result,
                 submittedAt, startedAt, completedAt, execTimeMs, traceId,
-                timeoutMs, maxRetries, attempts, clientId, workflowId, dependsOn);
+                timeoutMs, maxRetries, attempts, clientId, workflowId, dependsOn, deadlineAt,
+                strategy);
     }
 
     @Override
