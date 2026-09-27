@@ -1,0 +1,39 @@
+# Dashboard API (prompt 22). Override any of these on the command line, e.g.
+#   java -jar predisched-dashboard-api.jar --dashboard.cluster-config=configs/chaos.yaml
+server:
+  port: 8080
+spring:
+  application:
+    name: predisched-dashboard-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/predisched
+    username: postgres
+    password: predisched
+    hikari:
+      maximum-pool-size: 5
+      pool-name: dashboard
+  # The schedulers own the schema (Flyway runs there); the API only reads.
+  flyway:
+    enabled: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+  api-docs:
+    path: /v3/api-docs
+dashboard:
+  schedulers: [ "localhost:51051" ]
+  cluster-config: ""
+  admin-key: dev-admin
+  admin-rate-per-second: 5
+  grpc-timeout-ms: 2000
+  repo-root: "."
+  python: ".venv/Scripts/python.exe"
+  stream-rate-per-second: 4

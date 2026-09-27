@@ -74,6 +74,18 @@ public class EventLog implements AutoCloseable {
         return opened;
     }
 
+    /** Receives every event line as it is written (prompt 22: the admin event stream). */
+    private static final java.util.List<java.util.function.Consumer<String>> LISTENERS =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public static void addListener(java.util.function.Consumer<String> listener) {
+        LISTENERS.add(listener);
+    }
+
+    public static void removeListener(java.util.function.Consumer<String> listener) {
+        LISTENERS.remove(listener);
+    }
+
     public static EventLog get() {
         return instance;
     }
@@ -101,6 +113,13 @@ public class EventLog implements AutoCloseable {
         History.get().event(nodeId, lamport, (Long) fields.get("physical_ms"), type,
                 taskId, TraceContext.current(), details);
         String line = toJson(fields);
+        for (java.util.function.Consumer<String> listener : LISTENERS) {
+            try {
+                listener.accept(line);
+            } catch (RuntimeException e) {
+                LISTENERS.remove(listener);
+            }
+        }
         synchronized (this) {
             try {
                 writer.write(line);

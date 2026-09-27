@@ -220,9 +220,11 @@ class PredictionLog:
                         with conn.cursor() as cur:
                             cur.executemany(
                                 "INSERT INTO predictions (task_id, worker_id, pred_exec_ms,"
-                                " overload_prob, model_version, ts) VALUES (%s, %s, %s, %s, %s, %s)",
+                                " overload_prob, model_version, ts, pred_queue_len)"
+                                " VALUES (%s, %s, %s, %s, %s, %s, %s)",
                                 [(r["task_id"], p["worker_id"], p["pred_exec_ms"],
-                                  p["overload_prob"], r["model_versions"], r["ts"])
+                                  p["overload_prob"], r["model_versions"], r["ts"],
+                                  p.get("pred_queue_len"))
                                  for r in batch for p in r["predictions"]])
                     except Exception as e:  # noqa: BLE001
                         log.warning("predictions insert failed (%s); JSONL only from now", e)

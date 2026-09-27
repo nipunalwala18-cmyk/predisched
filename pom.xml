@@ -19,6 +19,7 @@
         <module>predisched-replication</module>
         <module>predisched-fault</module>
         <module>predisched-benchmark</module>
+        <module>predisched-dashboard-api</module>
     </modules>
 
     <properties>

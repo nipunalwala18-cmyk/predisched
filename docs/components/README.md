@@ -29,3 +29,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [benchmark.md](benchmark.md) | Full strategy comparison suite, what-if simulator, generated report; the results | 20 |
 | [model-lifecycle.md](model-lifecycle.md) | Shadow models, promotion rules, drift detection, alerts, retraining | 21 |
 | [autoscaling.md](autoscaling.md) | Predictive and reactive auto-scaling, launchers, the bursty-autoscale benchmark | 21 |
+| [dashboard-api.md](dashboard-api.md) | Spring Boot dashboard API: REST, STOMP stream, admin and chaos controls, AdminService | 22 |

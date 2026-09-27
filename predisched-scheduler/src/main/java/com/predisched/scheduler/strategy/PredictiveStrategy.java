@@ -87,6 +87,7 @@ public final class PredictiveStrategy implements SchedulingStrategy {
     private volatile DriftDetector drift;
     private volatile DoubleSupplier baselineMaeMs = () -> 0.0;
     private volatile Runnable onDrift;
+    private volatile String lastModelVersions = "";
 
     public PredictiveStrategy(Predictor predictor, Settings settings) {
         this(predictor, settings, null);
@@ -135,6 +136,11 @@ public final class PredictiveStrategy implements SchedulingStrategy {
 
     public DriftDetector drift() {
         return drift;
+    }
+
+    /** The model versions of the last prediction used (dashboard, prompt 22). */
+    public String modelVersions() {
+        return lastModelVersions;
     }
 
     @Override
@@ -195,6 +201,7 @@ public final class PredictiveStrategy implements SchedulingStrategy {
             }
         }
         StrategyDecision decision = score(task, candidates, result);
+        lastModelVersions = result.modelVersions();
         CandidateScore winner = decision.breakdown().stream()
                 .filter(CandidateScore::chosen).findFirst().orElseThrow();
         pending.put(task.id(), new Pending(winner.workerId(), winner.predictedExecMs(),

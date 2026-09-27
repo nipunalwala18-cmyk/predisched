@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package predisched;
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+import "task.proto";
+
+// Admin controls and live state for the dashboard API (prompt 22, F7, spec 15.10). Served by
+// every scheduler; only the primary accepts the mutating calls (the others answer ok=false with
+// a leader=<id> hint), GetClusterState and StreamEvents answer everywhere.
+
+message AdminReply {
+  bool ok = 1;
+  string message = 2;
+}
+
+message PauseRequest {}
+
+message DrainWorkerRequest {
+  string worker_id = 1;
+}
+
+message ElectionRequest {}
+
+message ClusterStateRequest {}
+
+message NodeState {
+  int32 id = 1;
+  string address = 2;
+  bool reachable = 3;
+  bool leader = 4;
+}
+
+message ClusterState {
+  string node_id = 1;              // the scheduler that answered
+  bool leader = 2;                 // is it the primary
+  int32 leader_id = 3;             // 0 when unknown or not clustered
+  repeated NodeState nodes = 4;    // the election peers, when clustered
+  repeated WorkerEntry workers = 5;
+  int32 queue_depth = 6;           // tasks waiting in the scheduler's queue
+  int32 running = 7;               // attempts in flight
+  string strategy = 8;
+  string model_versions = 9;       // from the predictive strategy's last answer, else empty
+  bool paused = 10;
+  double arrival_rate = 11;        // accepted submits per second, last 10 s
+  double decision_p50_ms = 12;
+  double decision_p95_ms = 13;
+  double live_mae_ms = 14;         // predictive only, NaN otherwise
+  int64 speculations = 15;
+  string autoscale_mode = 16;
+  int64 now_ms = 17;
+  int64 tasks_total = 18;          // tasks in the scheduler's store
+  int64 tasks_completed = 19;
+  int64 tasks_failed = 20;
+}
+
+message StreamRequest {
+  repeated string types = 1;       // event types to receive; empty for all
+}
+
+message EventMessage {
+  string json = 1;                 // one event-log line (node, lamport, type, task_id, details...)
+}
+
+service AdminService {
+  rpc SetStrategy (SetStrategyRequest) returns (SetStrategyResponse);
+  rpc PauseQueue (PauseRequest) returns (AdminReply);
+  rpc ResumeQueue (PauseRequest) returns (AdminReply);
+  rpc DrainWorker (DrainWorkerRequest) returns (AdminReply);
+  rpc TriggerElection (ElectionRequest) returns (AdminReply);
+  rpc GetClusterState (ClusterStateRequest) returns (ClusterState);
+  rpc StreamEvents (StreamRequest) returns (stream EventMessage);
+}

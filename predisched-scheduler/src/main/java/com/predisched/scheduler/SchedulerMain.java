@@ -249,6 +249,13 @@ public class SchedulerMain {
                 .addService(schedulerService)
                 .addService(new RegistryServiceImpl(workers, leadership::isLeader))
                 .addService(new ClockServiceImpl(id, physicalClock));
+        // Admin controls and the live view for the dashboard API (prompt 22, F7).
+        final String autoscaleName = autoscaleMode;
+        builder.addService(new AdminServiceImpl(new AdminServiceImpl.Parts(id, dispatcher,
+                new DispatcherAdmin(dispatcher, StrategyRegistry.standard(), strategySettings,
+                        workers), workers, running, queue, store, leadership, node,
+                electionConfig.getPeers(), () -> schedulerService.arrivals().perSecond(),
+                autoscaleName)));
         if (node != null) {
             builder.addService(node.service());
             if (node.replicationService() != null) {

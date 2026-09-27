@@ -5,3 +5,4 @@
 - `predictive.yaml`: `campaign-node.yaml` with the predictive strategy and its prediction-server client on (prompt 18, `docs/components/predictive-strategy.md`).
 - `chaos.yaml`: `cluster.yaml` with the chaos API and speculative execution on, least-loaded placement (prompt 19, `docs/components/speculation-and-chaos.md`).
 - `benchmark.yaml`, `benchmark-node.yaml`: the prompt 20 benchmark suite (scenarios, strategies, worker sets, controls) and the node config of every run.
+- `dashboard.yaml`: `chaos.yaml` with PostgreSQL history on, for the dashboard API demo (prompt 22, `docs/components/dashboard-api.md`).

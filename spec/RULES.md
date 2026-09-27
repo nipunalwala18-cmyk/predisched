@@ -45,7 +45,7 @@ prompt names before writing code.
 | Protobuf | 3.25.5 |
 | JUnit | 5.10.x |
 | Mockito | 5.x |
-| Spring Boot | 3.3.x |
+| Spring Boot | 3.3.x (3.3.4; springdoc-openapi 2.6.x, added in prompt 22) |
 | jjwt (JWT, F9) | 0.12.6 (added in prompt 09) |
 | PostgreSQL JDBC | 42.7.4 (added in prompt 11) |
 | HikariCP | 5.1.0 (added in prompt 11) |

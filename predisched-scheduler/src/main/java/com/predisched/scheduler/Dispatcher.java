@@ -105,6 +105,8 @@ public class Dispatcher implements AutoCloseable {
         }
     }
     private volatile boolean active;
+    /** Admin pause (prompt 22): tasks keep queueing, nothing is dispatched. */
+    private volatile boolean paused;
     private Thread thread;
     private volatile ResultCache cache;
     private volatile ArrivalRate arrivals = new ArrivalRate();
@@ -194,6 +196,10 @@ public class Dispatcher implements AutoCloseable {
         LamportInterceptors.applyMdc();
         while (active) {
             try {
+                if (paused) {
+                    Thread.sleep(50);
+                    continue;
+                }
                 String taskId = queue.take();
                 TaskRecord next = store.get(taskId);
                 if (next == null) {
@@ -349,6 +355,23 @@ public class Dispatcher implements AutoCloseable {
 
     public DecisionLog decisions() {
         return decisions;
+    }
+
+    /** Stops dispatching; queued tasks wait (prompt 22 admin control). */
+    public void pause() {
+        paused = true;
+        log.warn("Dispatch paused: tasks queue but are not sent to workers");
+        EventLog.get().event("QUEUE_PAUSED", "", Map.of());
+    }
+
+    public void resume() {
+        paused = false;
+        log.info("Dispatch resumed");
+        EventLog.get().event("QUEUE_RESUMED", "", Map.of());
+    }
+
+    public boolean isPaused() {
+        return paused;
     }
 
     public SpeculationStats speculation() {
