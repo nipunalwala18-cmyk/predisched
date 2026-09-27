@@ -83,6 +83,10 @@ public final class PredictiveStrategy implements SchedulingStrategy {
     private final AtomicLong fallbacks = new AtomicLong();
     private volatile DoubleSupplier arrivalRate = () -> 0.0;
     private volatile String lastFallbackReason = "";
+    // Drift (prompt 21, F15): rolling MAE over the live model's test MAE.
+    private volatile DriftDetector drift;
+    private volatile DoubleSupplier baselineMaeMs = () -> 0.0;
+    private volatile Runnable onDrift;
 
     public PredictiveStrategy(Predictor predictor, Settings settings) {
         this(predictor, settings, null);
@@ -114,6 +118,23 @@ public final class PredictiveStrategy implements SchedulingStrategy {
 
     public long fallbacks() {
         return fallbacks.get();
+    }
+
+    /**
+     * Watches the live MAE for drift (prompt 21): {@code baselineMaeMs} is the live model's test
+     * MAE (from the prediction server's Health); {@code onDrift} runs once per episode (retraining
+     * when configured). Returns this, for the registry.
+     */
+    public PredictiveStrategy useDrift(DriftDetector detector, DoubleSupplier baselineMaeMs,
+            Runnable onDrift) {
+        this.drift = detector;
+        this.baselineMaeMs = baselineMaeMs;
+        this.onDrift = onDrift;
+        return this;
+    }
+
+    public DriftDetector drift() {
+        return drift;
     }
 
     @Override
@@ -282,6 +303,31 @@ public final class PredictiveStrategy implements SchedulingStrategy {
                 "type_mae_ms", String.format(Locale.ROOT, "%.1f", s.typeMae())));
         History.get().predictionOutcome(task.id(), type, workerId, p.predExecMs(), execMs,
                 p.coldStart(), p.modelVersions(), s.mae(), s.typeMae(), now);
+        DriftDetector detector = drift;
+        if (detector != null) {
+            double baseline = baselineMaeMs.getAsDouble();
+            DriftDetector.Result d = detector.observe(s.mae(), baseline);
+            if (d.newEpisode()) {
+                Map<String, String> details = Map.of(
+                        "rolling_mae_ms", String.format(Locale.ROOT, "%.1f", s.mae()),
+                        "test_mae_ms", String.format(Locale.ROOT, "%.1f", baseline),
+                        "ratio", String.format(Locale.ROOT, "%.2f", d.ratio()),
+                        "threshold", String.valueOf(detector.threshold()),
+                        "window", String.valueOf(detector.window()),
+                        "model_versions", p.modelVersions());
+                log.warn("DRIFT: live exec-time MAE {} ms is {}x the model's test MAE {} ms for"
+                                + " {} tasks in a row (threshold {}x)",
+                        details.get("rolling_mae_ms"), details.get("ratio"),
+                        details.get("test_mae_ms"), d.above(), detector.threshold());
+                EventLog.get().event("DRIFT", task.id(), details);
+                com.predisched.common.obs.AlertSink.get().alert(
+                        com.predisched.common.obs.AlertSink.DRIFT, details);
+                Runnable hook = onDrift;
+                if (hook != null) {
+                    hook.run();
+                }
+            }
+        }
         if (s.tasks() % ACCURACY_LOG_EVERY == 0) {
             log.info("Live exec-time MAE over the last {} predicted tasks: {} ms (by type: {})",
                     s.window(), String.format(Locale.ROOT, "%.1f", s.mae()),

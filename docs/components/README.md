@@ -27,3 +27,5 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [predictive-strategy.md](predictive-strategy.md) | Predictive scheduling: cost function, fallback to least loaded, explain, live MAE, lambda tuning | 18 |
 | [speculation-and-chaos.md](speculation-and-chaos.md) | Speculative execution for stragglers; chaos API and CLI: latency, CPU, partition, drain, crash, burst | 19 |
 | [benchmark.md](benchmark.md) | Full strategy comparison suite, what-if simulator, generated report; the results | 20 |
+| [model-lifecycle.md](model-lifecycle.md) | Shadow models, promotion rules, drift detection, alerts, retraining | 21 |
+| [autoscaling.md](autoscaling.md) | Predictive and reactive auto-scaling, launchers, the bursty-autoscale benchmark | 21 |

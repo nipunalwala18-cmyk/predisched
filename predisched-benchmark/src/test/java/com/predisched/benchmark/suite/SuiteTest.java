@@ -164,6 +164,27 @@ class SuiteTest {
         assertEquals("least_loaded", first.get(6).strategy(), "rep 2 starts one strategy later");
         assertNotEquals(SuitePlan.plan(config, 2, "t-2").get(0).taskSuffix(),
                 first.get(0).taskSuffix(), "another suite's tasks never share ids");
+        assertTrue(first.stream().allMatch(r -> r.autoscale().equals("none")
+                && r.schedulerStrategy().equals(r.strategy())));
+    }
+
+    @Test
+    void anAutoscalingScenarioComparesItsVariantsUnderOneStrategy() throws Exception {
+        SuiteConfig config = config(dir);
+        Path yaml = dir.resolve("configs/benchmark.yaml");
+        Files.writeString(yaml, Files.readString(yaml) + "  - {name: s, profile: bursty,"
+                + " pattern: bursty, rate: 10, tasks: 20, seed: 9, workers: small,"
+                + " strategy: least_loaded, variants: [none, reactive, predictive]}\n",
+                StandardCharsets.UTF_8);
+        List<SuitePlan.Run> runs = SuitePlan.plan(SuiteConfig.load(yaml), 1, "t").stream()
+                .filter(r -> r.scenario().equals("s")).toList();
+        assertEquals(List.of("scale:none", "scale:reactive", "scale:predictive"),
+                runs.stream().map(SuitePlan.Run::strategy).toList());
+        assertTrue(runs.stream().allMatch(r -> r.schedulerStrategy().equals("least_loaded")));
+        assertEquals(List.of("none", "reactive", "predictive"),
+                runs.stream().map(SuitePlan.Run::autoscale).toList());
+        assertTrue(SuiteSummary.isPredictive("scale:predictive"));
+        assertTrue(!SuiteSummary.isPredictive("scale:reactive"));
     }
 
     @Test

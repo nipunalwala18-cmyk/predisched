@@ -54,6 +54,10 @@ message PredictResponse {
   int32 model_version = 2;       // M1's live version
   string model_versions = 3;     // e.g. "m1=v1,m2=v1,m3=v1"
   double server_ms = 4;          // time spent in Predict, for the client's latency split
+  // Prompt 21 (F14): what the shadow versions predict for the same workers. Logged for
+  // comparison; the scheduler uses only the live predictions above. Empty without a shadow.
+  repeated WorkerPrediction shadow_predictions = 5;
+  int32 shadow_version = 6;      // M1's shadow version, 0 for none
 }
 
 message HealthRequest {}
@@ -63,6 +67,9 @@ message HealthResponse {
   string model_versions = 2;
   int64 predictions = 3;         // requests answered since start
   int64 reloads = 4;             // hot reloads since start
+  // Prompt 21 (F15): the live M1's MAE on its held-out test set, the drift baseline.
+  double m1_test_mae_ms = 5;
+  string shadow_versions = 6;    // e.g. "m1=v2", empty for none
 }
 
 service PredictionService {

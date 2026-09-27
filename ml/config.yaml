@@ -24,6 +24,12 @@ models:
     kind: classification
     primary: f1
 
+# Promotion of a shadow version to live (prompt 21, F14): it must beat live's MAE by this margin
+# on at least minTasks completed tasks both predicted (python -m predisched_ml.registry promote).
+promotion:
+  margin: 0.05
+  minTasks: 200
+
 # Small grids, searched with time-series CV on the training part only.
 grids:
   linear:

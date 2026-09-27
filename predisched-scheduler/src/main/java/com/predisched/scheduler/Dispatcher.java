@@ -685,6 +685,14 @@ public class Dispatcher implements AutoCloseable {
                     attemptNumber, workerId, TaskAttempt.Outcome.SUCCEEDED, "",
                     startedAtMs, endedAtMs, result.getExecTimeMs());
             retries.succeeded(taskId, attempt, result.getOutput(), result.getExecTimeMs());
+            if (succeeded != null && succeeded.deadlineAt() > 0
+                    && endedAtMs > succeeded.deadlineAt()) {
+                com.predisched.common.obs.AlertSink.get().alert(
+                        com.predisched.common.obs.AlertSink.SLA_BREACH, Map.of(
+                                "task", taskId,
+                                "worker", workerId,
+                                "late_ms", String.valueOf(endedAtMs - succeeded.deadlineAt())));
+            }
             return;
         }
 

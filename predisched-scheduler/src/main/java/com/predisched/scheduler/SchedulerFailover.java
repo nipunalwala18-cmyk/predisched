@@ -198,6 +198,11 @@ public class SchedulerFailover
                 "worker", workerId,
                 "silent_ms", String.valueOf(silentMs),
                 "requeued", String.valueOf(lost.size())));
+        com.predisched.common.obs.AlertSink.get().alert(
+                com.predisched.common.obs.AlertSink.NODE_FAILURE, Map.of(
+                        "worker", workerId,
+                        "missed_heartbeats", String.valueOf(missed),
+                        "requeued", String.valueOf(lost.size())));
         String reason = "WORKER_LOST: " + workerId + " missed " + missed + " heartbeats";
         for (RunningTasks.Running task : lost) {
             boolean partnerRunning = task.speculative()

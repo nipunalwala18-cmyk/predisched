@@ -32,10 +32,19 @@ from jinja2 import Template  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 STRATEGIES = ["round_robin", "random", "least_loaded", "resource_aware", "predictive"]
-# Categorical slots 1-5 of the reference palette, in fixed order (identity follows the strategy).
-COLORS = dict(zip(STRATEGIES, ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"]))
+# Auto-scaling arms (prompt 21): same scenario and strategy, the scaling mode varies.
+SCALING = ["scale:none", "scale:reactive", "scale:predictive"]
+PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"]
+# Categorical slots of the reference palette, in fixed order (identity follows the arm).
+COLORS = {**dict(zip(STRATEGIES, PALETTE)), **dict(zip(SCALING, PALETTE))}
 LABELS = {"round_robin": "Round robin", "random": "Random", "least_loaded": "Least loaded",
-          "resource_aware": "Resource-aware", "predictive": "Predictive"}
+          "resource_aware": "Resource-aware", "predictive": "Predictive",
+          "scale:none": "No scaling", "scale:reactive": "Reactive scaling",
+          "scale:predictive": "Predictive scaling"}
+
+
+def is_predictive(arm: str) -> bool:
+    return arm == "predictive" or arm.endswith(":predictive")
 METRICS = [  # column, label, unit, lower is better (None: no direction)
     ("mean_latency_ms", "Mean latency", "ms", True),
     ("p95_latency_ms", "p95 latency", "ms", True),
@@ -111,8 +120,8 @@ def headlines(summary: pd.DataFrame, scenarios: list[str]) -> list[dict]:
     for scenario in scenarios:
         items = []
         for metric in HEADLINE_METRICS:
-            row = summary[(summary.scenario == scenario) & (summary.strategy == "predictive")
-                          & (summary.metric == metric)]
+            row = summary[(summary.scenario == scenario)
+                          & summary.strategy.map(is_predictive) & (summary.metric == metric)]
             if row.empty or pd.isna(row["p_value"].iat[0]):
                 continue
             r = row.iloc[0]
@@ -128,7 +137,7 @@ def headlines(summary: pd.DataFrame, scenarios: list[str]) -> list[dict]:
             if p < 0.05:
                 better = (diff < 0) == bool(lower_better)
                 verdict = "better" if better else "worse"
-                text = (f"{label}: predictive {diff:+.1f} % vs {base} "
+                text = (f"{label}: {LABELS.get(r['strategy'], r['strategy'])} {diff:+.1f} % vs {base} "
                         f"({p_text(p)}, d = {r['cohens_d']:.2f}): {verdict}")
             else:
                 text = (f"{label}: no significant difference vs {base} "
@@ -221,7 +230,10 @@ def imbalance_box(runs: pd.DataFrame, scenarios: list[str]) -> str:
         for patch, s in zip(bp["boxes"], STRATEGIES):
             patch.set_facecolor(COLORS[s])
             patch.set_alpha(0.85)
-        ax.set_xticks(range(1, len(STRATEGIES) + 1), ["RR", "Rnd", "LL", "RA", "Pred"],
+        short = {"round_robin": "RR", "random": "Rnd", "least_loaded": "LL",
+                 "resource_aware": "RA", "predictive": "Pred", "scale:none": "none",
+                 "scale:reactive": "reactive", "scale:predictive": "predictive"}
+        ax.set_xticks(range(1, len(STRATEGIES) + 1), [short.get(s, s) for s in STRATEGIES],
                       fontsize=8)
         style(ax, scenario)
     axes[0].set_ylabel("std of tasks per worker")
@@ -285,10 +297,10 @@ def scenario_tables(summary: pd.DataFrame, scenarios: list[str]) -> list[dict]:
                 digits = 2 if c in ("imbalance", "throughput_per_s", "sla_violation_pct") else 0
                 cells.append(fmt(m, digits) + ("" if pd.isna(sd) else " ± " + fmt(sd, digits)))
             rows.append({"strategy": LABELS[s], "cells": cells,
-                         "predictive": s == "predictive"})
+                         "predictive": is_predictive(s)})
         tests = []
         for c in shown:
-            r = summary[(summary.scenario == scenario) & (summary.strategy == "predictive")
+            r = summary[(summary.scenario == scenario) & summary.strategy.map(is_predictive)
                         & (summary.metric == c)]
             if r.empty or pd.isna(r["p_value"].iat[0]):
                 tests.append("")
@@ -415,6 +427,12 @@ def print_pdf(html: Path, pdf: Path) -> bool:
     return pdf.exists()
 
 
+def arms_of(runs: pd.DataFrame) -> list[str]:
+    present = list(dict.fromkeys(runs["strategy"]))
+    known = [a for a in STRATEGIES + SCALING if a in present]
+    return known + [a for a in present if a not in known]
+
+
 def main(argv=None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -426,6 +444,11 @@ def main(argv=None) -> int:
     suite_dir = REPO / "results" / "benchmark" / args.suite_id
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
     runs, summary, tasks = load(suite_dir)
+    global STRATEGIES
+    STRATEGIES = arms_of(runs)
+    for i, arm in enumerate(STRATEGIES):
+        COLORS.setdefault(arm, PALETTE[i % len(PALETTE)])
+        LABELS.setdefault(arm, arm)
     scenarios = [s["name"] for s in config["scenarios"] if s["name"] in set(runs.scenario)]
     heads = headlines(summary, scenarios)
     overhead = []
@@ -434,7 +457,7 @@ def main(argv=None) -> int:
         overhead.append({"strategy": LABELS[s], "mean": fmt(g["overhead_mean_us"].mean(), 0),
                          "p95": fmt(g["overhead_p95_us"].mean(), 0)})
     mae = [{"scenario": sc, "value": fmt(runs[(runs.scenario == sc)
-                                             & (runs.strategy == "predictive")]["mae_ms"].mean())}
+                                             & runs.strategy.map(is_predictive)]["mae_ms"].mean())}
            for sc in scenarios]
     html = TEMPLATE.render(
         suite_id=args.suite_id, generated=dt.datetime.now().strftime("%Y-%m-%d %H:%M"),

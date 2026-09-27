@@ -31,7 +31,7 @@ public final class RunMetrics {
             "tasks", "completed", "failed", "mean_latency_ms", "p95_latency_ms",
             "p99_latency_ms", "throughput_per_s", "makespan_ms", "cpu_mean_pct", "cpu_var",
             "imbalance", "max_queue", "sla_violation_pct", "overhead_mean_us",
-            "overhead_p95_us", "mae_ms");
+            "overhead_p95_us", "mae_ms", "scale_ups", "scale_downs");
 
     private RunMetrics() {}
 

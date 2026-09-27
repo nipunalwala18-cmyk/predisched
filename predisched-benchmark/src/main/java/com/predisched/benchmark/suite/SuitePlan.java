@@ -11,8 +11,14 @@ import java.util.List;
  */
 public final class SuitePlan {
 
+    /**
+     * @param strategy what the run compares: a strategy, or {@code scale:<mode>} in an
+     *      auto-scaling scenario
+     * @param schedulerStrategy the {@code --strategy} the scheduler runs with
+     * @param autoscale the {@code --autoscale} mode ({@code none} outside such scenarios)
+     */
     public record Run(int index, String runId, String scenario, String strategy, int rep,
-            String taskSuffix) {}
+            String taskSuffix, String schedulerStrategy, String autoscale) {}
 
     private SuitePlan() {}
 
@@ -30,13 +36,17 @@ public final class SuitePlan {
         int index = 0;
         for (int rep = 1; rep <= reps; rep++) {
             for (SuiteConfig.Scenario scenario : config.scenarios()) {
-                for (int i = 0; i < strategies.size(); i++) {
-                    String strategy = strategies.get((i + rep - 1) % strategies.size());
+                boolean scaling = scenario.variants() != null && !scenario.variants().isEmpty();
+                List<String> arms = scaling ? scenario.variants() : strategies;
+                for (int i = 0; i < arms.size(); i++) {
+                    String arm = arms.get((i + rep - 1) % arms.size());
+                    String label = scaling ? "scale:" + arm : arm;
                     index++;
-                    String runId = config.suite() + "-" + scenario.name() + "-" + strategy + "-r"
-                            + rep;
-                    runs.add(new Run(index, runId, scenario.name(), strategy, rep,
-                            "~" + suiteId + "r" + index));
+                    String runId = config.suite() + "-" + scenario.name() + "-"
+                            + label.replace(':', '-') + "-r" + rep;
+                    runs.add(new Run(index, runId, scenario.name(), label, rep,
+                            "~" + suiteId + "r" + index,
+                            scaling ? scenario.strategy() : arm, scaling ? arm : "none"));
                 }
             }
         }

@@ -131,6 +131,10 @@ public class SchedulerMain {
         WorkerClients clients = new WorkerClients();
         // An unknown strategy name stops the scheduler here, listing the valid ones.
         NodeConfig.SchedulingConfig scheduling = config.getScheduling();
+        // Alerts (prompt 21): DRIFT, SLA_BREACH and NODE_FAILURE to the configured webhook.
+        com.predisched.common.obs.AlertSink.install(new com.predisched.common.obs.AlertSink(id,
+                config.getAlerts().getWebhookUrl(), config.getAlerts().getMinIntervalMs(),
+                System::currentTimeMillis));
         StrategyRegistry.Settings strategySettings = StrategyRegistry.Settings.from(config);
         SchedulingStrategy strategy = StrategyRegistry.standard().create(
                 opts.getOrDefault("--strategy", scheduling.getStrategy()), strategySettings);
@@ -173,6 +177,60 @@ public class SchedulerMain {
         TimeoutWatcher timeouts = new TimeoutWatcher(
                 running, workers, clients, queueConfig.getTimeoutCheckMs());
         timeouts.start();
+        // Auto-scaling (prompt 21, F12): off unless autoscale.mode (or --autoscale) says
+        // reactive or predictive; only the primary acts.
+        String autoscaleMode = opts.getOrDefault("--autoscale", config.getAutoscale().getMode());
+        com.predisched.scheduler.autoscale.AutoScaler autoscaler = null;
+        if (!"none".equalsIgnoreCase(autoscaleMode)) {
+            com.predisched.scheduler.autoscale.Forecaster forecaster;
+            if ("predictive".equalsIgnoreCase(autoscaleMode)) {
+                com.predisched.scheduler.prediction.PredictionClient forecasts =
+                        com.predisched.scheduler.prediction.PredictionClient.create(
+                                config.getPrediction());
+                forecasts.warmUp(2_000);
+                forecaster = com.predisched.scheduler.autoscale.Forecaster.predictive(
+                        forecasts::predict);
+            } else {
+                forecaster = com.predisched.scheduler.autoscale.Forecaster.reactive();
+            }
+            final TaskQueue scaleQueue = queue;
+            autoscaler = new com.predisched.scheduler.autoscale.AutoScaler(config.getAutoscale(),
+                    new com.predisched.scheduler.autoscale.ClusterView() {
+                        @Override
+                        public State snapshot() {
+                            java.util.Map<String, Integer> inFlight = new java.util.HashMap<>();
+                            java.util.List<WorkerInfo> live = new java.util.ArrayList<>();
+                            for (WorkerInfo w : workers.healthy()) {
+                                int n = running.countFor(w.id());
+                                inFlight.put(w.id(), n);
+                                if (!workers.isDraining(w.id())) {
+                                    live.add(w.withLiveLoad(n));
+                                }
+                            }
+                            return new State(live, scaleQueue.size(), inFlight);
+                        }
+
+                        @Override
+                        public boolean isLeader() {
+                            return leadership.isLeader();
+                        }
+
+                        @Override
+                        public void drain(String workerId) {
+                            workers.markDraining(workerId);
+                        }
+
+                        @Override
+                        public void forget(String workerId) {
+                            workers.remove(workerId);
+                        }
+                    }, forecaster,
+                    com.predisched.scheduler.autoscale.WorkerLauncher.from(config.getAutoscale(),
+                            configPath),
+                    System::currentTimeMillis);
+            autoscaler.start();
+        }
+        final com.predisched.scheduler.autoscale.AutoScaler scaler = autoscaler;
         // Speculative execution for stragglers (prompt 19, F11): off unless configured.
         StragglerDetector stragglers = config.getSpeculation().isEnabled()
                 ? new StragglerDetector(dispatcher, running, store, config.getSpeculation())
@@ -237,6 +295,9 @@ public class SchedulerMain {
             timeouts.close();
             if (stragglers != null) {
                 stragglers.close();
+            }
+            if (scaler != null) {
+                scaler.close();
             }
             workerDeaths.close();
             retries.close();

@@ -93,3 +93,16 @@ cache:
   maxEntries: 10000
 chaos:
   enabled: true
+autoscale:
+  # Auto-scaling (prompt 21): off here; the bursty-autoscale scenario sets --autoscale per run.
+  mode: "none"
+  intervalMs: 1000
+  upRatio: 1.0
+  downRatio: 0.3
+  coolDownMs: 8000
+  minWorkers: 1
+  maxWorkers: 4
+  drainTimeoutMs: 15000
+  launcher: "process"
+  poolSize: 4
+  basePort: 51070

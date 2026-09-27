@@ -22,6 +22,8 @@ workerSets:
     - {id: worker-1, port: 51061, poolSize: 4, slowdown: 1.0}
     - {id: worker-2, port: 51062, poolSize: 4, slowdown: 1.0}
     - {id: worker-3, port: 51063, poolSize: 4, slowdown: 1.0}
+  single:
+    - {id: worker-1, port: 51061, poolSize: 2, slowdown: 1.0}
   heterogeneous:
     - {id: worker-1, port: 51061, poolSize: 2, slowdown: 2.0}
     - {id: worker-2, port: 51062, poolSize: 4, slowdown: 1.0}
@@ -65,3 +67,15 @@ scenarios:
     workers: heterogeneous
     killWorker: worker-2      # crashed through the chaos API ...
     killAtMs: 6000            # ... this long after the replay starts
+  # Prompt 21 (F12): one small worker to start from and a heavy burst; the runs compare no
+  # scaling, reactive scaling (queues now) and predictive scaling (M2 queue forecast), all under
+  # least_loaded placement. Run with --scenario bursty-autoscale.
+  - name: bursty-autoscale
+    profile: bursty
+    pattern: bursty
+    rate: 20
+    tasks: 400
+    seed: 2006
+    workers: single
+    strategy: least_loaded
+    variants: [none, reactive, predictive]

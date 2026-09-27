@@ -79,7 +79,7 @@ public final class SuiteSummary {
                     row.put("n", String.valueOf(v.length));
                     row.put("mean", fmt(Stats.mean(v)));
                     row.put("std", fmt(Stats.std(v)));
-                    boolean test = strategy.equals(PREDICTIVE) && best != null
+                    boolean test = isPredictive(strategy) && best != null
                             && !NEUTRAL.contains(metric) && v.length > 0;
                     double[] b = best == null ? new double[0] : values.get(best);
                     row.put("best_baseline", test ? best : "");
@@ -95,13 +95,18 @@ public final class SuiteSummary {
         return out;
     }
 
+    /** The predictive arm: the predictive strategy, or predictive auto-scaling. */
+    static boolean isPredictive(String strategy) {
+        return strategy.equals(PREDICTIVE) || strategy.endsWith(":" + PREDICTIVE);
+    }
+
     /** The reactive strategy with the best mean for this metric, or null. */
     static String bestBaseline(String metric, Map<String, double[]> values) {
         String best = null;
         double bestMean = Double.NaN;
         boolean higher = HIGHER_IS_BETTER.contains(metric);
         for (Map.Entry<String, double[]> e : values.entrySet()) {
-            if (e.getKey().equals(PREDICTIVE) || e.getValue().length == 0) {
+            if (isPredictive(e.getKey()) || e.getValue().length == 0) {
                 continue;
             }
             double m = Stats.mean(e.getValue());

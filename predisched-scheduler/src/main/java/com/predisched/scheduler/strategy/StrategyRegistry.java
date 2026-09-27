@@ -19,11 +19,12 @@ public final class StrategyRegistry {
      * (prompt 17) and {@code predictive} the cost-function settings (prompt 18).
      */
     public record Settings(long seed, double cpuWeight, double memWeight, double queueWeight,
-            NodeConfig.PredictionConfig prediction, PredictiveStrategy.Settings predictive) {
+            NodeConfig.PredictionConfig prediction, PredictiveStrategy.Settings predictive,
+            NodeConfig.DriftConfig drift) {
 
         public Settings(long seed, double cpuWeight, double memWeight, double queueWeight) {
             this(seed, cpuWeight, memWeight, queueWeight, new NodeConfig.PredictionConfig(),
-                    PredictiveStrategy.Settings.defaults());
+                    PredictiveStrategy.Settings.defaults(), new NodeConfig.DriftConfig());
         }
 
         public static Settings defaults() {
@@ -36,7 +37,8 @@ public final class StrategyRegistry {
             return new Settings(s.getSeed(), s.getCpuWeight(), s.getMemWeight(),
                     s.getQueueWeight(), config.getPrediction(),
                     new PredictiveStrategy.Settings(s.getLambda(), s.getOverloadThreshold(),
-                            s.getHighPriority(), s.getHighPriorityOverloadThreshold()));
+                            s.getHighPriority(), s.getHighPriorityOverloadThreshold()),
+                    config.getDrift());
         }
     }
 
@@ -66,7 +68,21 @@ public final class StrategyRegistry {
         }
         PredictionClient client = PredictionClient.create(prediction);
         client.warmUp(2_000);
-        return new PredictiveStrategy(client::predict, settings.predictive());
+        PredictiveStrategy strategy = new PredictiveStrategy(client::predict,
+                settings.predictive());
+        NodeConfig.DriftConfig drift = settings.drift();
+        if (drift != null && drift.isEnabled()) {
+            // Drift (prompt 21): baseline from the server's Health, refreshed if it was not up.
+            Runnable retrain = drift.isAutoRetrain()
+                    ? new com.predisched.scheduler.RetrainLauncher(drift) : null;
+            strategy.useDrift(new DriftDetector(drift.getThreshold(), drift.getWindow()), () -> {
+                if (client.testMaeMs() <= 0) {
+                    client.warmUp(500);
+                }
+                return client.testMaeMs();
+            }, retrain);
+        }
+        return strategy;
     }
 
     public synchronized StrategyRegistry register(

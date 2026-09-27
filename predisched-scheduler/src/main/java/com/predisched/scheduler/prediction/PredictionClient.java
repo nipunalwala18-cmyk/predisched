@@ -61,6 +61,7 @@ public final class PredictionClient implements AutoCloseable {
     private final int latencyLogEvery;
     private final LatencyWindow latencies = new LatencyWindow(1024);
     private final AtomicLong calls = new AtomicLong();
+    private volatile double testMaeMs;
     private final AtomicLong failures = new AtomicLong();
     private final AtomicLong shortCircuited = new AtomicLong();
 
@@ -100,8 +101,11 @@ public final class PredictionClient implements AutoCloseable {
         try {
             HealthResponse health = stub.withDeadlineAfter(timeoutMs, TimeUnit.MILLISECONDS)
                     .health(HealthRequest.getDefaultInstance());
-            log.info("Prediction server ready: {} ({} predictions served so far)",
-                    health.getModelVersions(), health.getPredictions());
+            log.info("Prediction server ready: {} ({} predictions served so far){}",
+                    health.getModelVersions(), health.getPredictions(),
+                    health.getShadowVersions().isEmpty() ? ""
+                            : "; shadow " + health.getShadowVersions());
+            testMaeMs = health.getM1TestMaeMs();
             return health.getModelVersions();
         } catch (StatusRuntimeException e) {
             log.warn("Prediction server not reachable yet: {}", e.getStatus().getCode());
@@ -177,6 +181,11 @@ public final class PredictionClient implements AutoCloseable {
 
     private static String fmt(double ms) {
         return String.format(java.util.Locale.ROOT, "%.2f", ms);
+    }
+
+    /** The live M1's test MAE from the last Health answer; 0 before one (drift baseline). */
+    public double testMaeMs() {
+        return testMaeMs;
     }
 
     public CircuitBreaker.State breakerState() {

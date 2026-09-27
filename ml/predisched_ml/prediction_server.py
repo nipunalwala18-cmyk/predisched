@@ -64,19 +64,31 @@ class ModelSet:
     m2: object
     m3: object
     versions: dict      # {"m1": 1, ...}
+    shadows: dict = dataclasses.field(default_factory=dict)   # {"m1": (obj, version)} (F14)
+    m1_test_mae: float = 0.0
 
     @property
     def label(self) -> str:
         return ",".join(f"{m}=v{self.versions[m]}" for m in MODELS)
 
+    @property
+    def shadow_label(self) -> str:
+        return ",".join(f"{m}=v{self.shadows[m][1]}" for m in MODELS if m in self.shadows)
+
     @classmethod
     def load(cls, root: Path = registry.MODELS_DIR) -> "ModelSet":
-        loaded, versions = {}, {}
+        loaded, versions, shadows = {}, {}, {}
+        test_mae = 0.0
         for model_id in MODELS:
             obj, meta = registry.load(model_id, root)
             loaded[model_id] = obj
             versions[model_id] = int(meta["version"])
-        return cls(loaded["m1"], loaded["m2"], loaded["m3"], versions)
+            if model_id == "m1":
+                test_mae = float((meta.get("metrics") or {}).get("test", {}).get("mae") or 0.0)
+            shadow = registry.shadow_version(model_id, root)
+            if shadow:
+                shadows[model_id] = (registry.load(model_id, root, shadow)[0], int(shadow))
+        return cls(loaded["m1"], loaded["m2"], loaded["m3"], versions, shadows, test_mae)
 
 
 class InvalidRequest(ValueError):
@@ -253,16 +265,46 @@ class PredictionService(pb_grpc.PredictionServiceServicer):
                             "pred_queue_len": round(p.pred_queue_len, 4),
                             "overload_prob": round(p.overload_prob, 5),
                             "cold_start": p.cold_start})
+        shadow_records = self._shadow(models, frame, exec_ms, queue_len, overload, response)
         response.server_ms = (time.perf_counter() - started) * 1000
         with self._count_lock:
             self.served += 1
         if self.log:
-            self.log.add({"ts": dt.datetime.now(dt.timezone.utc).isoformat(),
-                          "request_id": request.request_id, "task_id": request.task.task_id,
-                          "task_type": frame["task_type"].iat[0],
-                          "model_versions": models.label, "latency_ms": round(response.server_ms, 3),
-                          "predictions": records})
+            record = {"ts": dt.datetime.now(dt.timezone.utc).isoformat(),
+                      "request_id": request.request_id, "task_id": request.task.task_id,
+                      "task_type": frame["task_type"].iat[0],
+                      "model_versions": models.label, "m1_version": models.versions["m1"],
+                      "latency_ms": round(response.server_ms, 3), "predictions": records}
+            if shadow_records:
+                record.update(shadow_versions=models.shadow_label,
+                              shadow_version=response.shadow_version,
+                              shadow_predictions=shadow_records)
+            self.log.add(record)
         return response
+
+    @staticmethod
+    def _shadow(models: ModelSet, frame, exec_ms, queue_len, overload, response) -> list[dict]:
+        """Shadow predictions (F14): a model's shadow version where it has one, else live."""
+        if not models.shadows:
+            return []
+        s_exec, s_queue, s_over = exec_ms, queue_len, overload
+        if "m1" in models.shadows:
+            s_exec = models.shadows["m1"][0].predict_with_flags(frame)[0]
+            response.shadow_version = models.shadows["m1"][1]
+        if "m2" in models.shadows:
+            s_queue = np.clip(np.asarray(models.shadows["m2"][0].predict(frame), dtype=float),
+                              0.0, None)
+        if "m3" in models.shadows:
+            s_over = np.asarray(models.shadows["m3"][0].predict_proba(frame), dtype=float)
+        out = []
+        for i, worker in enumerate(frame["worker_id"]):
+            p = response.shadow_predictions.add(worker_id=worker, pred_exec_ms=float(s_exec[i]),
+                                                pred_queue_len=float(s_queue[i]),
+                                                overload_prob=float(s_over[i]))
+            out.append({"worker_id": worker, "pred_exec_ms": round(p.pred_exec_ms, 3),
+                        "pred_queue_len": round(p.pred_queue_len, 4),
+                        "overload_prob": round(p.overload_prob, 5)})
+        return out
 
     # --- gRPC ------------------------------------------------------------------------------
     def Predict(self, request, context):  # noqa: N802 - gRPC method name
@@ -276,7 +318,9 @@ class PredictionService(pb_grpc.PredictionServiceServicer):
 
     def Health(self, request, context):  # noqa: N802
         return pb.HealthResponse(ready=True, model_versions=self.models.label,
-                                 predictions=self.served, reloads=self.reloads)
+                                 predictions=self.served, reloads=self.reloads,
+                                 m1_test_mae_ms=self.models.m1_test_mae,
+                                 shadow_versions=self.models.shadow_label)
 
     def reload(self, root: Path = registry.MODELS_DIR) -> bool:
         try:
@@ -284,11 +328,14 @@ class PredictionService(pb_grpc.PredictionServiceServicer):
         except Exception as e:  # noqa: BLE001 - keep serving the old set
             log.error("model reload failed, keeping %s: %s", self.models.label, e)
             return False
-        if fresh.versions != self.models.versions:
-            old = self.models.label
+        if (fresh.versions != self.models.versions
+                or fresh.shadow_label != self.models.shadow_label):
+            old = self.models.label + (f" shadow {self.models.shadow_label}"
+                                       if self.models.shadows else "")
             self.models = fresh
             self.reloads += 1
-            log.info("models reloaded: %s -> %s", old, fresh.label)
+            log.info("models reloaded: %s -> %s%s", old, fresh.label,
+                     f" shadow {fresh.shadow_label}" if fresh.shadows else "")
         return True
 
 

@@ -78,8 +78,9 @@ public final class RunSuite {
         Path runsCsv = out.resolve("runs.csv");
 
         List<SuitePlan.Run> plan = SuitePlan.plan(config, reps, suiteId);
-        if (opts.containsKey("--only")) {
-            Set<String> only = Set.of(opts.get("--only").split(","));
+        String only0 = opts.getOrDefault("--scenario", opts.get("--only"));
+        if (only0 != null) {
+            Set<String> only = Set.of(only0.split(","));
             plan = plan.stream().filter(r -> only.contains(r.scenario())).toList();
         }
         if (flags.contains("--plan")) {
@@ -163,7 +164,8 @@ public final class RunSuite {
         Path logs = out.resolve("logs").resolve(run.runId());
         Files.createDirectories(logs);
         Path csv = out.resolve("runs").resolve(run.runId() + ".csv");
-        Cluster cluster = Cluster.start(root, config.nodeConfig(), run.strategy(), workers, logs);
+        Cluster cluster = Cluster.start(root, config.nodeConfig(), run.schedulerStrategy(),
+                run.autoscale(), workers, logs);
         long windowStart = System.currentTimeMillis();
         Thread killer = null;
         try (SchedulerClient client = new SchedulerClient("localhost", SCHEDULER_PORT)) {
@@ -200,6 +202,11 @@ public final class RunSuite {
                 config.deadlineMs()));
         m.putAll(fromDatabase(db, run.taskSuffix(), windowStart, windowEnd));
         cluster.stop();
+        // Auto-scaling (prompt 21): how often the scheduler scaled during the run.
+        List<String> log = Files.readAllLines(logs.resolve("scheduler.log"), StandardCharsets.UTF_8);
+        m.put("scale_ups", (double) log.stream().filter(l -> l.contains("Scale up:")).count());
+        m.put("scale_downs", (double) log.stream()
+                .filter(l -> l.contains("Scale down: stopped")).count());
         return m;
     }
 
@@ -308,7 +315,7 @@ public final class RunSuite {
     static final class Cluster {
         private final List<Process> processes = new ArrayList<>();
 
-        static Cluster start(Path root, String nodeConfig, String strategy,
+        static Cluster start(Path root, String nodeConfig, String strategy, String autoscale,
                 List<SuiteConfig.WorkerSpec> workers, Path logs) throws Exception {
             waitFor(() -> !portOpen(SCHEDULER_PORT) && workers.stream()
                     .noneMatch(w -> portOpen(w.port())), 30_000, "ports from the last run");
@@ -316,7 +323,8 @@ public final class RunSuite {
             Cluster cluster = new Cluster();
             cluster.processes.add(new ProcessBuilder(java, "-jar",
                     "predisched-scheduler/target/predisched-scheduler.jar", "--config", nodeConfig,
-                    "--port", String.valueOf(SCHEDULER_PORT), "--strategy", strategy)
+                    "--port", String.valueOf(SCHEDULER_PORT), "--strategy", strategy,
+                    "--autoscale", autoscale == null ? "none" : autoscale)
                     .directory(root.toFile()).redirectErrorStream(true)
                     .redirectOutput(logs.resolve("scheduler.log").toFile()).start());
             waitFor(() -> portOpen(SCHEDULER_PORT), 60_000, "scheduler");
@@ -351,6 +359,8 @@ public final class RunSuite {
 
         void stop() throws InterruptedException {
             for (Process p : processes) {
+                // Workers the auto-scaler started are the scheduler's children (prompt 21).
+                p.descendants().forEach(ProcessHandle::destroyForcibly);
                 p.destroy();
             }
             for (Process p : processes) {

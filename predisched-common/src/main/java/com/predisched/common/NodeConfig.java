@@ -26,6 +26,33 @@ public class NodeConfig {
     private MlConfig ml = new MlConfig();
     private PredictionConfig prediction = new PredictionConfig();
     private ChaosConfig chaos = new ChaosConfig();
+    private DriftConfig drift = new DriftConfig();
+    private AlertsConfig alerts = new AlertsConfig();
+    private AutoscaleConfig autoscale = new AutoscaleConfig();
+
+    public DriftConfig getDrift() {
+        return drift;
+    }
+
+    public void setDrift(DriftConfig drift) {
+        this.drift = drift;
+    }
+
+    public AlertsConfig getAlerts() {
+        return alerts;
+    }
+
+    public void setAlerts(AlertsConfig alerts) {
+        this.alerts = alerts;
+    }
+
+    public AutoscaleConfig getAutoscale() {
+        return autoscale;
+    }
+
+    public void setAutoscale(AutoscaleConfig autoscale) {
+        this.autoscale = autoscale;
+    }
     private SpeculationConfig speculation = new SpeculationConfig();
 
     public ChaosConfig getChaos() {
@@ -1075,6 +1102,241 @@ public class NodeConfig {
 
         public void setTimeoutMs(long timeoutMs) {
             this.timeoutMs = timeoutMs;
+        }
+    }
+
+    /**
+     * Drift detection (prompt 21, F15): the predictive strategy's rolling exec-time MAE over the
+     * live M1's test MAE. A ratio above {@code threshold} for {@code window} tasks in a row is one
+     * DRIFT episode (one event and alert). With {@code autoRetrain}, an episode runs
+     * {@code retrainCommand} in {@code retrainWorkDir}: it registers a shadow model, never a live one.
+     */
+    public static class DriftConfig {
+        private boolean enabled = true;
+        private double threshold = 1.5;
+        private int window = 50;
+        private boolean autoRetrain = false;
+        private String retrainCommand =
+                "../.venv/Scripts/python.exe -m predisched_ml.retrain --since-hours 24";
+        private String retrainWorkDir = "ml";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public double getThreshold() {
+            return threshold;
+        }
+
+        public void setThreshold(double threshold) {
+            this.threshold = threshold;
+        }
+
+        public int getWindow() {
+            return window;
+        }
+
+        public void setWindow(int window) {
+            this.window = window;
+        }
+
+        public boolean isAutoRetrain() {
+            return autoRetrain;
+        }
+
+        public void setAutoRetrain(boolean autoRetrain) {
+            this.autoRetrain = autoRetrain;
+        }
+
+        public String getRetrainCommand() {
+            return retrainCommand;
+        }
+
+        public void setRetrainCommand(String retrainCommand) {
+            this.retrainCommand = retrainCommand;
+        }
+
+        public String getRetrainWorkDir() {
+            return retrainWorkDir;
+        }
+
+        public void setRetrainWorkDir(String retrainWorkDir) {
+            this.retrainWorkDir = retrainWorkDir;
+        }
+    }
+
+    /**
+     * Alerts (prompt 21, F23 minimal): DRIFT, SLA_BREACH and NODE_FAILURE posted as JSON to a
+     * webhook. Empty URL: no alerts. At most one alert per type every {@code minIntervalMs}.
+     */
+    public static class AlertsConfig {
+        private String webhookUrl = "";
+        private long minIntervalMs = 5_000;
+
+        public String getWebhookUrl() {
+            return webhookUrl;
+        }
+
+        public void setWebhookUrl(String webhookUrl) {
+            this.webhookUrl = webhookUrl;
+        }
+
+        public long getMinIntervalMs() {
+            return minIntervalMs;
+        }
+
+        public void setMinIntervalMs(long minIntervalMs) {
+            this.minIntervalMs = minIntervalMs;
+        }
+    }
+
+    /**
+     * Auto-scaling (prompt 21, F12). Every {@code intervalMs} the primary compares forecast demand
+     * with capacity (the pool slots of its healthy workers). Demand above capacity x
+     * {@code upRatio} for two checks in a row starts a worker; utilisation under
+     * {@code downRatio} for {@code coolDownMs} drains and stops the most idle worker it started.
+     * {@code mode}: none, reactive (queues now) or predictive (queue forecast, M2).
+     */
+    public static class AutoscaleConfig {
+        private String mode = "none";
+        private long intervalMs = 2_000;
+        private double upRatio = 1.0;
+        private double downRatio = 0.3;
+        private long coolDownMs = 20_000;
+        private int minWorkers = 1;
+        private int maxWorkers = 4;
+        private long drainTimeoutMs = 30_000;
+        /** process (java -jar the worker jar) or docker (docker run the image). */
+        private String launcher = "process";
+        private String workerJar = "predisched-worker/target/predisched-worker.jar";
+        private String workerConfig = "";
+        private int poolSize = 4;
+        private int basePort = 51070;
+        private String dockerImage = "predisched-worker:latest";
+        private String logDir = "logs/autoscale";
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        public long getIntervalMs() {
+            return intervalMs;
+        }
+
+        public void setIntervalMs(long intervalMs) {
+            this.intervalMs = intervalMs;
+        }
+
+        public double getUpRatio() {
+            return upRatio;
+        }
+
+        public void setUpRatio(double upRatio) {
+            this.upRatio = upRatio;
+        }
+
+        public double getDownRatio() {
+            return downRatio;
+        }
+
+        public void setDownRatio(double downRatio) {
+            this.downRatio = downRatio;
+        }
+
+        public long getCoolDownMs() {
+            return coolDownMs;
+        }
+
+        public void setCoolDownMs(long coolDownMs) {
+            this.coolDownMs = coolDownMs;
+        }
+
+        public int getMinWorkers() {
+            return minWorkers;
+        }
+
+        public void setMinWorkers(int minWorkers) {
+            this.minWorkers = minWorkers;
+        }
+
+        public int getMaxWorkers() {
+            return maxWorkers;
+        }
+
+        public void setMaxWorkers(int maxWorkers) {
+            this.maxWorkers = maxWorkers;
+        }
+
+        public long getDrainTimeoutMs() {
+            return drainTimeoutMs;
+        }
+
+        public void setDrainTimeoutMs(long drainTimeoutMs) {
+            this.drainTimeoutMs = drainTimeoutMs;
+        }
+
+        public String getLauncher() {
+            return launcher;
+        }
+
+        public void setLauncher(String launcher) {
+            this.launcher = launcher;
+        }
+
+        public String getWorkerJar() {
+            return workerJar;
+        }
+
+        public void setWorkerJar(String workerJar) {
+            this.workerJar = workerJar;
+        }
+
+        public String getWorkerConfig() {
+            return workerConfig;
+        }
+
+        public void setWorkerConfig(String workerConfig) {
+            this.workerConfig = workerConfig;
+        }
+
+        public int getPoolSize() {
+            return poolSize;
+        }
+
+        public void setPoolSize(int poolSize) {
+            this.poolSize = poolSize;
+        }
+
+        public int getBasePort() {
+            return basePort;
+        }
+
+        public void setBasePort(int basePort) {
+            this.basePort = basePort;
+        }
+
+        public String getDockerImage() {
+            return dockerImage;
+        }
+
+        public void setDockerImage(String dockerImage) {
+            this.dockerImage = dockerImage;
+        }
+
+        public String getLogDir() {
+            return logDir;
+        }
+
+        public void setLogDir(String logDir) {
+            this.logDir = logDir;
         }
     }
 

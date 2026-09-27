@@ -17,7 +17,7 @@ img { max-width: 100%; } .box { border: 1px solid var(--rule); border-radius: 6p
 @media print { body { max-width: none; } h2 { break-before: auto; } img { break-inside: avoid; } }
 </style></head><body>
 <h1>PrediSched benchmark s20-20260927</h1>
-<p class="muted">Generated 2026-09-27 15:28 by scripts/make-report.py from results/benchmark/s20-20260927/.
+<p class="muted">Generated 2026-09-27 15:55 by scripts/make-report.py from results/benchmark/s20-20260927/.
 125 runs: 5 scenarios × 5 strategies × 5 repetitions.</p>
 
 <h2>Headlines: predictive vs the best baseline</h2>
@@ -27,11 +27,11 @@ A difference is only called one at p &lt; 0.05 (two-sided Welch t-test over the 
 <div class="box" style="margin-bottom:8px"><strong>steady</strong>
 <div class="headline nosig">Mean latency: no significant difference vs Round robin (+7.4 %, p = 0.712)</div><div class="headline nosig">p95 latency: no significant difference vs Round robin (-1.4 %, p = 0.918)</div><div class="headline nosig">Throughput: no significant difference vs Round robin (-0.7 %, p = 0.265)</div><div class="headline nosig">SLA violations: 0 for every strategy (no difference)</div></div>
 <div class="box" style="margin-bottom:8px"><strong>bursty</strong>
-<div class="headline sig worse">Mean latency: predictive +12.9 % vs Resource-aware (p = 0.012, d = 2.69): worse</div><div class="headline nosig">p95 latency: no significant difference vs Resource-aware (+7.3 %, p = 0.070)</div><div class="headline nosig">Throughput: no significant difference vs Least loaded (-0.0 %, p = 0.551)</div><div class="headline nosig">SLA violations: 0 for every strategy (no difference)</div></div>
+<div class="headline sig worse">Mean latency: Predictive +12.9 % vs Resource-aware (p = 0.012, d = 2.69): worse</div><div class="headline nosig">p95 latency: no significant difference vs Resource-aware (+7.3 %, p = 0.070)</div><div class="headline nosig">Throughput: no significant difference vs Least loaded (-0.0 %, p = 0.551)</div><div class="headline nosig">SLA violations: 0 for every strategy (no difference)</div></div>
 <div class="box" style="margin-bottom:8px"><strong>heterogeneous</strong>
-<div class="headline nosig">Mean latency: no significant difference vs Resource-aware (-2.2 %, p = 0.694)</div><div class="headline nosig">p95 latency: no significant difference vs Resource-aware (-6.3 %, p = 0.462)</div><div class="headline sig worse">Throughput: predictive -0.3 % vs Resource-aware (p = 0.020, d = -1.85): worse</div><div class="headline nosig">SLA violations: 0 for every strategy (no difference)</div></div>
+<div class="headline nosig">Mean latency: no significant difference vs Resource-aware (-2.2 %, p = 0.694)</div><div class="headline nosig">p95 latency: no significant difference vs Resource-aware (-6.3 %, p = 0.462)</div><div class="headline sig worse">Throughput: Predictive -0.3 % vs Resource-aware (p = 0.020, d = -1.85): worse</div><div class="headline nosig">SLA violations: 0 for every strategy (no difference)</div></div>
 <div class="box" style="margin-bottom:8px"><strong>mixed</strong>
-<div class="headline sig better">Mean latency: predictive -49.6 % vs Random (p < 0.001, d = -5.46): better</div><div class="headline sig better">p95 latency: predictive -25.1 % vs Random (p = 0.002, d = -2.96): better</div><div class="headline sig better">Throughput: predictive +5.0 % vs Random (p = 0.007, d = 3.21): better</div><div class="headline sig better">SLA violations: predictive -69.0 % vs Random (p < 0.001, d = -4.66): better</div></div>
+<div class="headline sig better">Mean latency: Predictive -49.6 % vs Random (p < 0.001, d = -5.46): better</div><div class="headline sig better">p95 latency: Predictive -25.1 % vs Random (p = 0.002, d = -2.96): better</div><div class="headline sig better">Throughput: Predictive +5.0 % vs Random (p = 0.007, d = 3.21): better</div><div class="headline sig better">SLA violations: Predictive -69.0 % vs Random (p < 0.001, d = -4.66): better</div></div>
 <div class="box" style="margin-bottom:8px"><strong>failure</strong>
 <div class="headline nosig">Mean latency: no significant difference vs Resource-aware (+29.5 %, p = 0.270)</div><div class="headline nosig">p95 latency: no significant difference vs Resource-aware (+38.0 %, p = 0.347)</div><div class="headline nosig">Throughput: no significant difference vs Random (-0.2 %, p = 0.371)</div><div class="headline nosig">SLA violations: no significant difference vs Round robin (+850.0 %, p = 0.270)</div></div>
 
@@ -49,7 +49,7 @@ Every task carries a 2000 ms deadline; SLA violation = failed or later than that
 <li>Latency is submit → completion as seen by the client (status polled every 50 ms).</li>
 </ul>
 <table><tr><th>Scenario</th><th>Profile</th><th>Pattern</th><th>Rate (/s)</th><th>Tasks</th><th>Seed</th><th>Workers</th><th>Fault</th></tr>
-<tr><td>steady</td><td>mixed</td><td>steady</td><td>20</td><td>240</td><td>2001</td><td>homogeneous</td><td></td></tr><tr><td>bursty</td><td>bursty</td><td>bursty</td><td>12</td><td>240</td><td>2002</td><td>homogeneous</td><td></td></tr><tr><td>heterogeneous</td><td>mixed</td><td>steady</td><td>15</td><td>240</td><td>2003</td><td>heterogeneous</td><td></td></tr><tr><td>mixed</td><td>long_tail</td><td>periodic</td><td>15</td><td>240</td><td>2004</td><td>heterogeneous</td><td></td></tr><tr><td>failure</td><td>mixed</td><td>steady</td><td>15</td><td>240</td><td>2005</td><td>heterogeneous</td><td>kill worker-2 at 6 s</td></tr>
+<tr><td>steady</td><td>mixed</td><td>steady</td><td>20</td><td>240</td><td>2001</td><td>homogeneous</td><td></td></tr><tr><td>bursty</td><td>bursty</td><td>bursty</td><td>12</td><td>240</td><td>2002</td><td>homogeneous</td><td></td></tr><tr><td>heterogeneous</td><td>mixed</td><td>steady</td><td>15</td><td>240</td><td>2003</td><td>heterogeneous</td><td></td></tr><tr><td>mixed</td><td>long_tail</td><td>periodic</td><td>15</td><td>240</td><td>2004</td><td>heterogeneous</td><td></td></tr><tr><td>failure</td><td>mixed</td><td>steady</td><td>15</td><td>240</td><td>2005</td><td>heterogeneous</td><td>kill worker-2 at 6 s</td></tr><tr><td>bursty-autoscale</td><td>bursty</td><td>bursty</td><td>20</td><td>400</td><td>2006</td><td>single</td><td></td></tr>
 </table>
 
 <h2>Results per scenario</h2>

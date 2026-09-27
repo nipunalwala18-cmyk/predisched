@@ -28,8 +28,13 @@ public record SuiteConfig(
 
     public record WorkerSpec(String id, int port, int poolSize, double slowdown) {}
 
+    /**
+     * @param strategy fixed strategy of a scenario whose runs vary something else
+     * @param variants auto-scaling modes to compare (prompt 21) instead of the strategies
+     */
     public record Scenario(String name, String profile, String pattern, double rate, int tasks,
-            long seed, String workers, String killWorker, long killAtMs) {
+            long seed, String workers, String killWorker, long killAtMs, String strategy,
+            List<String> variants) {
 
         public String traceFile(String traceDir) {
             return traceDir + "/" + name + "-" + profile + "-" + pattern + "-" + seed + ".jsonl";
@@ -62,7 +67,9 @@ public record SuiteConfig(
                     (String) s.get("pattern"), num(s.get("rate")).doubleValue(),
                     num(s.get("tasks")).intValue(), num(s.get("seed")).longValue(), workers,
                     (String) s.getOrDefault("killWorker", ""),
-                    num(s.getOrDefault("killAtMs", 0)).longValue()));
+                    num(s.getOrDefault("killAtMs", 0)).longValue(),
+                    (String) s.getOrDefault("strategy", ""),
+                    (List<String>) s.getOrDefault("variants", List.of())));
         }
         return new SuiteConfig((String) y.get("suite"), (String) y.get("nodeConfig"),
                 (String) y.get("profilesFile"), (String) y.get("traceDir"),

@@ -1,4 +1,5 @@
 # SHA-256 of each benchmark trace (prompt 20); sha256sum -c compatible
+2c7e20e80af549ac33a3a8434f5a25e72e7f344b6bf24be62a86c9d0bffb3f1e  bursty-autoscale-bursty-bursty-2006.jsonl
 b89bd4c070da4bd895828048664df569f52506639c1ca9fa984c437a898b249d  bursty-bursty-bursty-2002.jsonl
 dc5e29e2f9f74d1e3f9446f0200fa7003584869cea23733d22d6ee5941c480ed  failure-mixed-steady-2005.jsonl
 2df7897f25aba1a9f8b478f63266ce3600369d99779283a36e1b30f6bda959ba  heterogeneous-mixed-steady-2003.jsonl

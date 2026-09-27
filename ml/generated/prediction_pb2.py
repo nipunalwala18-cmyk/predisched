@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import task_pb2 as task__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10prediction.proto\x12\npredisched\x1a\ntask.proto\"\x9e\x02\n\x0bWorkerState\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\r\n\x05\x63ores\x18\x02 \x01(\x05\x12\x0f\n\x07\x63pu_pct\x18\x03 \x01(\x01\x12\x0f\n\x07mem_pct\x18\x04 \x01(\x01\x12\x16\n\x0e\x61\x63tive_threads\x18\x05 \x01(\x05\x12\x11\n\tqueue_len\x18\x06 \x01(\x05\x12\x13\n\x0b\x61vg_exec_ms\x18\x07 \x01(\x01\x12\x14\n\x0c\x61rrival_rate\x18\x08 \x01(\x01\x12\x11\n\tpool_size\x18\t \x01(\x05\x12\x10\n\x08slowdown\x18\n \x01(\x01\x12\x18\n\x10\x63oncurrent_tasks\x18\x0b \x01(\x05\x12\x1b\n\x13type_worker_mean_ms\x18\x0c \x01(\x01\x12\x19\n\x11type_worker_count\x18\r \x01(\x03\"\x8b\x01\n\x0ePredictRequest\x12%\n\x04task\x18\x01 \x01(\x0b\x32\x17.predisched.TaskRequest\x12(\n\x07workers\x18\x02 \x03(\x0b\x32\x17.predisched.WorkerState\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x14\n\x0ctype_mean_ms\x18\x04 \x01(\x01\"~\n\x10WorkerPrediction\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x14\n\x0cpred_exec_ms\x18\x02 \x01(\x01\x12\x16\n\x0epred_queue_len\x18\x03 \x01(\x01\x12\x15\n\roverload_prob\x18\x04 \x01(\x01\x12\x12\n\ncold_start\x18\x05 \x01(\x08\"\x86\x01\n\x0fPredictResponse\x12\x31\n\x0bpredictions\x18\x01 \x03(\x0b\x32\x1c.predisched.WorkerPrediction\x12\x15\n\rmodel_version\x18\x02 \x01(\x05\x12\x16\n\x0emodel_versions\x18\x03 \x01(\t\x12\x11\n\tserver_ms\x18\x04 \x01(\x01\"\x0f\n\rHealthRequest\"]\n\x0eHealthResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x12\x16\n\x0emodel_versions\x18\x02 \x01(\t\x12\x13\n\x0bpredictions\x18\x03 \x01(\x03\x12\x0f\n\x07reloads\x18\x04 \x01(\x03\x32\x98\x01\n\x11PredictionService\x12\x42\n\x07Predict\x12\x1a.predisched.PredictRequest\x1a\x1b.predisched.PredictResponse\x12?\n\x06Health\x12\x19.predisched.HealthRequest\x1a\x1a.predisched.HealthResponseB\x18\n\x14\x63om.predisched.protoP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10prediction.proto\x12\npredisched\x1a\ntask.proto\"\x9e\x02\n\x0bWorkerState\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\r\n\x05\x63ores\x18\x02 \x01(\x05\x12\x0f\n\x07\x63pu_pct\x18\x03 \x01(\x01\x12\x0f\n\x07mem_pct\x18\x04 \x01(\x01\x12\x16\n\x0e\x61\x63tive_threads\x18\x05 \x01(\x05\x12\x11\n\tqueue_len\x18\x06 \x01(\x05\x12\x13\n\x0b\x61vg_exec_ms\x18\x07 \x01(\x01\x12\x14\n\x0c\x61rrival_rate\x18\x08 \x01(\x01\x12\x11\n\tpool_size\x18\t \x01(\x05\x12\x10\n\x08slowdown\x18\n \x01(\x01\x12\x18\n\x10\x63oncurrent_tasks\x18\x0b \x01(\x05\x12\x1b\n\x13type_worker_mean_ms\x18\x0c \x01(\x01\x12\x19\n\x11type_worker_count\x18\r \x01(\x03\"\x8b\x01\n\x0ePredictRequest\x12%\n\x04task\x18\x01 \x01(\x0b\x32\x17.predisched.TaskRequest\x12(\n\x07workers\x18\x02 \x03(\x0b\x32\x17.predisched.WorkerState\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x14\n\x0ctype_mean_ms\x18\x04 \x01(\x01\"~\n\x10WorkerPrediction\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x14\n\x0cpred_exec_ms\x18\x02 \x01(\x01\x12\x16\n\x0epred_queue_len\x18\x03 \x01(\x01\x12\x15\n\roverload_prob\x18\x04 \x01(\x01\x12\x12\n\ncold_start\x18\x05 \x01(\x08\"\xd8\x01\n\x0fPredictResponse\x12\x31\n\x0bpredictions\x18\x01 \x03(\x0b\x32\x1c.predisched.WorkerPrediction\x12\x15\n\rmodel_version\x18\x02 \x01(\x05\x12\x16\n\x0emodel_versions\x18\x03 \x01(\t\x12\x11\n\tserver_ms\x18\x04 \x01(\x01\x12\x38\n\x12shadow_predictions\x18\x05 \x03(\x0b\x32\x1c.predisched.WorkerPrediction\x12\x16\n\x0eshadow_version\x18\x06 \x01(\x05\"\x0f\n\rHealthRequest\"\x8e\x01\n\x0eHealthResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x12\x16\n\x0emodel_versions\x18\x02 \x01(\t\x12\x13\n\x0bpredictions\x18\x03 \x01(\x03\x12\x0f\n\x07reloads\x18\x04 \x01(\x03\x12\x16\n\x0em1_test_mae_ms\x18\x05 \x01(\x01\x12\x17\n\x0fshadow_versions\x18\x06 \x01(\t2\x98\x01\n\x11PredictionService\x12\x42\n\x07Predict\x12\x1a.predisched.PredictRequest\x1a\x1b.predisched.PredictResponse\x12?\n\x06Health\x12\x19.predisched.HealthRequest\x1a\x1a.predisched.HealthResponseB\x18\n\x14\x63om.predisched.protoP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -40,11 +40,11 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_WORKERPREDICTION']._serialized_start=475
   _globals['_WORKERPREDICTION']._serialized_end=601
   _globals['_PREDICTRESPONSE']._serialized_start=604
-  _globals['_PREDICTRESPONSE']._serialized_end=738
-  _globals['_HEALTHREQUEST']._serialized_start=740
-  _globals['_HEALTHREQUEST']._serialized_end=755
-  _globals['_HEALTHRESPONSE']._serialized_start=757
-  _globals['_HEALTHRESPONSE']._serialized_end=850
-  _globals['_PREDICTIONSERVICE']._serialized_start=853
-  _globals['_PREDICTIONSERVICE']._serialized_end=1005
+  _globals['_PREDICTRESPONSE']._serialized_end=820
+  _globals['_HEALTHREQUEST']._serialized_start=822
+  _globals['_HEALTHREQUEST']._serialized_end=837
+  _globals['_HEALTHRESPONSE']._serialized_start=840
+  _globals['_HEALTHRESPONSE']._serialized_end=982
+  _globals['_PREDICTIONSERVICE']._serialized_start=985
+  _globals['_PREDICTIONSERVICE']._serialized_end=1137
 # @@protoc_insertion_point(module_scope)

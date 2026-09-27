@@ -19,6 +19,9 @@ public class WorkerRegistry {
     private static final org.slf4j.Logger log =
             org.slf4j.LoggerFactory.getLogger(WorkerRegistry.class);
     private final java.util.Set<String> draining = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    /** Drained by the scheduler itself (the auto-scaler, prompt 21): heartbeats do not undo it. */
+    private final java.util.Set<String> drainedHere =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private final ConcurrentHashMap<String, WorkerInfo> workers = new ConcurrentHashMap<>();
     /** Workers whose last call failed as unreachable, until their next heartbeat (prompt 10). */
@@ -40,6 +43,7 @@ public class WorkerRegistry {
         long now = clock.getAsLong();
         suspected.remove(request.getWorkerId());
         draining.remove(request.getWorkerId());
+        drainedHere.remove(request.getWorkerId());
         return workers.compute(request.getWorkerId(), (id, existing) ->
                 WorkerInfo.fromRegistration(request, now));
     }
@@ -95,6 +99,7 @@ public class WorkerRegistry {
         workers.remove(workerId);
         suspected.remove(workerId);
         draining.remove(workerId);
+        drainedHere.remove(workerId);
     }
 
     /**
@@ -113,6 +118,15 @@ public class WorkerRegistry {
 
     /** The worker's last heartbeat said it is draining (prompt 19): it gets no new tasks. */
     public boolean isDraining(String workerId) {
-        return draining.contains(workerId);
+        return draining.contains(workerId) || drainedHere.contains(workerId);
+    }
+
+    /** Stop dispatching to a worker whatever its heartbeats say (auto-scaler scale-down). */
+    public void markDraining(String workerId) {
+        if (workers.containsKey(workerId)) {
+            drainedHere.add(workerId);
+            log.info("Worker {} is draining (scheduler request): no new dispatches to it",
+                    workerId);
+        }
     }
 }
