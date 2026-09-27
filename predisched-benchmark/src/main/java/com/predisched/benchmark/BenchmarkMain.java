@@ -24,6 +24,8 @@ public class BenchmarkMain {
             case "failover-test" -> FailoverTest.main(rest);
             case "prediction-latency" -> PredictionLatency.main(rest);
             case "tune-lambda" -> TuneLambda.main(rest);
+            case "run-suite" -> com.predisched.benchmark.suite.RunSuite.main(rest);
+            case "simulate" -> com.predisched.benchmark.sim.Simulate.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -69,6 +71,13 @@ public class BenchmarkMain {
                               (prompt 18); needs the prediction server and scripts/mock-http.py
                               [--trace workloads/campaign/mixed-steady-1506.jsonl]
                               [--lambdas 0,0.5,1,2,4] [--reps 3] [--out results/lambda-tuning.csv]
+                  run-suite   The full benchmark (prompt 20, spec 13): every scenario x strategy x
+                              repetition on a fresh cluster, runs.csv + summary.csv
+                              [--config configs/benchmark.yaml] [--reps 5] [--suite-id ID]
+                              [--only steady,bursty] [--plan] [--summarize]
+                  simulate    What-if discrete-event simulation of a trace under a strategy, no
+                              cluster (F17) [--trace FILE] [--strategy least_loaded] [--speed 10]
+                              [--workers heterogeneous] [--samples FILE] [--seed 42]
                 """);
     }
 }

@@ -1,0 +1,67 @@
+# Benchmark suite (prompt 20, spec 13): every scenario x strategy x repetition on identical saved
+# traces, a fresh cluster per run. Run with:
+#   java -jar predisched-benchmark/target/predisched-benchmark.jar run-suite --config configs/benchmark.yaml --reps 5
+# Trace seeds 2001-2005 were used neither by the dataset campaign (1500-1517) nor by the lambda
+# tuning (1506), so the predictive models and lambda never saw these traces.
+suite: "s20"
+nodeConfig: "configs/benchmark-node.yaml"     # scheduler + worker config of every run
+profilesFile: "configs/workloads.yaml"
+traceDir: "workloads/benchmark"
+httpBaseUrl: "http://localhost:8100"          # scripts/mock-http.py, started by the harness
+strategies: [round_robin, random, least_loaded, resource_aware, predictive]
+reps: 5
+speed: 1.0
+warmupFraction: 0.1        # the first 10 % of each trace's tasks are left out of the latency metrics
+deadlineMs: 2000           # every task gets this deadline: SLA violation = latency above it
+runTimeoutMs: 180000
+
+# Worker sets. Heterogeneous is the dataset campaign's cluster (pools 2/4/8, worker-1 at 2x
+# slowdown); homogeneous is three equal pool-4 workers.
+workerSets:
+  homogeneous:
+    - {id: worker-1, port: 51061, poolSize: 4, slowdown: 1.0}
+    - {id: worker-2, port: 51062, poolSize: 4, slowdown: 1.0}
+    - {id: worker-3, port: 51063, poolSize: 4, slowdown: 1.0}
+  heterogeneous:
+    - {id: worker-1, port: 51061, poolSize: 2, slowdown: 2.0}
+    - {id: worker-2, port: 51062, poolSize: 4, slowdown: 1.0}
+    - {id: worker-3, port: 51063, poolSize: 8, slowdown: 1.0}
+
+scenarios:
+  - name: steady              # 1. steady load
+    profile: mixed
+    pattern: steady
+    rate: 20
+    tasks: 240
+    seed: 2001
+    workers: homogeneous
+  - name: bursty              # 2. bursty load
+    profile: bursty
+    pattern: bursty
+    rate: 12
+    tasks: 240
+    seed: 2002
+    workers: homogeneous
+  - name: heterogeneous       # 3. heterogeneous workers
+    profile: mixed
+    pattern: steady
+    rate: 15
+    tasks: 240
+    seed: 2003
+    workers: heterogeneous
+  - name: mixed               # 4. mixed task types across all resource profiles
+    profile: long_tail
+    pattern: periodic
+    rate: 15
+    tasks: 240
+    seed: 2004
+    workers: heterogeneous
+  - name: failure             # 5. worker failure mid-run
+    profile: mixed
+    pattern: steady
+    rate: 15
+    tasks: 240
+    seed: 2005
+    workers: heterogeneous
+    killWorker: worker-2      # crashed through the chaos API ...
+    killAtMs: 6000            # ... this long after the replay starts

@@ -47,3 +47,6 @@ certs/
 spark/data/
 spark/out/
 ml/data/features/
+
+# Benchmark suites (prompt 20): per-run node logs are large and regenerated; results stay
+results/benchmark/*/logs/

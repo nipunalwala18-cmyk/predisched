@@ -12,6 +12,34 @@ mvn -q verify
 
 See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for the numbered build prompts.
 
+## Results
+
+Benchmark suite **`s20-20260927`** (prompt 20; method, full tables and the simulator in
+[docs/components/benchmark.md](docs/components/benchmark.md), charts in
+[results/benchmark/s20-20260927/report.html](results/benchmark/s20-20260927/report.html)):
+
+- **Setup**: 5 strategies × 5 scenarios × 5 repetitions, 125 runs. Each run is a fresh cluster (one
+  scheduler, three workers) on one 4-core laptop, replaying identical saved traces the models never
+  saw. All 30,000 tasks completed.
+- **Comparison**: predictive against the best reactive baseline in each scenario, two-sided Welch
+  t-test.
+
+| Scenario | Best baseline (mean latency) | Predictive | Difference | p |
+| --- | --- | --- | --- | --- |
+| steady (homogeneous workers) | round robin 343 ms | 368 ms | +7.4 % | 0.712 (no significant difference) |
+| bursty | resource-aware 87 ms | 98 ms | **+12.9 % (worse)** | 0.012 |
+| heterogeneous workers | resource-aware 171 ms | 167 ms | −2.2 % | 0.694 (no significant difference) |
+| mixed long-tail tasks, heterogeneous workers | random 2,225 ms | 1,121 ms | **−49.6 % (better)** | < 0.001 |
+| worker failure mid-run | resource-aware 160 ms | 207 ms | +29.5 % | 0.270 (no significant difference) |
+
+**Where predictive wins.** Task sizes vary widely on uneven workers ("mixed"). Predicting each
+task's execution time on each worker roughly halves the mean latency, cuts p95 by 25 % and cuts
+SLA violations from 58 % to 18 %.
+
+**Where it doesn't.** In the other scenarios it is statistically tied with the best reactive
+strategy, or worse on bursty traffic of short tasks. There, its 7.7 ms prediction call per decision
+(against about 0.1 ms for the reactive strategies) is a real cost.
+
 ## Progress
 
 | # | Prompt | Status |
@@ -36,7 +64,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 17 | Prediction server | [x] |
 | 18 | Predictive strategy | [x] |
 | 19 | Speculative execution and chaos | [x] |
-| 20 | Benchmark harness and report | [ ] |
+| 20 | Benchmark harness and report | [x] |
 | 21 | Model lifecycle and auto-scaling | [ ] |
 | 22 | Dashboard API | [ ] |
 | 23 | Dashboard UI | [ ] |
