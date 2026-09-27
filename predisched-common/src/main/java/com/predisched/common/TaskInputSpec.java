@@ -118,6 +118,28 @@ public final class TaskInputSpec {
         return input == null ? 0 : input.length();
     }
 
+    /**
+     * The input a type takes, in the {@code key=value, ...} form, for help text: required keys with
+     * their range or choices, optional ones in brackets. E.g. {@code size=<1..1000> [threads=<1..64>]}.
+     */
+    public static String describe(TaskType type) {
+        List<String> parts = new ArrayList<>();
+        REQUIRED.getOrDefault(type, List.of())
+                .forEach(k -> parts.add(k.key() + "=<" + k.min() + ".." + k.max() + ">"));
+        REQUIRED_ENUMS.getOrDefault(type, List.of())
+                .forEach(k -> parts.add(k.key() + "=" + String.join("|", k.allowed())));
+        REQUIRED_URLS.getOrDefault(type, List.of())
+                .forEach(k -> parts.add(k.key() + "=<http(s) url>"));
+        REQUIRED_TEXT.getOrDefault(type, List.of()).forEach(k -> parts.add(k + "=<text>"));
+        OPTIONAL.getOrDefault(type, List.of())
+                .forEach(k -> parts.add("[" + k.key() + "=<" + k.min() + ".." + k.max() + ">]"));
+        FRACTIONS.getOrDefault(type, List.of())
+                .forEach(k -> parts.add("[" + k.key() + "=<" + k.min() + ".." + k.max() + ">]"));
+        OPTIONAL_ENUMS.getOrDefault(type, List.of())
+                .forEach(k -> parts.add("[" + k.key() + "=" + String.join("|", k.allowed()) + "]"));
+        return String.join(", ", parts);
+    }
+
     /** The types that have an executor, for error messages. */
     public static List<TaskType> knownTypes() {
         List<TaskType> known = new ArrayList<>(REQUIRED.keySet());

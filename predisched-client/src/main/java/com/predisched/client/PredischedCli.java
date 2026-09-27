@@ -36,6 +36,9 @@ import picocli.CommandLine.Parameters;
         description = "PrediSched client: submit, track and cancel tasks over gRPC.",
         subcommands = {
             PredischedCli.Submit.class,
+            PredischedCli.SubmitFile.class,
+            PredischedCli.Shell.class,
+            PredischedCli.Tasks.class,
             PredischedCli.Status.class,
             PredischedCli.Cancel.class,
             PredischedCli.Watch.class,
@@ -223,6 +226,199 @@ public class PredischedCli implements Runnable {
             System.out.println(repeat + " submits in " + ms + " ms:");
             outcomes.forEach((outcome, count) -> System.out.println("  " + count + " " + outcome));
             return 0;
+        }
+    }
+
+    @Command(name = "tasks", description = "List the task types, their inputs and an example of each.")
+    static class Tasks implements Callable<Integer> {
+        @Override
+        public Integer call() {
+            System.out.println("Task types (line format for submit-file and shell:"
+                    + " TYPE [priority] input):");
+            for (TaskType type : TaskType.values()) {
+                if (type == TaskType.UNRECOGNIZED) {
+                    continue;
+                }
+                String reserved = com.predisched.common.TaskInputSpec.reservedReason(type);
+                if (reserved != null) {
+                    System.out.printf("  %-17s not available: %s%n", type, reserved);
+                    continue;
+                }
+                System.out.printf("  %-17s %s%n", type,
+                        com.predisched.common.TaskInputSpec.describe(type));
+                String example = ManualTasks.EXAMPLES.get(type);
+                if (example != null) {
+                    System.out.printf("  %-17s   e.g. %s %d %s%n", "", type,
+                            ManualTasks.DEFAULT_PRIORITY, example);
+                }
+            }
+            return 0;
+        }
+    }
+
+    /** Submits one parsed line; prints the outcome and returns the task id, or null if refused. */
+    static String submitLine(SchedulerClient client, ManualTasks.Line line, boolean noCache) {
+        String taskId = "task-" + UUID.randomUUID().toString().substring(0, 8);
+        String traceId = com.predisched.common.obs.TraceContext.newTraceId();
+        TaskResponse response = client.submitTask(taskId, line.type(), line.input(),
+                line.priority(), traceId, 0, -1, 0, noCache);
+        System.out.println("accepted=" + response.getAccepted()
+                + " task_id=" + response.getTaskId()
+                + " type=" + line.type()
+                + " priority=" + line.priority()
+                + " message='" + response.getMessage() + "'");
+        return response.getAccepted() ? response.getTaskId() : null;
+    }
+
+    /** Polls until every task is terminal or the timeout passes; returns how many completed. */
+    static int waitFor(SchedulerClient client, List<String> ids, long timeoutMs)
+            throws InterruptedException {
+        java.util.Set<String> pending = new java.util.LinkedHashSet<>(ids);
+        int completed = 0;
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (!pending.isEmpty() && System.currentTimeMillis() < deadline) {
+            for (java.util.Iterator<String> it = pending.iterator(); it.hasNext(); ) {
+                TaskStatusResponse response = client.getStatus(it.next());
+                TaskStatus status = response.getStatus();
+                if (status == TaskStatus.COMPLETED || status == TaskStatus.FAILED
+                        || status == TaskStatus.CANCELLED) {
+                    System.out.println("  " + response.getTaskId() + " " + status
+                            + " worker=" + response.getWorkerId()
+                            + " exec_ms=" + response.getExecTimeMs()
+                            + " result='" + response.getResult() + "'");
+                    completed += status == TaskStatus.COMPLETED ? 1 : 0;
+                    it.remove();
+                }
+            }
+            Thread.sleep(200L);
+        }
+        pending.forEach(id -> System.out.println("  " + id + " still running after "
+                + timeoutMs + " ms"));
+        return completed;
+    }
+
+    @Command(name = "submit-file",
+            description = "Submit the tasks listed in a text file, one per line:"
+                    + " TYPE [priority] input (e.g. 'CPU_TASK 5 n=2000000'); # starts a comment.")
+    static class SubmitFile implements Callable<Integer> {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Parameters(index = "0", description = "Tasks file")
+        String file;
+
+        @Option(names = "--watch", description = "Wait for every task and print its result")
+        boolean watch;
+
+        @Option(names = "--watch-timeout",
+                description = "Stop waiting after this many ms (default: ${DEFAULT-VALUE})")
+        long watchTimeoutMs = 300_000;
+
+        @Option(names = "--no-cache", description = "Run tasks even if their result is cached")
+        boolean noCache;
+
+        @Override
+        public Integer call() throws Exception {
+            List<String> lines = Files.readAllLines(Paths.get(file));
+            List<ManualTasks.Line> tasks = new java.util.ArrayList<>();
+            boolean bad = false;
+            for (int i = 0; i < lines.size(); i++) {
+                if (ManualTasks.skip(lines.get(i))) {
+                    continue;
+                }
+                ManualTasks.Line line = ManualTasks.parse(lines.get(i));
+                if (!line.ok()) {
+                    System.out.println(file + ":" + (i + 1) + ": " + line.error());
+                    bad = true;
+                }
+                tasks.add(line);
+            }
+            if (bad) {
+                System.out.println("nothing submitted: fix the lines above first");
+                return 2;
+            }
+            List<String> ids = new java.util.ArrayList<>();
+            try (SchedulerClient client = parent.newClient()) {
+                for (ManualTasks.Line line : tasks) {
+                    String id = submitLine(client, line, noCache);
+                    if (id != null) {
+                        ids.add(id);
+                    }
+                }
+                System.out.println(ids.size() + " of " + tasks.size() + " tasks accepted");
+                if (watch && !ids.isEmpty()) {
+                    int completed = waitFor(client, ids, watchTimeoutMs);
+                    System.out.println(completed + " of " + ids.size() + " completed");
+                    return completed == tasks.size() ? 0 : 1;
+                }
+            }
+            return ids.size() == tasks.size() ? 0 : 1;
+        }
+    }
+
+    @Command(name = "shell",
+            description = "Type tasks interactively: TYPE [priority] input, status <id>,"
+                    + " watch <id>, tasks, quit.")
+    static class Shell implements Callable<Integer> {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Option(names = "--watch", description = "Wait for each task and print its result")
+        boolean watch;
+
+        @Override
+        public Integer call() throws Exception {
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(
+                    System.in, java.nio.charset.StandardCharsets.UTF_8));
+            System.out.println("PrediSched shell. Type a task (e.g. 'cpu 5 n=2000000'),"
+                    + " 'status <id>', 'watch <id>', 'tasks' or 'quit'.");
+            try (SchedulerClient client = parent.newClient()) {
+                while (true) {
+                    System.out.print("predisched> ");
+                    System.out.flush();
+                    String text = in.readLine();
+                    if (text == null) {
+                        return 0;
+                    }
+                    if (ManualTasks.skip(text)) {
+                        continue;
+                    }
+                    String[] words = text.strip().split("\\s+", 2);
+                    String command = words[0].toLowerCase(Locale.ROOT);
+                    try {
+                        if (command.equals("quit") || command.equals("exit")) {
+                            return 0;
+                        } else if (command.equals("tasks") || command.equals("help")) {
+                            new Tasks().call();
+                        } else if (command.equals("status") || command.equals("watch")) {
+                            if (words.length < 2) {
+                                System.out.println("  " + command + " needs a task id");
+                            } else if (command.equals("watch")) {
+                                waitFor(client, List.of(words[1].strip()), 120_000);
+                            } else {
+                                TaskStatusResponse r = client.getStatus(words[1].strip());
+                                System.out.println("  " + r.getTaskId() + " " + r.getStatus()
+                                        + " worker=" + r.getWorkerId()
+                                        + " exec_ms=" + r.getExecTimeMs()
+                                        + " result='" + r.getResult() + "'");
+                            }
+                        } else {
+                            ManualTasks.Line line = ManualTasks.parse(text);
+                            if (!line.ok()) {
+                                System.out.println("  " + line.error());
+                                continue;
+                            }
+                            String id = submitLine(client, line, false);
+                            if (id != null && watch) {
+                                waitFor(client, List.of(id), 120_000);
+                            }
+                        }
+                    } catch (StatusRuntimeException e) {
+                        System.out.println("  " + e.getStatus().getCode() + ": "
+                                + e.getStatus().getDescription());
+                    }
+                }
+            }
         }
     }
 

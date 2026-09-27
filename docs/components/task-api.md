@@ -94,6 +94,45 @@ java -jar predisched-client/target/predisched-client.jar submit --type CPU_TASK 
 
 CLI subcommands: `submit`, `status <id>`, `cancel <id>`, `watch <id>`.
 
+### Submitting tasks by hand
+
+Three commands make hand-typed tasks quicker than `submit --type ... --input ... --priority ...`.
+They share one line format, `TYPE [priority] input`:
+
+- `TYPE` is case-insensitive, and the `_TASK` suffix can be left out (`cpu` is `CPU_TASK`).
+- `priority` is 1–10 and defaults to 5.
+- A line starting with `#` is a comment.
+
+Every line is checked against the scheduler's own input rules (`TaskInputSpec`) before anything is
+sent.
+
+- `predisched tasks`: every task type, the input it takes, and a copyable example.
+- `predisched submit-file <file> [--watch]`: submits one task per line. If any line is wrong,
+  nothing is submitted and each bad line is reported as `file:line: reason`. With `--watch` the
+  command waits and prints every result. `workloads/manual-tasks.txt` is a sample.
+- `predisched shell [--watch]`: an interactive prompt that takes the same lines, plus
+  `status <id>`, `watch <id>`, `tasks` and `quit`. Input can also be piped in.
+
+```
+$ predisched submit-file workloads/manual-tasks.txt --watch
+accepted=true task_id=task-2fc0b024 type=CPU_TASK priority=5 message='queued'
+...
+6 of 6 tasks accepted
+  task-2fc0b024 COMPLETED worker=worker-1 exec_ms=47 result='primes_below_2000000=148933'
+  task-9850a5c7 COMPLETED worker=worker-1 exec_ms=82 result='size=200 threads=1 checksum=1997209.445178'
+  ...
+6 of 6 completed
+
+$ predisched shell --watch
+predisched> cpu 9 n=500000
+accepted=true task_id=task-7b137888 type=CPU_TASK priority=9 message='queued'
+  task-7b137888 COMPLETED worker=worker-1 exec_ms=2 result='primes_below_500000=41538'
+predisched> matrix size=5000
+  MATRIX_TASK: size must be between 1 and 1000 (got 5000)
+predisched> bogus 1 x=1
+  unknown task type 'bogus' (run 'predisched tasks')
+```
+
 Ports are 51051 / 51061, moved +1000 from spec §16 because Hyper-V reserves 50000–50159 on the dev
 machine (recorded in `CLAUDE.md`).
 

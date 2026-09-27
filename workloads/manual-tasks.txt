@@ -1,0 +1,9 @@
+# Tasks typed by hand: predisched submit-file workloads/manual-tasks.txt --watch
+# One per line: TYPE [priority 1-10, default 5] input. 'predisched tasks' lists every type.
+# The type is case-insensitive and _TASK may be left out.
+CPU_TASK 5 n=2000000
+MATRIX_TASK 8 size=200
+sort n=100000, type=reversed
+HASH_TASK 3 rounds=100000
+MONTE_CARLO_TASK samples=1000000, seed=7
+SLEEP_TASK 2 ms=300
