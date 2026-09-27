@@ -55,7 +55,7 @@ prompt names before writing code.
 | Python | 3.10+ |
 | grpcio / grpcio-tools | 1.66.x |
 | PySpark | 3.5.x |
-| mpi4py | 3.1.x (MS-MPI on Windows, OpenMPI on Linux) |
+| mpi4py | 4.1.x (prompt 13: Intel MPI `impi_rt` from PyPI on Windows, as 3.1 wheels only load MS-MPI; MS-MPI still works; OpenMPI on Linux) |
 | Node | 20 LTS |
 | PostgreSQL | 16 |
 

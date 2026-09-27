@@ -1,0 +1,21 @@
+task_id,task_type,input,output,exec_ms,rank
+mpi-42-00000,CPU_TASK,n=102451,primes_below_102451=9809,8.712,0
+mpi-42-00001,MONTE_CARLO_TASK,"samples=74196, seed=228",samples=74196 seed=228 inside=58302 pi_estimate=3.143134,179.013,1
+mpi-42-00002,HASH_TASK,rounds=36868,rounds=36868 digest=1c1c72852846c87d3851dfc0705c17dc9db123426265809a0d42738a5fc450f7,38.044,2
+mpi-42-00003,CPU_TASK,n=1288352,primes_below_1288352=99212,144.825,3
+mpi-42-00004,SLEEP_TASK,ms=18,slept_ms=18,18.351,0
+mpi-42-00005,CPU_TASK,n=246493,primes_below_246493=21749,16.957,1
+mpi-42-00006,HASH_TASK,rounds=70990,rounds=70990 digest=7694e4f1b861ad3fbe315b506d2c9acd8c7e1f28813ca2afcf904e3745cee342,94.699,2
+mpi-42-00007,CPU_TASK,n=1227016,primes_below_1227016=94845,108.317,3
+mpi-42-00008,HASH_TASK,rounds=197700,rounds=197700 digest=1a83c2d61c7e77b7485c18362409b11150bf3f42b2e01c6056cbb587eae49a3b,237.749,0
+mpi-42-00009,SLEEP_TASK,ms=66,slept_ms=66,66.451,1
+mpi-42-00010,SLEEP_TASK,ms=160,slept_ms=160,160.432,2
+mpi-42-00011,MONTE_CARLO_TASK,"samples=11703, seed=777",samples=11703 seed=777 inside=9226 pi_estimate=3.153379,20.069,3
+mpi-42-00012,HASH_TASK,rounds=193013,rounds=193013 digest=97ce1ae2abb5e31faccb2bf539e02892197ae0222950e69cea8a13abb618b6a9,200.669,0
+mpi-42-00013,SLEEP_TASK,ms=97,slept_ms=97,97.459,1
+mpi-42-00014,MONTE_CARLO_TASK,"samples=50758, seed=220",samples=50758 seed=220 inside=39842 pi_estimate=3.139761,106.800,2
+mpi-42-00015,MONTE_CARLO_TASK,"samples=36793, seed=94",samples=36793 seed=94 inside=28988 pi_estimate=3.151469,81.870,3
+mpi-42-00016,SLEEP_TASK,ms=34,slept_ms=34,34.168,0
+mpi-42-00017,MONTE_CARLO_TASK,"samples=100165, seed=618",samples=100165 seed=618 inside=78750 pi_estimate=3.144811,221.416,1
+mpi-42-00018,MONTE_CARLO_TASK,"samples=21390, seed=747",samples=21390 seed=747 inside=16797 pi_estimate=3.141094,42.644,2
+mpi-42-00019,SLEEP_TASK,ms=147,slept_ms=147,147.119,3

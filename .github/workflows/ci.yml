@@ -17,7 +17,7 @@ jobs:
       - name: Build and test
         run: mvn -q verify
 
-  spark:
+  python:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,9 +29,18 @@ jobs:
         with:
           python-version: '3.11'
           cache: pip
-          cache-dependency-path: spark/requirements.txt
-      - name: Install PySpark
-        run: pip install -r spark/requirements.txt
+          cache-dependency-path: |
+            spark/requirements.txt
+            mpi/requirements.txt
+      - name: Install OpenMPI
+        run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
+      - name: Install Python dependencies
+        run: pip install -r spark/requirements.txt -r mpi/requirements.txt
       - name: Spark job tests
         working-directory: spark
+        run: python -m pytest -q
+      - name: MPI tests
+        working-directory: mpi
+        env:
+          OMPI_MCA_rmaps_base_oversubscribe: '1'
         run: python -m pytest -q

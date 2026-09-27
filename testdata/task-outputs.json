@@ -1,0 +1,16 @@
+[
+  {"type": "CPU_TASK", "input": "n=2", "success": true, "output": "primes_below_2=0"},
+  {"type": "CPU_TASK", "input": "n=3", "success": true, "output": "primes_below_3=1"},
+  {"type": "CPU_TASK", "input": "n=100", "success": true, "output": "primes_below_100=25"},
+  {"type": "CPU_TASK", "input": "n=2000000", "success": true, "output": "primes_below_2000000=148933"},
+  {"type": "HASH_TASK", "input": "rounds=1", "success": true, "output": "rounds=1 digest=e867556838e92b3bbfe9cdcd81a0f95b92bdd8c390a2834855e65e4eed6d11cb"},
+  {"type": "HASH_TASK", "input": "rounds=1000", "success": true, "output": "rounds=1000 digest=6dc1ea0393592c10ef4040060f3a54ce440581d6a44f4434d34a7a8a8deac029"},
+  {"type": "HASH_TASK", "input": "rounds=100000", "success": true, "output": "rounds=100000 digest=9a640c9ca920b06181eb97ebca2aae4c7f2389f34839a096cd447b8265753388"},
+  {"type": "MONTE_CARLO_TASK", "input": "samples=1000", "success": true, "output": "samples=1000 seed=42 inside=776 pi_estimate=3.104000"},
+  {"type": "MONTE_CARLO_TASK", "input": "samples=100000, seed=7", "success": true, "output": "samples=100000 seed=7 inside=78394 pi_estimate=3.135760"},
+  {"type": "MONTE_CARLO_TASK", "input": "samples=1000000, seed=7", "success": true, "output": "samples=1000000 seed=7 inside=785563 pi_estimate=3.142252"},
+  {"type": "SLEEP_TASK", "input": "ms=0", "success": true, "output": "slept_ms=0"},
+  {"type": "SLEEP_TASK", "input": "ms=5", "success": true, "output": "slept_ms=5"},
+  {"type": "SLEEP_TASK", "input": "ms=1, failRate=0.5, seed=3", "success": true, "output": "slept_ms=1"},
+  {"type": "SLEEP_TASK", "input": "ms=1, failRate=0.9, seed=0", "success": false, "output": "injected failure (failRate=0.90, draw=0.731)"}
+]

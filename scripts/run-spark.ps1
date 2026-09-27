@@ -3,10 +3,10 @@
 # docker/spark.Dockerfile.
 #
 #   scripts/run-spark.ps1 exec_stats.py --input spark/data/execution_history.csv --output spark/out
-param(
-    [Parameter(Mandatory = $true, Position = 0)][string]$Job,
-    [Parameter(ValueFromRemainingArguments = $true)][string[]]$JobArgs
-)
+# Plain $args, not param(): an advanced script would read --output as -OutVariable/-OutBuffer.
+if ($args.Count -lt 1) { Write-Error 'usage: run-spark.ps1 <job.py> [args]' }
+$Job = $args[0]
+$JobArgs = @($args | Select-Object -Skip 1)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
