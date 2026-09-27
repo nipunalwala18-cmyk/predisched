@@ -76,6 +76,7 @@ public class RegistrationClient implements AutoCloseable {
                 .setCores(metrics.cores())
                 .setMemoryMb(metrics.maxMemoryMb())
                 .setPoolSize(engine.poolSize())
+                .setSlowdown(engine.slowdown())
                 .build();
         try {
             Ack ack = registry.register(request);

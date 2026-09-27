@@ -25,6 +25,18 @@ public interface HistorySink {
     default void decision(String taskId, String strategy, String chosenWorker, Double cost,
             Map<String, Double> scores, long decisionUs, long tsMs) {}
 
+    /** A decision with its per-candidate breakdown as JSON (F13, prompt 18). */
+    default void decision(String taskId, String strategy, String chosenWorker, Double cost,
+            Map<String, Double> scores, long decisionUs, long tsMs, String breakdownJson,
+            boolean fallback, String fallbackReason, String modelVersions) {
+        decision(taskId, strategy, chosenWorker, cost, scores, decisionUs, tsMs);
+    }
+
+    /** A predicted task finished: its prediction next to the actual time (prompt 18). */
+    default void predictionOutcome(String taskId, String taskType, String workerId,
+            double predExecMs, long actualExecMs, boolean coldStart, String modelVersions,
+            double rollingMaeMs, double rollingTypeMaeMs, long tsMs) {}
+
     default void execution(ExecutionRow row) {}
 
     default void event(String nodeId, long lamportTime, long tsMs, String type, String taskId,

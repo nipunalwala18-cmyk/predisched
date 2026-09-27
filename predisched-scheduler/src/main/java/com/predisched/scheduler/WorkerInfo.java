@@ -15,6 +15,7 @@ public record WorkerInfo(
         int cores,
         long memoryMb,
         int poolSize,
+        double slowdown,
         double cpuPct,
         double memPct,
         int activeThreads,
@@ -32,6 +33,7 @@ public record WorkerInfo(
                 request.getCores(),
                 request.getMemoryMb(),
                 request.getPoolSize(),
+                request.getSlowdown() >= 1.0 ? request.getSlowdown() : 1.0,
                 0.0, 0.0, 0, 0, 0L, 0.0,
                 nowMs,
                 nowMs);
@@ -39,7 +41,7 @@ public record WorkerInfo(
 
     public WorkerInfo withHeartbeat(Heartbeat heartbeat, long nowMs) {
         return new WorkerInfo(
-                id, host, port, cores, memoryMb, poolSize,
+                id, host, port, cores, memoryMb, poolSize, slowdown,
                 heartbeat.getCpuPct(),
                 heartbeat.getMemPct(),
                 heartbeat.getActiveThreads(),
@@ -69,7 +71,7 @@ public record WorkerInfo(
         int running = Math.max(activeThreads, Math.min(inFlight, poolSize));
         int waiting = Math.max(queueLen, inFlight - poolSize);
         return new WorkerInfo(
-                id, host, port, cores, memoryMb, poolSize, cpuPct, memPct,
+                id, host, port, cores, memoryMb, poolSize, slowdown, cpuPct, memPct,
                 running, waiting, tasksCompleted, avgExecMs, registeredAtMs, lastHeartbeatMs);
     }
 

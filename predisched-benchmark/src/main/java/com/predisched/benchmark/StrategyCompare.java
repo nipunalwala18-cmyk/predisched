@@ -91,7 +91,9 @@ public final class StrategyCompare {
         System.out.println("strategy        w1/p2  w2/p4  w3/p8  imbalance  mean_lat_ms"
                 + "  p95_lat_ms  tasks/s  makespan_ms  decision_us  failed");
         for (String strategy : List.of("round_robin", "random", "least_loaded", "resource_aware")) {
-            Result result = run(strategy, trace, speed, seed);
+            Result result = run(strategy, () -> StrategyRegistry.standard().create(strategy,
+                    new StrategyRegistry.Settings(seed, 0.4, 0.2, 0.4)), trace, speed, seed,
+                    NO_SLOWDOWN);
             rows.add(String.format(Locale.ROOT, "%s,%d,%d,%d,%d,%d,%d,%.2f,%.1f,%d,%.2f,%d,%.1f",
                     strategy, trace.size(), result.completed, result.failed,
                     result.perWorker.get("worker-1"), result.perWorker.get("worker-2"),
@@ -112,11 +114,19 @@ public final class StrategyCompare {
         System.out.println("rows written to " + out);
     }
 
-    private record Result(Map<String, Integer> perWorker, int completed, int failed,
+    record Result(Map<String, Integer> perWorker, int completed, int failed,
             double imbalance, double meanLatencyMs, long p95LatencyMs, double throughput,
-            long makespanMs, double meanDecisionMicros) {}
+            long makespanMs, double meanDecisionMicros, long p95DecisionMicros) {}
 
-    private static Result run(String strategyName, List<TraceEntry> trace, double speed, long seed)
+    static final double[] NO_SLOWDOWN = {1.0, 1.0, 1.0};
+
+    /**
+     * One replay of {@code trace} on a fresh in-process scheduler with {@code strategy} and three
+     * workers of pools 2/4/8, each stretched by its {@code slowdowns} factor (prompt 15).
+     */
+    static Result run(String strategyName, java.util.function.Supplier<
+            com.predisched.scheduler.strategy.SchedulingStrategy> strategy,
+            List<TraceEntry> trace, double speed, long seed, double[] slowdowns)
             throws Exception {
         List<AutoCloseable> closers = new ArrayList<>();
         try {
@@ -130,15 +140,16 @@ public final class StrategyCompare {
                     new ConcurrentHashMap<>();
             Dispatcher dispatcher = new Dispatcher(store, queue, registry,
                     worker -> workerStubs.get(worker.id()), retries, new RunningTasks(),
-                    0L, 2.0, 16, 20,
-                    StrategyRegistry.standard().create(strategyName, new StrategyRegistry.Settings(
-                            seed, 0.4, 0.2, 0.4)));
+                    0L, 2.0, 16, 20, strategy.get());
             closers.add(dispatcher);
 
             String schedulerName = "strategy-sched-" + UUID.randomUUID();
+            SchedulerServiceImpl service = new SchedulerServiceImpl(
+                    store, new TaskValidator(4096), queue, retries);
+            // The arrival-rate feature, as in SchedulerMain (the predictive strategy sends it).
+            dispatcher.useArrivalRate(service.arrivals());
             Server scheduler = InProcessServerBuilder.forName(schedulerName)
-                    .addService(new SchedulerServiceImpl(
-                            store, new TaskValidator(4096), queue, retries))
+                    .addService(service)
                     .addService(new RegistryServiceImpl(registry))
                     .build()
                     .start();
@@ -151,6 +162,7 @@ public final class StrategyCompare {
                 WorkerMetrics metrics = new WorkerMetrics();
                 ExecutionEngine engine = new ExecutionEngine(
                         new ExecutorRegistry(), metrics, id, POOL_SIZES[i], 200);
+                engine.setSlowdown(slowdowns[i]);
                 closers.add(engine);
                 String workerName = "strategy-" + id + "-" + UUID.randomUUID();
                 Server worker = InProcessServerBuilder.forName(workerName)
@@ -249,12 +261,16 @@ public final class StrategyCompare {
                 .mapToDouble(count -> (count - avg) * (count - avg)).average().orElse(0);
         double decisionMicros = decisions.stream()
                 .mapToLong(SchedulingDecision::decisionMicros).average().orElse(0);
+        long[] decisionTimes = decisions.stream().mapToLong(SchedulingDecision::decisionMicros)
+                .sorted().toArray();
+        long p95Decision = decisionTimes.length == 0 ? 0
+                : decisionTimes[(int) Math.ceil(0.95 * decisionTimes.length) - 1];
         return new Result(perWorker, completed, failed, Math.sqrt(variance), mean, p95,
-                completed / (makespan / 1000.0), makespan, decisionMicros);
+                completed / (makespan / 1000.0), makespan, decisionMicros, p95Decision);
     }
 
     /** HTTP_TASK calls the mock service; without it every such task would fail and skew rows. */
-    private static void requireMockHttpIfNeeded(List<TraceEntry> trace) {
+    static void requireMockHttpIfNeeded(List<TraceEntry> trace) {
         TraceEntry http = trace.stream()
                 .filter(entry -> entry.type() == TaskType.HTTP_TASK)
                 .findFirst()

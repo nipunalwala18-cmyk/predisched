@@ -188,7 +188,7 @@ class PredictionClientTest {
 
     @Test
     void latencyPercentilesComeFromRecentCalls() {
-        PredictionClient.LatencyWindow window = new PredictionClient.LatencyWindow(4);
+        com.predisched.scheduler.LatencyWindow window = new com.predisched.scheduler.LatencyWindow(4);
         for (double v : new double[] {9, 1, 2, 3, 4}) {
             window.add(v);
         }

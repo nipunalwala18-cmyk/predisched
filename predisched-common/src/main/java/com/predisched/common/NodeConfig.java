@@ -631,6 +631,48 @@ public class NodeConfig {
         private double cpuWeight = 0.4;
         private double memWeight = 0.2;
         private double queueWeight = 0.4;
+        /**
+         * Predictive strategy (prompt 18, spec 12.4): cost = completion x (1 + lambda x
+         * overload_prob). Workers above the overload threshold are skipped while another is
+         * below it; tasks of priority highPriority or more use the stricter threshold. The lambda
+         * default comes from the tune-lambda run (docs/components/predictive-strategy.md).
+         */
+        private double lambda = 1.0;
+        private double overloadThreshold = 0.8;
+        private int highPriority = 8;
+        private double highPriorityOverloadThreshold = 0.5;
+
+        public double getLambda() {
+            return lambda;
+        }
+
+        public void setLambda(double lambda) {
+            this.lambda = lambda;
+        }
+
+        public double getOverloadThreshold() {
+            return overloadThreshold;
+        }
+
+        public void setOverloadThreshold(double overloadThreshold) {
+            this.overloadThreshold = overloadThreshold;
+        }
+
+        public int getHighPriority() {
+            return highPriority;
+        }
+
+        public void setHighPriority(int highPriority) {
+            this.highPriority = highPriority;
+        }
+
+        public double getHighPriorityOverloadThreshold() {
+            return highPriorityOverloadThreshold;
+        }
+
+        public void setHighPriorityOverloadThreshold(double highPriorityOverloadThreshold) {
+            this.highPriorityOverloadThreshold = highPriorityOverloadThreshold;
+        }
 
         /** round_robin, random, least_loaded or resource_aware. */
         public String getStrategy() {

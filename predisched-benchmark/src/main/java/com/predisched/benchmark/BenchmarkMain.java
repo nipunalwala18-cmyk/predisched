@@ -23,6 +23,7 @@ public class BenchmarkMain {
             case "strategy-compare" -> StrategyCompare.main(rest);
             case "failover-test" -> FailoverTest.main(rest);
             case "prediction-latency" -> PredictionLatency.main(rest);
+            case "tune-lambda" -> TuneLambda.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -63,6 +64,11 @@ public class BenchmarkMain {
                               Against a running prediction server (prompt 17): latency seen
                               through PredictionClient, deadline and breaker included
                               [--requests 2000] [--workers 3] [--port 50070] [--timeout-ms 10]
+                  tune-lambda
+                              Predictive strategy on one training-period trace for each lambda
+                              (prompt 18); needs the prediction server and scripts/mock-http.py
+                              [--trace workloads/campaign/mixed-steady-1506.jsonl]
+                              [--lambdas 0,0.5,1,2,4] [--reps 3] [--out results/lambda-tuning.csv]
                 """);
     }
 }

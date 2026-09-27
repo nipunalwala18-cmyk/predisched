@@ -20,10 +20,12 @@ import com.predisched.scheduler.queue.RetryCoordinator;
 import com.predisched.scheduler.queue.RunningTasks;
 import com.predisched.scheduler.cache.ResultCache;
 import com.predisched.scheduler.queue.TaskQueue;
+import com.predisched.scheduler.strategy.CandidateScore;
 import com.predisched.scheduler.strategy.DecisionLog;
 import com.predisched.scheduler.strategy.RoundRobinStrategy;
 import com.predisched.scheduler.strategy.SchedulingDecision;
 import com.predisched.scheduler.strategy.SchedulingStrategy;
+import com.predisched.scheduler.strategy.StrategyDecision;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import java.util.ArrayList;
@@ -71,7 +73,12 @@ public class Dispatcher implements AutoCloseable {
     private final ExecutorService dispatchPool;
     private final long noWorkerRetryMs;
     private final AtomicReference<SchedulingStrategy> strategy;
-    private final DecisionLog decisions = new DecisionLog(1000);
+    private final DecisionLog decisions = new DecisionLog(10_000);
+    /** Decision times (ms), logged as percentiles every DECISION_LOG_EVERY decisions. */
+    private final LatencyWindow decisionTimes = new LatencyWindow(1024);
+    private final java.util.concurrent.atomic.AtomicLong decisionCount =
+            new java.util.concurrent.atomic.AtomicLong();
+    private static final int DECISION_LOG_EVERY = 100;
     private volatile boolean active;
     private Thread thread;
     private volatile ResultCache cache;
@@ -118,6 +125,7 @@ public class Dispatcher implements AutoCloseable {
             long noWorkerRetryMs,
             SchedulingStrategy strategy) {
         this.strategy = new AtomicReference<>(strategy);
+        strategy.attach(context());
         this.store = store;
         this.queue = queue;
         this.registry = registry;
@@ -207,23 +215,41 @@ public class Dispatcher implements AutoCloseable {
             return Optional.empty();
         }
         SchedulingStrategy current = strategy.get();
+        // Timed as a whole: for the predictive strategy this includes the prediction call.
         long started = System.nanoTime();
-        WorkerInfo chosen = current.select(task, candidates);
+        StrategyDecision decision = current.decide(task, candidates);
         long micros = (System.nanoTime() - started) / 1_000;
-        Map<String, Double> scores = current.scores(task, candidates);
-        decisions.add(new SchedulingDecision(
-                task.id(), current.name(), chosen.id(), scores, micros, Clocks.now()));
+        WorkerInfo chosen = decision.chosen();
+        Map<String, Double> scores = decision.scores();
+        long now = Clocks.now();
+        decisions.add(new SchedulingDecision(task.id(), current.name(), chosen.id(), scores,
+                micros, now, decision.breakdown(), decision.fallback(), decision.fallbackReason(),
+                decision.modelVersions()));
         History.get().decision(task.id(), current.name(), chosen.id(), scores.get(chosen.id()),
-                scores, micros, Clocks.now());
-        EventLog.get().event(EventLog.SCHEDULE_DECISION, task.id(), Map.of(
-                "strategy", current.name(),
-                "worker", chosen.id(),
-                "candidates", String.valueOf(candidates.size()),
-                "decision_us", String.valueOf(micros),
-                "scores", scores.entrySet().stream()
-                        .map(entry -> entry.getKey() + "="
-                                + String.format(Locale.ROOT, "%.3f", entry.getValue()))
-                        .collect(Collectors.joining(" "))));
+                scores, micros, now, CandidateScore.toJson(decision.breakdown()),
+                decision.fallback(), decision.fallbackReason(), decision.modelVersions());
+        Map<String, String> details = new java.util.LinkedHashMap<>();
+        details.put("strategy", current.name());
+        details.put("worker", chosen.id());
+        details.put("candidates", String.valueOf(candidates.size()));
+        details.put("decision_us", String.valueOf(micros));
+        details.put("scores", scores.entrySet().stream()
+                .map(entry -> entry.getKey() + "="
+                        + String.format(Locale.ROOT, "%.3f", entry.getValue()))
+                .collect(Collectors.joining(" ")));
+        if (decision.fallback()) {
+            details.put("fallback", decision.fallbackReason());
+        }
+        EventLog.get().event(EventLog.SCHEDULE_DECISION, task.id(), details);
+        decisionTimes.add(micros / 1000.0);
+        if (decisionCount.incrementAndGet() % DECISION_LOG_EVERY == 0) {
+            double[] p = decisionTimes.percentiles(50, 95, 99);
+            log.info("Decision latency ({}, last {}): p50={} ms p95={} ms p99={} ms",
+                    current.name(), decisionTimes.size(),
+                    String.format(Locale.ROOT, "%.2f", p[0]),
+                    String.format(Locale.ROOT, "%.2f", p[1]),
+                    String.format(Locale.ROOT, "%.2f", p[2]));
+        }
         return Optional.of(chosen);
     }
 
@@ -276,6 +302,7 @@ public class Dispatcher implements AutoCloseable {
 
     /** Swaps the strategy for every later dispatch (the admin API in prompt 22 calls this). */
     public void setStrategy(SchedulingStrategy next) {
+        next.attach(context());
         SchedulingStrategy previous = strategy.getAndSet(next);
         log.info("Scheduling strategy changed from {} to {}", previous.name(), next.name());
     }
@@ -286,6 +313,16 @@ public class Dispatcher implements AutoCloseable {
 
     public DecisionLog decisions() {
         return decisions;
+    }
+
+    /** Recent decision times (ms), p-th percentiles. */
+    public double[] decisionPercentiles(double... p) {
+        return decisionTimes.percentiles(p);
+    }
+
+    /** Reads the arrival rate at call time, so a later useArrivalRate still reaches it. */
+    private SchedulingStrategy.Context context() {
+        return new SchedulingStrategy.Context(() -> arrivals.perSecond());
     }
 
     void process(String taskId, WorkerInfo worker) {
@@ -424,6 +461,17 @@ public class Dispatcher implements AutoCloseable {
             Features features) {
         long endedAtMs = Clocks.now();
         recordHistory(taskId, workerId, attemptNumber, startedAtMs, result, features);
+        if (!result.getRejected()) {
+            TaskRecord ran = store.get(taskId);
+            if (ran != null) {
+                try {
+                    strategy.get().completed(ran, workerId, result.getExecTimeMs(),
+                            result.getSuccess());
+                } catch (RuntimeException e) {
+                    log.warn("Strategy completion hook failed for {}: {}", taskId, e.toString());
+                }
+            }
+        }
         EventLog.get().event(EventLog.RESULT, taskId, Map.of(
                 "worker", workerId,
                 "attempt", String.valueOf(attemptNumber),

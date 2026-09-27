@@ -219,6 +219,21 @@ public class SchedulerClient implements AutoCloseable, SchedulerGateway {
                 reply -> null);
     }
 
+    /** Switches the scheduler's strategy at runtime (prompt 18). */
+    public com.predisched.proto.SetStrategyResponse setStrategy(String strategy) {
+        return call("strategy " + strategy, stub -> stub.setStrategy(
+                com.predisched.proto.SetStrategyRequest.newBuilder().setStrategy(strategy)
+                        .build()),
+                reply -> !reply.getOk() && reply.getMessage().startsWith("not the leader")
+                        ? reply.getMessage() : null);
+    }
+
+    /** The per-worker breakdown of one placement (F13, prompt 18). */
+    public com.predisched.proto.DecisionExplanation explain(String taskId) {
+        return call("explain " + taskId, stub -> stub.explainDecision(
+                TaskStatusRequest.newBuilder().setTaskId(taskId).build()), reply -> null);
+    }
+
     public TaskResponse cancelTask(String taskId) {
         return call("cancel " + taskId, stub -> stub.cancelTask(
                 TaskStatusRequest.newBuilder().setTaskId(taskId).build()), SchedulerClient::refusal);

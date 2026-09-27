@@ -26,6 +26,18 @@ public class DecisionLog {
         recent.addLast(decision);
     }
 
+    /** The newest decision for this task (a retried task has several), or null. */
+    public synchronized SchedulingDecision find(String taskId) {
+        var it = recent.descendingIterator();
+        while (it.hasNext()) {
+            SchedulingDecision decision = it.next();
+            if (decision.taskId().equals(taskId)) {
+                return decision;
+            }
+        }
+        return null;
+    }
+
     /** Oldest first. */
     public synchronized List<SchedulingDecision> recent() {
         return new ArrayList<>(recent);

@@ -169,10 +169,18 @@ public class HistoryWriter implements HistorySink, AutoCloseable {
     @Override
     public void decision(String taskId, String strategy, String chosenWorker, Double cost,
             Map<String, Double> scores, long decisionUs, long tsMs) {
+        decision(taskId, strategy, chosenWorker, cost, scores, decisionUs, tsMs, null, false,
+                null, null);
+    }
+
+    @Override
+    public void decision(String taskId, String strategy, String chosenWorker, Double cost,
+            Map<String, Double> scores, long decisionUs, long tsMs, String breakdownJson,
+            boolean fallback, String fallbackReason, String modelVersions) {
         offer(new SimpleRow("""
                 INSERT INTO scheduling_decisions (task_id, strategy, chosen_worker, cost, scores,
-                    decision_us, ts)
-                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?)
+                    decision_us, ts, breakdown, fallback, fallback_reason, model_versions)
+                VALUES (?, ?, ?, ?, ?::jsonb, ?, ?, ?::jsonb, ?, ?, ?)
                 """, s -> {
             s.setString(1, taskId);
             s.setString(2, strategy);
@@ -181,6 +189,36 @@ public class HistoryWriter implements HistorySink, AutoCloseable {
             s.setString(5, Json.object(scores));
             s.setLong(6, decisionUs);
             s.setTimestamp(7, new Timestamp(tsMs));
+            s.setString(8, breakdownJson);
+            s.setBoolean(9, fallback);
+            s.setString(10, fallbackReason == null || fallbackReason.isEmpty()
+                    ? null : fallbackReason);
+            s.setString(11, modelVersions == null || modelVersions.isEmpty()
+                    ? null : modelVersions);
+        }));
+    }
+
+    @Override
+    public void predictionOutcome(String taskId, String taskType, String workerId,
+            double predExecMs, long actualExecMs, boolean coldStart, String modelVersions,
+            double rollingMaeMs, double rollingTypeMaeMs, long tsMs) {
+        offer(new SimpleRow("""
+                INSERT INTO prediction_outcomes (task_id, task_type, worker_id, pred_exec_ms,
+                    actual_exec_ms, abs_error_ms, cold_start, model_versions, rolling_mae_ms,
+                    rolling_type_mae_ms, ts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, s -> {
+            s.setString(1, taskId);
+            s.setString(2, taskType);
+            s.setString(3, workerId);
+            s.setDouble(4, predExecMs);
+            s.setLong(5, actualExecMs);
+            s.setDouble(6, Math.abs(predExecMs - actualExecMs));
+            s.setBoolean(7, coldStart);
+            s.setString(8, modelVersions);
+            number(s, 9, Double.isFinite(rollingMaeMs) ? rollingMaeMs : null);
+            number(s, 10, Double.isFinite(rollingTypeMaeMs) ? rollingTypeMaeMs : null);
+            s.setTimestamp(11, new Timestamp(tsMs));
         }));
     }
 

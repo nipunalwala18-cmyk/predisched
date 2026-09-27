@@ -40,6 +40,8 @@ public class EventLog implements AutoCloseable {
     public static final String LEADER_ELECTED = "LEADER_ELECTED";
     /** A scheduling strategy picked a worker for a task (prompt 08). */
     public static final String SCHEDULE_DECISION = "SCHEDULE_DECISION";
+    /** A predicted task finished: prediction vs actual and the rolling MAE (prompt 18). */
+    public static final String PREDICTION_OUTCOME = "PREDICTION_OUTCOME";
 
     private static volatile EventLog instance = new EventLog();
 

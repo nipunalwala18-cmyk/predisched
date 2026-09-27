@@ -38,6 +38,9 @@ message RegisterRequest {
   int32 cores = 4;
   int64 memory_mb = 5;
   int32 pool_size = 6;
+  // Simulated slower hardware (prompt 15): executions take this many times as long. 0 means 1.
+  // The predictive strategy passes it to the models, which were trained with it (prompt 18).
+  double slowdown = 7;
 }
 
 message Heartbeat {

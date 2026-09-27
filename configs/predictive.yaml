@@ -1,0 +1,93 @@
+# Predictive scheduling (prompt 18): configs/campaign-node.yaml (database on, cache off) with the
+# predictive strategy and its prediction-server client turned on. Start the server first:
+#   cd ml && python -m predisched_ml.prediction_server --port 50070
+scheduler:
+  id: "scheduler-1"
+  host: "localhost"
+  port: 51051
+  # gRPC calls to workers run on this pool, so one slow task cannot block the queue.
+  dispatchThreads: 4
+  # A worker that has not sent a heartbeat within this long is not dispatched to.
+  workerStaleAfterMs: 5000
+  noWorkerRetryMs: 200
+  # Tasks kept outstanding on one worker, as a multiple of its pool size. Holding work in the
+  # scheduler's queue instead is what lets priority and ageing decide anything (F2).
+  outstandingPerWorkerFactor: 2.0
+  # One log line per worker per interval with its latest heartbeat metrics; 0 turns it off.
+  clusterReportIntervalMs: 5000
+worker:
+  id: "worker-1"
+  host: "localhost"
+  port: 51061
+  poolSize: 4
+  queueCapacity: 100
+  heartbeatIntervalMs: 1000
+queue:
+  # Effective priority = priority + ageingPerSecond * secondsWaiting, capped at maxPriority (F2).
+  ageingPerSecond: 0.1
+  maxPriority: 10
+  # Retries with exponential backoff, then the dead-letter queue (F4).
+  maxRetries: 3
+  retryBaseDelayMs: 200
+  retryMaxDelayMs: 30000
+  retryJitter: 0.2
+  # 0 means tasks only time out when they ask to, with --timeout (F5).
+  defaultTimeoutMs: 0
+  timeoutCheckMs: 250
+  seed: 42
+clock:
+  # Artificial skew so clock synchronisation has something to correct on one machine.
+  # Override per node with --clock-offset; drift is parts per million.
+  offsetMs: 0
+  driftPpm: 0
+  # berkeley: the scheduler polls and corrects everyone. cristian: this worker pulls the
+  # scheduler's time and corrects itself. none: no physical sync.
+  algorithm: "berkeley"
+  syncIntervalMs: 10000
+  outlierMs: 1000
+validation:
+  maxInputChars: 4096
+scheduling:
+  # How the scheduler picks a worker (FR11, Exp 6): round_robin, random, least_loaded or
+  # resource_aware. Override per run with --strategy. Seed and weights feed random and
+  # resource_aware (score = cpu*cpu% + mem*mem% + queue*load/pool, lowest wins).
+  strategy: "predictive"
+  seed: 42
+  cpuWeight: 0.4
+  memWeight: 0.2
+  queueWeight: 0.4
+  # Predictive (spec 12.4): cost = (pred_wait + pred_exec) x (1 + lambda x overload_prob).
+  # lambda from results/lambda-tuning.csv (docs/components/predictive-strategy.md).
+  lambda: 1.0
+  overloadThreshold: 0.8           # skip workers above this while another is below it
+  highPriority: 8                  # tasks of this priority or more ...
+  highPriorityOverloadThreshold: 0.5   # ... use this stricter threshold
+prediction:
+  # The prediction server (prompt 17): 10 ms deadline, breaker opens after 5 failures in a row
+  # and tries again after 5 s. Without predictions the strategy falls back to least_loaded.
+  enabled: true
+  host: "localhost"
+  port: 50070
+  timeoutMs: 10
+  failureThreshold: 5
+  coolDownMs: 5000
+  latencyLogEvery: 100
+db:
+  # PostgreSQL (spec §14, prompt 11). Matches:
+  #   docker run -d --name predisched-pg -e POSTGRES_PASSWORD=predisched -e POSTGRES_DB=predisched -p 5432:5432 postgres:16
+  # The scheduler migrates the schema on start (Flyway) and writes history asynchronously.
+  enabled: true
+  url: "jdbc:postgresql://localhost:5432/predisched"
+  user: "postgres"
+  password: "predisched"
+  poolSize: 4
+  historyQueueCapacity: 50000
+  historyBatchSize: 500
+  historyFlushMs: 200
+  # Workers run DB_QUERY_TASK on their own pool of this size.
+  queryPoolSize: 2
+cache:
+  # Off for the dataset campaign (prompt 15): every strategy replays the same traces, and a cache
+  # hit would skip the execution the dataset needs a row for.
+  enabled: false
+  maxEntries: 10000

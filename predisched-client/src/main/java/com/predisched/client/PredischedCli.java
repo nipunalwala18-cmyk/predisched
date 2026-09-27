@@ -40,6 +40,7 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Shell.class,
             PredischedCli.Tasks.class,
             PredischedCli.Status.class,
+            PredischedCli.Explain.class,
             PredischedCli.Cancel.class,
             PredischedCli.Watch.class,
             PredischedCli.Dlq.class,
@@ -638,6 +639,12 @@ public class PredischedCli implements Runnable {
                     description = "Give every task a deadline this many ms after its submit (F3)")
             long deadlineMs = 0;
 
+            @Option(names = "--strategy",
+                    description = "Switch the scheduler to this strategy before replaying"
+                            + " (round_robin, random, least_loaded, resource_aware, predictive);"
+                            + " it stays switched afterwards")
+            String strategy;
+
             @Option(names = "--id-suffix",
                     description = "Append this to every task id, to replay a trace again as new"
                             + " tasks (a repeated id is the same task)")
@@ -662,6 +669,15 @@ public class PredischedCli implements Runnable {
                         .replaceFirst("\\.jsonl$", "");
                 String out = output != null ? output : "results/" + base + "-replay.csv";
                 try (SchedulerClient client = parent.parent.newClient()) {
+                    if (strategy != null) {
+                        com.predisched.proto.SetStrategyResponse switched =
+                                client.setStrategy(strategy);
+                        System.out.println("strategy: " + switched.getPrevious() + " -> "
+                                + switched.getCurrent() + " (" + switched.getMessage() + ")");
+                        if (!switched.getOk()) {
+                            return 1;
+                        }
+                    }
                     com.predisched.client.workload.Replayer.Summary summary =
                             com.predisched.client.workload.Replayer.replay(
                                     entries, speed, client, java.nio.file.Paths.get(out),
@@ -671,6 +687,28 @@ public class PredischedCli implements Runnable {
                     System.out.println("replay failed: " + e.getMessage());
                     return 1;
                 }
+            }
+        }
+    }
+
+    @Command(name = "explain",
+            description = "Why a task went to its worker: the per-worker scores (F13).")
+    static class Explain implements Callable<Integer> {
+        @CommandLine.ParentCommand
+        PredischedCli parent;
+
+        @Parameters(index = "0", description = "Task id")
+        String id;
+
+        @Override
+        public Integer call() {
+            try (SchedulerClient client = parent.newClient()) {
+                com.predisched.proto.DecisionExplanation explanation = client.explain(id);
+                System.out.print(ExplainFormat.format(explanation));
+                return explanation.getFound() ? 0 : 1;
+            } catch (Exception e) {
+                System.out.println("explain failed: " + e.getMessage());
+                return 1;
             }
         }
     }

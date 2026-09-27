@@ -4,6 +4,7 @@ import com.predisched.common.TaskRecord;
 import com.predisched.scheduler.WorkerInfo;
 import java.util.List;
 import java.util.Map;
+import java.util.function.DoubleSupplier;
 
 /**
  * Picks the worker a task goes to (FR11, Exp 6). A new strategy is one class implementing this
@@ -27,4 +28,25 @@ public interface SchedulingStrategy {
     default Map<String, Double> scores(TaskRecord task, List<WorkerInfo> candidates) {
         return Map.of();
     }
+
+    /**
+     * The whole decision: worker, scores and the per-candidate breakdown (F13). The dispatcher
+     * calls this and times it. The default is {@link #select} plus {@link #scores}; the
+     * predictive strategy overrides it to make one prediction call per task.
+     */
+    default StrategyDecision decide(TaskRecord task, List<WorkerInfo> candidates) {
+        WorkerInfo chosen = select(task, candidates);
+        return StrategyDecision.of(chosen, scores(task, candidates), candidates);
+    }
+
+    /** What the dispatcher offers a strategy beyond the candidates (prompt 18). */
+    record Context(DoubleSupplier arrivalRatePerSecond) {
+        public static final Context NONE = new Context(() -> 0.0);
+    }
+
+    /** Called when the strategy is installed in a dispatcher. */
+    default void attach(Context context) {}
+
+    /** An attempt this strategy placed has ended (prompt 18: accuracy tracking). */
+    default void completed(TaskRecord task, String workerId, long execMs, boolean success) {}
 }

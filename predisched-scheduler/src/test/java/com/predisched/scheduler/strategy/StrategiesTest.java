@@ -16,7 +16,7 @@ class StrategiesTest {
             TaskRecord.createQueued("t", TaskType.SLEEP_TASK, "ms=5", 5);
 
     static WorkerInfo worker(String id, int pool, double cpu, double mem, int active, int queued) {
-        return new WorkerInfo(id, "localhost", 0, 4, 1024, pool, cpu, mem, active, queued,
+        return new WorkerInfo(id, "localhost", 0, 4, 1024, pool, 1.0, cpu, mem, active, queued,
                 0, 0, 0, 0);
     }
 

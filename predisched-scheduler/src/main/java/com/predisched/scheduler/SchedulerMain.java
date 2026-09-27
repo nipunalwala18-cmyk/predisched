@@ -131,10 +131,9 @@ public class SchedulerMain {
         WorkerClients clients = new WorkerClients();
         // An unknown strategy name stops the scheduler here, listing the valid ones.
         NodeConfig.SchedulingConfig scheduling = config.getScheduling();
+        StrategyRegistry.Settings strategySettings = StrategyRegistry.Settings.from(config);
         SchedulingStrategy strategy = StrategyRegistry.standard().create(
-                opts.getOrDefault("--strategy", scheduling.getStrategy()),
-                new StrategyRegistry.Settings(scheduling.getSeed(), scheduling.getCpuWeight(),
-                        scheduling.getMemWeight(), scheduling.getQueueWeight()));
+                opts.getOrDefault("--strategy", scheduling.getStrategy()), strategySettings);
         Dispatcher dispatcher = new Dispatcher(
                 store, queue, workers, clients, retries, running,
                 queueConfig.getDefaultTimeoutMs(),
@@ -145,6 +144,8 @@ public class SchedulerMain {
         SchedulerServiceImpl schedulerService = new SchedulerServiceImpl(
                 store, validator, queue, retries, leadership, limits);
         dispatcher.useArrivalRate(schedulerService.arrivals());
+        schedulerService.useAdmin(new DispatcherAdmin(dispatcher, StrategyRegistry.standard(),
+                strategySettings));
         ResultCache resultCache = null;
         if (config.getCache().isEnabled()) {
             resultCache = new ResultCache(config.getCache().getMaxEntries(),

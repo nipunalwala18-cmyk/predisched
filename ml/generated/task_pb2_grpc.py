@@ -69,6 +69,16 @@ class SchedulerServiceStub(object):
                 request_serializer=task__pb2.WorkflowStatusRequest.SerializeToString,
                 response_deserializer=task__pb2.WorkflowStatusResponse.FromString,
                 _registered_method=True)
+        self.SetStrategy = channel.unary_unary(
+                '/predisched.SchedulerService/SetStrategy',
+                request_serializer=task__pb2.SetStrategyRequest.SerializeToString,
+                response_deserializer=task__pb2.SetStrategyResponse.FromString,
+                _registered_method=True)
+        self.ExplainDecision = channel.unary_unary(
+                '/predisched.SchedulerService/ExplainDecision',
+                request_serializer=task__pb2.TaskStatusRequest.SerializeToString,
+                response_deserializer=task__pb2.DecisionExplanation.FromString,
+                _registered_method=True)
 
 
 class SchedulerServiceServicer(object):
@@ -118,6 +128,19 @@ class SchedulerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetStrategy(self, request, context):
+        """Prompt 18: switch the scheduling strategy at runtime, and explain one placement (F13).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ExplainDecision(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SchedulerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -155,6 +178,16 @@ def add_SchedulerServiceServicer_to_server(servicer, server):
                     servicer.GetWorkflowStatus,
                     request_deserializer=task__pb2.WorkflowStatusRequest.FromString,
                     response_serializer=task__pb2.WorkflowStatusResponse.SerializeToString,
+            ),
+            'SetStrategy': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetStrategy,
+                    request_deserializer=task__pb2.SetStrategyRequest.FromString,
+                    response_serializer=task__pb2.SetStrategyResponse.SerializeToString,
+            ),
+            'ExplainDecision': grpc.unary_unary_rpc_method_handler(
+                    servicer.ExplainDecision,
+                    request_deserializer=task__pb2.TaskStatusRequest.FromString,
+                    response_serializer=task__pb2.DecisionExplanation.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -346,6 +379,60 @@ class SchedulerService(object):
             '/predisched.SchedulerService/GetWorkflowStatus',
             task__pb2.WorkflowStatusRequest.SerializeToString,
             task__pb2.WorkflowStatusResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetStrategy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/predisched.SchedulerService/SetStrategy',
+            task__pb2.SetStrategyRequest.SerializeToString,
+            task__pb2.SetStrategyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ExplainDecision(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/predisched.SchedulerService/ExplainDecision',
+            task__pb2.TaskStatusRequest.SerializeToString,
+            task__pb2.DecisionExplanation.FromString,
             options,
             channel_credentials,
             insecure,

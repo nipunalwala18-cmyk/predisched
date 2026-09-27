@@ -55,6 +55,7 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
     private final ClientLimits limits;
     private final ArrivalRate arrivals = new ArrivalRate();
     private volatile ResultCache cache;
+    private volatile DispatcherAdmin admin;
 
     public SchedulerServiceImpl(
             TaskStore store,
@@ -95,6 +96,43 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
 
     public WorkflowManager workflows() {
         return workflows;
+    }
+
+    /** Enables SetStrategy and ExplainDecision (prompt 18). */
+    public void useAdmin(DispatcherAdmin dispatcherAdmin) {
+        this.admin = dispatcherAdmin;
+    }
+
+    @Override
+    public void setStrategy(com.predisched.proto.SetStrategyRequest request,
+            StreamObserver<com.predisched.proto.SetStrategyResponse> observer) {
+        DispatcherAdmin current = admin;
+        String refusal = notLeader();
+        if (current == null || refusal != null) {
+            observer.onNext(com.predisched.proto.SetStrategyResponse.newBuilder().setOk(false)
+                    .setMessage(current == null ? "this scheduler has no admin interface"
+                            : refusal).build());
+            observer.onCompleted();
+            return;
+        }
+        com.predisched.proto.SetStrategyResponse response =
+                current.setStrategy(request.getStrategy().trim());
+        log.info("SetStrategy {}: {} ({} -> {})", request.getStrategy(), response.getMessage(),
+                response.getPrevious(), response.getCurrent());
+        observer.onNext(response);
+        observer.onCompleted();
+    }
+
+    @Override
+    public void explainDecision(TaskStatusRequest request,
+            StreamObserver<com.predisched.proto.DecisionExplanation> observer) {
+        DispatcherAdmin current = admin;
+        observer.onNext(current == null
+                ? com.predisched.proto.DecisionExplanation.newBuilder().setFound(false)
+                        .setTaskId(request.getTaskId())
+                        .setMessage("this scheduler has no admin interface").build()
+                : current.explain(request.getTaskId()));
+        observer.onCompleted();
     }
 
     /** Accepted submits per second, for the dispatcher's ML features (prompt 11). */

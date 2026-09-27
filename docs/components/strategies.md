@@ -133,3 +133,9 @@ a seed (in any list order) and reaches every candidate; least-loaded picks the l
 registered twice. `PluggableStrategyTest`: a strategy defined only in the test is registered and
 drives six real dispatches, all recorded as decisions; a retry after a timeout avoids that worker,
 after an ordinary failure it does not.
+
+## Later additions
+
+- Prompt 18 adds a fifth strategy, `predictive`, plus a per-candidate breakdown for every decision
+  (`predisched explain <taskId>`) and a runtime switch (`workload replay --strategy`). See
+  `docs/components/predictive-strategy.md`.

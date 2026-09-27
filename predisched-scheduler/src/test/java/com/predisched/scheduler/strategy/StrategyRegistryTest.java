@@ -10,8 +10,9 @@ import org.junit.jupiter.api.Test;
 class StrategyRegistryTest {
 
     @Test
-    void theStandardRegistryHasTheFourStrategies() {
-        assertEquals(Set.of("round_robin", "random", "least_loaded", "resource_aware"),
+    void theStandardRegistryHasTheFiveStrategies() {
+        assertEquals(Set.of("round_robin", "random", "least_loaded", "resource_aware",
+                "predictive"),
                 StrategyRegistry.standard().names());
     }
 
@@ -22,7 +23,8 @@ class StrategyRegistryTest {
         assertTrue(error.getMessage().contains("unknown scheduling.strategy 'fastest'"),
                 error.getMessage());
         assertTrue(error.getMessage().contains(
-                "[round_robin, random, least_loaded, resource_aware]"), error.getMessage());
+                "[round_robin, random, least_loaded, resource_aware, predictive]"),
+                error.getMessage());
     }
 
     @Test

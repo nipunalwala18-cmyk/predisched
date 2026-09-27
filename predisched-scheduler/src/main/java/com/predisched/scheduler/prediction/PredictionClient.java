@@ -1,6 +1,7 @@
 package com.predisched.scheduler.prediction;
 
 import com.predisched.common.NodeConfig;
+import com.predisched.scheduler.LatencyWindow;
 import com.predisched.proto.HealthRequest;
 import com.predisched.proto.HealthResponse;
 import com.predisched.proto.PredictRequest;
@@ -13,7 +14,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -204,41 +204,6 @@ public final class PredictionClient implements AutoCloseable {
     public void close() {
         if (ownsChannel) {
             channel.shutdownNow();
-        }
-    }
-
-    /** The last {@code capacity} latencies, for percentiles. */
-    static final class LatencyWindow {
-        private final double[] values;
-        private int next;
-        private int size;
-
-        LatencyWindow(int capacity) {
-            values = new double[capacity];
-        }
-
-        synchronized void add(double value) {
-            values[next] = value;
-            next = (next + 1) % values.length;
-            size = Math.min(size + 1, values.length);
-        }
-
-        synchronized int size() {
-            return size;
-        }
-
-        synchronized double[] percentiles(double... ps) {
-            double[] out = new double[ps.length];
-            if (size == 0) {
-                return out;
-            }
-            double[] sorted = Arrays.copyOf(values, size);
-            Arrays.sort(sorted);
-            for (int i = 0; i < ps.length; i++) {
-                int rank = (int) Math.ceil(ps[i] / 100.0 * size) - 1;
-                out[i] = sorted[Math.max(0, Math.min(size - 1, rank))];
-            }
-            return out;
         }
     }
 }

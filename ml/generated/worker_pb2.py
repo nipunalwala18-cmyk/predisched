@@ -26,7 +26,7 @@ import task_pb2 as task__pb2
 import common_pb2 as common__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cworker.proto\x12\npredisched\x1a\ntask.proto\x1a\x0c\x63ommon.proto\"L\n\x0e\x45xecuteRequest\x12%\n\x04task\x18\x01 \x01(\x0b\x32\x17.predisched.TaskRequest\x12\x13\n\x0b\x64ispatch_id\x18\x02 \x01(\t\"\xc2\x01\n\rExecuteResult\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0e\n\x06output\x18\x03 \x01(\t\x12\x14\n\x0c\x65xec_time_ms\x18\x04 \x01(\x03\x12\x14\n\x0cwait_time_ms\x18\x05 \x01(\x03\x12\x14\n\x0clamport_time\x18\x06 \x01(\x03\x12\x10\n\x08rejected\x18\x07 \x01(\x08\x12\x11\n\tcacheable\x18\x08 \x01(\x08\x12\x18\n\x10resource_profile\x18\t \x01(\t\"u\n\x0fRegisterRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x0c\n\x04host\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\x05\x12\r\n\x05\x63ores\x18\x04 \x01(\x05\x12\x11\n\tmemory_mb\x18\x05 \x01(\x03\x12\x11\n\tpool_size\x18\x06 \x01(\x05\"\xaf\x01\n\tHeartbeat\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63pu_pct\x18\x02 \x01(\x01\x12\x0f\n\x07mem_pct\x18\x03 \x01(\x01\x12\x16\n\x0e\x61\x63tive_threads\x18\x04 \x01(\x05\x12\x11\n\tqueue_len\x18\x05 \x01(\x05\x12\x17\n\x0ftasks_completed\x18\x06 \x01(\x03\x12\x13\n\x0b\x61vg_exec_ms\x18\x07 \x01(\x01\x12\x14\n\x0clamport_time\x18\x08 \x01(\x03\"=\n\x15QueryExecutionRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64ispatch_id\x18\x02 \x01(\t\"g\n\x0f\x45xecutionStatus\x12)\n\x05state\x18\x01 \x01(\x0e\x32\x1a.predisched.ExecutionState\x12)\n\x06result\x18\x02 \x01(\x0b\x32\x19.predisched.ExecuteResult\"0\n\rCancelRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t*V\n\x0e\x45xecutionState\x12\x15\n\x11\x45XECUTION_UNKNOWN\x10\x00\x12\x15\n\x11\x45XECUTION_RUNNING\x10\x01\x12\x16\n\x12\x45XECUTION_FINISHED\x10\x02\x32\xe6\x01\n\rWorkerService\x12\x44\n\x0b\x45xecuteTask\x12\x1a.predisched.ExecuteRequest\x1a\x19.predisched.ExecuteResult\x12=\n\x0f\x43\x61ncelExecution\x12\x19.predisched.CancelRequest\x1a\x0f.predisched.Ack\x12P\n\x0eQueryExecution\x12!.predisched.QueryExecutionRequest\x1a\x1b.predisched.ExecutionStatus2\x84\x01\n\x0fRegistryService\x12\x38\n\x08Register\x12\x1b.predisched.RegisterRequest\x1a\x0f.predisched.Ack\x12\x37\n\rSendHeartbeat\x12\x15.predisched.Heartbeat\x1a\x0f.predisched.AckB\x18\n\x14\x63om.predisched.protoP\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cworker.proto\x12\npredisched\x1a\ntask.proto\x1a\x0c\x63ommon.proto\"L\n\x0e\x45xecuteRequest\x12%\n\x04task\x18\x01 \x01(\x0b\x32\x17.predisched.TaskRequest\x12\x13\n\x0b\x64ispatch_id\x18\x02 \x01(\t\"\xc2\x01\n\rExecuteResult\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0e\n\x06output\x18\x03 \x01(\t\x12\x14\n\x0c\x65xec_time_ms\x18\x04 \x01(\x03\x12\x14\n\x0cwait_time_ms\x18\x05 \x01(\x03\x12\x14\n\x0clamport_time\x18\x06 \x01(\x03\x12\x10\n\x08rejected\x18\x07 \x01(\x08\x12\x11\n\tcacheable\x18\x08 \x01(\x08\x12\x18\n\x10resource_profile\x18\t \x01(\t\"\x87\x01\n\x0fRegisterRequest\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x0c\n\x04host\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\x05\x12\r\n\x05\x63ores\x18\x04 \x01(\x05\x12\x11\n\tmemory_mb\x18\x05 \x01(\x03\x12\x11\n\tpool_size\x18\x06 \x01(\x05\x12\x10\n\x08slowdown\x18\x07 \x01(\x01\"\xaf\x01\n\tHeartbeat\x12\x11\n\tworker_id\x18\x01 \x01(\t\x12\x0f\n\x07\x63pu_pct\x18\x02 \x01(\x01\x12\x0f\n\x07mem_pct\x18\x03 \x01(\x01\x12\x16\n\x0e\x61\x63tive_threads\x18\x04 \x01(\x05\x12\x11\n\tqueue_len\x18\x05 \x01(\x05\x12\x17\n\x0ftasks_completed\x18\x06 \x01(\x03\x12\x13\n\x0b\x61vg_exec_ms\x18\x07 \x01(\x01\x12\x14\n\x0clamport_time\x18\x08 \x01(\x03\"=\n\x15QueryExecutionRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x13\n\x0b\x64ispatch_id\x18\x02 \x01(\t\"g\n\x0f\x45xecutionStatus\x12)\n\x05state\x18\x01 \x01(\x0e\x32\x1a.predisched.ExecutionState\x12)\n\x06result\x18\x02 \x01(\x0b\x32\x19.predisched.ExecuteResult\"0\n\rCancelRequest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t*V\n\x0e\x45xecutionState\x12\x15\n\x11\x45XECUTION_UNKNOWN\x10\x00\x12\x15\n\x11\x45XECUTION_RUNNING\x10\x01\x12\x16\n\x12\x45XECUTION_FINISHED\x10\x02\x32\xe6\x01\n\rWorkerService\x12\x44\n\x0b\x45xecuteTask\x12\x1a.predisched.ExecuteRequest\x1a\x19.predisched.ExecuteResult\x12=\n\x0f\x43\x61ncelExecution\x12\x19.predisched.CancelRequest\x1a\x0f.predisched.Ack\x12P\n\x0eQueryExecution\x12!.predisched.QueryExecutionRequest\x1a\x1b.predisched.ExecutionStatus2\x84\x01\n\x0fRegistryService\x12\x38\n\x08Register\x12\x1b.predisched.RegisterRequest\x1a\x0f.predisched.Ack\x12\x37\n\rSendHeartbeat\x12\x15.predisched.Heartbeat\x1a\x0f.predisched.AckB\x18\n\x14\x63om.predisched.protoP\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,24 +34,24 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'worker_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\024com.predisched.protoP\001'
-  _globals['_EXECUTIONSTATE']._serialized_start=844
-  _globals['_EXECUTIONSTATE']._serialized_end=930
+  _globals['_EXECUTIONSTATE']._serialized_start=863
+  _globals['_EXECUTIONSTATE']._serialized_end=949
   _globals['_EXECUTEREQUEST']._serialized_start=54
   _globals['_EXECUTEREQUEST']._serialized_end=130
   _globals['_EXECUTERESULT']._serialized_start=133
   _globals['_EXECUTERESULT']._serialized_end=327
-  _globals['_REGISTERREQUEST']._serialized_start=329
-  _globals['_REGISTERREQUEST']._serialized_end=446
-  _globals['_HEARTBEAT']._serialized_start=449
-  _globals['_HEARTBEAT']._serialized_end=624
-  _globals['_QUERYEXECUTIONREQUEST']._serialized_start=626
-  _globals['_QUERYEXECUTIONREQUEST']._serialized_end=687
-  _globals['_EXECUTIONSTATUS']._serialized_start=689
-  _globals['_EXECUTIONSTATUS']._serialized_end=792
-  _globals['_CANCELREQUEST']._serialized_start=794
-  _globals['_CANCELREQUEST']._serialized_end=842
-  _globals['_WORKERSERVICE']._serialized_start=933
-  _globals['_WORKERSERVICE']._serialized_end=1163
-  _globals['_REGISTRYSERVICE']._serialized_start=1166
-  _globals['_REGISTRYSERVICE']._serialized_end=1298
+  _globals['_REGISTERREQUEST']._serialized_start=330
+  _globals['_REGISTERREQUEST']._serialized_end=465
+  _globals['_HEARTBEAT']._serialized_start=468
+  _globals['_HEARTBEAT']._serialized_end=643
+  _globals['_QUERYEXECUTIONREQUEST']._serialized_start=645
+  _globals['_QUERYEXECUTIONREQUEST']._serialized_end=706
+  _globals['_EXECUTIONSTATUS']._serialized_start=708
+  _globals['_EXECUTIONSTATUS']._serialized_end=811
+  _globals['_CANCELREQUEST']._serialized_start=813
+  _globals['_CANCELREQUEST']._serialized_end=861
+  _globals['_WORKERSERVICE']._serialized_start=952
+  _globals['_WORKERSERVICE']._serialized_end=1182
+  _globals['_REGISTRYSERVICE']._serialized_start=1185
+  _globals['_REGISTRYSERVICE']._serialized_end=1317
 # @@protoc_insertion_point(module_scope)

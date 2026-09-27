@@ -162,4 +162,49 @@ service SchedulerService {
   // Workflows (F1): accepted as a whole or not at all; task_id in the reply is the workflow id.
   rpc SubmitWorkflow (WorkflowRequest) returns (TaskResponse);
   rpc GetWorkflowStatus (WorkflowStatusRequest) returns (WorkflowStatusResponse);
+  // Prompt 18: switch the scheduling strategy at runtime, and explain one placement (F13).
+  rpc SetStrategy (SetStrategyRequest) returns (SetStrategyResponse);
+  rpc ExplainDecision (TaskStatusRequest) returns (DecisionExplanation);
+}
+
+message SetStrategyRequest {
+  string strategy = 1;
+}
+
+message SetStrategyResponse {
+  bool ok = 1;
+  string message = 2;
+  string previous = 3;
+  string current = 4;
+}
+
+// One candidate worker in a placement decision (F13). For the predictive strategy every field
+// is filled; for the others only score (their own number, lower is better) and chosen.
+message CandidateBreakdown {
+  string worker_id = 1;
+  double score = 2;                // the strategy's number for this worker (cost for predictive)
+  bool chosen = 3;
+  double pred_queue_len = 4;
+  double predicted_wait_ms = 5;
+  double predicted_exec_ms = 6;
+  double overload_prob = 7;
+  double overload_penalty_ms = 8;
+  double cost = 9;
+  bool skipped = 10;
+  string skip_reason = 11;
+  bool cold_start = 12;
+}
+
+message DecisionExplanation {
+  bool found = 1;
+  string message = 2;
+  string task_id = 3;
+  string strategy = 4;
+  string chosen_worker = 5;
+  bool fallback = 6;
+  string fallback_reason = 7;
+  int64 decision_us = 8;
+  int64 at_ms = 9;
+  string model_versions = 10;
+  repeated CandidateBreakdown candidates = 11;
 }
