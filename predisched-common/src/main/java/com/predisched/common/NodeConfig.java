@@ -24,6 +24,15 @@ public class NodeConfig {
     private SparkConfig spark = new SparkConfig();
     private MpiConfig mpi = new MpiConfig();
     private MlConfig ml = new MlConfig();
+    private PredictionConfig prediction = new PredictionConfig();
+
+    public PredictionConfig getPrediction() {
+        return prediction;
+    }
+
+    public void setPrediction(PredictionConfig prediction) {
+        this.prediction = prediction;
+    }
 
     public MlConfig getMl() {
         return ml;
@@ -1006,6 +1015,80 @@ public class NodeConfig {
 
         public void setTimeoutMs(long timeoutMs) {
             this.timeoutMs = timeoutMs;
+        }
+    }
+
+    /**
+     * The scheduler's link to the prediction server (prompt 17, spec 12.3): a strict per-call
+     * deadline and a circuit breaker, so a slow or dead server never holds up dispatching.
+     */
+    public static class PredictionConfig {
+        private boolean enabled = false;
+        private String host = "localhost";
+        private int port = 50070;
+        /** Deadline of one Predict call (spec: p95 decision budget 20 ms). */
+        private long timeoutMs = 10;
+        /** Consecutive failures or timeouts that open the breaker. */
+        private int failureThreshold = 5;
+        /** How long the breaker stays open before one trial call (half-open). */
+        private long coolDownMs = 5_000;
+        /** Log client-observed latency percentiles every this many calls; 0 turns it off. */
+        private int latencyLogEvery = 500;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public void setHost(String host) {
+            this.host = host;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void setPort(int port) {
+            this.port = port;
+        }
+
+        public long getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+
+        public int getFailureThreshold() {
+            return failureThreshold;
+        }
+
+        public void setFailureThreshold(int failureThreshold) {
+            this.failureThreshold = failureThreshold;
+        }
+
+        public long getCoolDownMs() {
+            return coolDownMs;
+        }
+
+        public void setCoolDownMs(long coolDownMs) {
+            this.coolDownMs = coolDownMs;
+        }
+
+        public int getLatencyLogEvery() {
+            return latencyLogEvery;
+        }
+
+        public void setLatencyLogEvery(int latencyLogEvery) {
+            this.latencyLogEvery = latencyLogEvery;
         }
     }
 

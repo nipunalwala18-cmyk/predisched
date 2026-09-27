@@ -33,7 +33,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 14 | MPI matrix multiplication | [x] |
 | 15 | Dataset collection | [x] |
 | 16 | ML models | [x] |
-| 17 | Prediction server | [ ] |
+| 17 | Prediction server | [x] |
 | 18 | Predictive strategy | [ ] |
 | 19 | Speculative execution and chaos | [ ] |
 | 20 | Benchmark harness and report | [ ] |

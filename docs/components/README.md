@@ -23,3 +23,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [mpi.md](mpi.md) | MPI collectives (Broadcast, Scatter, Gather), parallel matrix multiplication with speedup, MATRIX_TASK mode=mpi | 13, 14 |
 | [dataset.md](dataset.md) | Dataset campaign on heterogeneous workers, future-looking labels, leak-free features, dataset card | 15 |
 | [ml-models.md](ml-models.md) | Execution-time, queue-forecast and overload models: features, time split, candidates, metrics, ML_INFER_TASK | 16 |
+| [prediction-server.md](prediction-server.md) | gRPC PredictionService: batched per-worker predictions, hot reload, prediction log; Java client with deadline and circuit breaker | 17 |

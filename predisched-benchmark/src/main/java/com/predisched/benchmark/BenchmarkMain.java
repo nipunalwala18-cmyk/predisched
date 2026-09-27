@@ -22,6 +22,7 @@ public class BenchmarkMain {
             case "consistency-compare" -> ConsistencyCompare.main(rest);
             case "strategy-compare" -> StrategyCompare.main(rest);
             case "failover-test" -> FailoverTest.main(rest);
+            case "prediction-latency" -> PredictionLatency.main(rest);
             default -> {
                 System.err.println("Unknown command: " + command);
                 usage();
@@ -58,6 +59,10 @@ public class BenchmarkMain {
                               [--tasks 100] [--kill-at 50] [--config configs/cluster.yaml]
                               [--type SLEEP_TASK] [--input ms=2000] [--submit-interval-ms 20]
                               [--out results/exp8-failover.csv]
+                  prediction-latency
+                              Against a running prediction server (prompt 17): latency seen
+                              through PredictionClient, deadline and breaker included
+                              [--requests 2000] [--workers 3] [--port 50070] [--timeout-ms 10]
                 """);
     }
 }

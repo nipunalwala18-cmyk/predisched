@@ -1,0 +1,16 @@
+{
+  "request_id": "demo-1",
+  "task": {"task_id": "demo-task-1", "type": "MATRIX_TASK", "input": "size=300", "priority": 5},
+  "type_mean_ms": 0,
+  "workers": [
+    {"worker_id": "worker-1", "cores": 8, "pool_size": 2, "slowdown": 2.0, "cpu_pct": 12.5,
+     "mem_pct": 0.6, "active_threads": 2, "queue_len": 2, "avg_exec_ms": 180.0,
+     "arrival_rate": 6.0, "concurrent_tasks": 4, "type_worker_mean_ms": 95.0, "type_worker_count": 40},
+    {"worker_id": "worker-2", "cores": 8, "pool_size": 4, "slowdown": 1.0, "cpu_pct": 8.0,
+     "mem_pct": 0.5, "active_threads": 1, "queue_len": 0, "avg_exec_ms": 60.0,
+     "arrival_rate": 6.0, "concurrent_tasks": 1, "type_worker_mean_ms": 48.0, "type_worker_count": 52},
+    {"worker_id": "worker-3", "cores": 8, "pool_size": 8, "slowdown": 1.0, "cpu_pct": 4.0,
+     "mem_pct": 0.5, "active_threads": 0, "queue_len": 0, "avg_exec_ms": 0.0,
+     "arrival_rate": 6.0, "concurrent_tasks": 0, "type_worker_mean_ms": 0, "type_worker_count": 0}
+  ]
+}

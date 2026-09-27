@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package predisched;
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+import "task.proto";
+
+// Scheduler <-> prediction engine (spec 10.4, prompt 17). One request carries one task and every
+// candidate worker's state; the answer has one prediction per worker.
+
+message WorkerState {
+  string worker_id = 1;
+  int32 cores = 2;
+  double cpu_pct = 3;
+  double mem_pct = 4;
+  int32 active_threads = 5;
+  int32 queue_len = 6;
+  double avg_exec_ms = 7;
+  double arrival_rate = 8;
+  // Prompt 17: the rest of the features the models were trained on (spec 12.1). 0 means unknown:
+  // pool size falls back to cores, slowdown to 1.
+  int32 pool_size = 9;
+  double slowdown = 10;
+  int32 concurrent_tasks = 11;
+  // The scheduler's running mean execution time of this task type on this worker, and how many
+  // executions it covers (0 = none yet).
+  double type_worker_mean_ms = 12;
+  int64 type_worker_count = 13;
+}
+
+message PredictRequest {
+  TaskRequest task = 1;
+  repeated WorkerState workers = 2;
+  // Optional, echoed into the prediction log.
+  string request_id = 3;
+  // The scheduler's running mean execution time of the task's type on any worker; used by the
+  // cold-start fallback when the model never saw the type (0 = unknown).
+  double type_mean_ms = 4;
+}
+
+message WorkerPrediction {
+  string worker_id = 1;
+  double pred_exec_ms = 2;
+  double pred_queue_len = 3;     // queue length in N seconds (N = 5 in the dataset)
+  double overload_prob = 4;      // 0..1
+  // The task type was not in M1's training data: pred_exec_ms is a running mean, not the model.
+  bool cold_start = 5;
+}
+
+message PredictResponse {
+  repeated WorkerPrediction predictions = 1;
+  int32 model_version = 2;       // M1's live version
+  string model_versions = 3;     // e.g. "m1=v1,m2=v1,m3=v1"
+  double server_ms = 4;          // time spent in Predict, for the client's latency split
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool ready = 1;
+  string model_versions = 2;
+  int64 predictions = 3;         // requests answered since start
+  int64 reloads = 4;             // hot reloads since start
+}
+
+service PredictionService {
+  rpc Predict(PredictRequest) returns (PredictResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}

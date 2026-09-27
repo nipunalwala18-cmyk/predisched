@@ -66,6 +66,40 @@ def input_size(task_type: str, text: str | None) -> float:
     return float(len(text))
 
 
+class _Columns:
+    """Column access over a DataFrame, one mapping (a serving request) or a list of mappings."""
+
+    def __init__(self, rows):
+        if isinstance(rows, pd.DataFrame):
+            self.frame, self.n, self.index = rows, len(rows), rows.index
+            self.names = set(rows.columns)
+        else:
+            records = [dict(rows)] if isinstance(rows, Mapping) else [dict(r) for r in rows]
+            self.frame, self.n, self.index = None, len(records), pd.RangeIndex(len(records))
+            self.names = set().union(*records) if records else set()
+            self.records = records
+
+    def has(self, name: str) -> bool:
+        return name in self.names
+
+    def raw(self, name: str) -> np.ndarray:
+        if name not in self.names:
+            return np.full(self.n, DEFAULTS[name], dtype=object)
+        if self.frame is not None:
+            return self.frame[name].to_numpy()
+        return np.array([r.get(name, DEFAULTS.get(name)) for r in self.records], dtype=object)
+
+    def number(self, name: str, default: float | None = None) -> np.ndarray:
+        values = self.raw(name)
+        try:
+            out = np.asarray(values, dtype=float)
+        except (TypeError, ValueError):
+            out = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
+        if default is not None:
+            out = np.where(np.isnan(out), default, out)
+        return out
+
+
 def as_frame(rows: pd.DataFrame | Mapping | Iterable[Mapping]) -> pd.DataFrame:
     if isinstance(rows, pd.DataFrame):
         return rows
@@ -74,51 +108,47 @@ def as_frame(rows: pd.DataFrame | Mapping | Iterable[Mapping]) -> pd.DataFrame:
     return pd.DataFrame([dict(r) for r in rows])
 
 
+def feature_matrix(rows: pd.DataFrame | Mapping | Iterable[Mapping]) -> np.ndarray:
+    """The features as an (n, len(FEATURE_NAMES)) float64 array. NumPy only, so one serving
+    request of a few rows costs well under a millisecond (prompt 17's latency budget)."""
+    cols = _Columns(rows)
+    n = cols.n
+    types = cols.raw("task_type").astype(str)
+    size = cols.number("input_size") if cols.has("input_size") else np.full(n, np.nan)
+    if cols.has("input"):
+        texts = cols.raw("input")
+        missing = np.isnan(size)
+        if missing.any():
+            size = size.copy()
+            size[missing] = [input_size(t, x) for t, x in zip(types[missing], texts[missing])]
+    log_size = np.log1p(np.clip(np.nan_to_num(size, nan=0.0), 0.0, None))
+
+    type_hot = np.stack([(types == t) for t in TASK_TYPES], axis=1).astype(float)         if n else np.zeros((0, len(TASK_TYPES)))
+    profiles = cols.raw("resource_profile").astype(str)
+    profile_hot = np.stack([(profiles == p) for p in RESOURCE_PROFILES], axis=1).astype(float)         if n else np.zeros((0, len(RESOURCE_PROFILES)))
+    numeric = np.stack([cols.number(name, DEFAULTS[name]) for name in NUMERIC], axis=1)         if n else np.zeros((0, len(NUMERIC)))
+    pool = np.clip(numeric[:, NUMERIC.index("worker_pool_size")], 1.0, None)
+    busy_ratio = numeric[:, NUMERIC.index("active_threads")] / pool
+    queue_ratio = numeric[:, NUMERIC.index("queue_len")] / pool
+    avg_exec = cols.number("avg_exec_recent", 0.0)
+    count = cols.number("prior_type_worker_count", 0.0)
+    mean = cols.number("prior_type_worker_mean_ms")
+    has_prior = (count > 0) & ~np.isnan(mean)
+    log_prior = np.where(has_prior, np.log1p(np.clip(np.nan_to_num(mean, nan=0.0), 0.0, None)),
+                         0.0)
+    return np.column_stack([
+        type_hot, profile_hot, log_size, type_hot * log_size[:, None], numeric,
+        busy_ratio, queue_ratio, np.log1p(np.clip(avg_exec, 0.0, None)),
+        has_prior.astype(float), log_prior, np.log1p(np.clip(count, 0.0, None)),
+    ]).astype(float)
+
+
 def build_features(rows: pd.DataFrame | Mapping | Iterable[Mapping]) -> pd.DataFrame:
-    """One row of ``FEATURE_NAMES`` (float64) per input row; the index is preserved."""
-    df = as_frame(rows)
-    n = len(df)
-
-    def col(name: str) -> pd.Series:
-        if name in df.columns:
-            return df[name]
-        return pd.Series([DEFAULTS[name]] * n, index=df.index)
-
-    types = df["task_type"].astype(str)
-    if "input_size" in df.columns:
-        size = pd.to_numeric(df["input_size"], errors="coerce")
-    else:
-        size = pd.Series(np.nan, index=df.index)
-    if "input" in df.columns:
-        parsed = [input_size(t, s) for t, s in zip(types, df["input"])]
-        size = size.fillna(pd.Series(parsed, index=df.index))
-    log_size = np.log1p(size.fillna(0.0).clip(lower=0.0).astype(float))
-
-    out = {}
-    for t in TASK_TYPES:
-        out[f"type_{t}"] = (types == t).astype(float)
-    profiles = col("resource_profile").astype(str)
-    for p in RESOURCE_PROFILES:
-        out[f"profile_{p}"] = (profiles == p).astype(float)
-    out["log_size"] = log_size
-    for t in TASK_TYPES:
-        out[f"log_size_x_{t}"] = log_size * out[f"type_{t}"]
-    for name in NUMERIC:
-        out[name] = pd.to_numeric(col(name), errors="coerce").fillna(DEFAULTS[name]).astype(float)
-    pool = out["worker_pool_size"].clip(lower=1.0)
-    out["busy_ratio"] = out["active_threads"] / pool
-    out["queue_ratio"] = out["queue_len"] / pool
-    avg_exec = pd.to_numeric(col("avg_exec_recent"), errors="coerce").fillna(0.0)
-    out["log_avg_exec_recent"] = np.log1p(avg_exec.clip(lower=0.0))
-    count = pd.to_numeric(col("prior_type_worker_count"), errors="coerce").fillna(0.0)
-    mean = pd.to_numeric(col("prior_type_worker_mean_ms"), errors="coerce")
-    has_prior = (count > 0) & mean.notna()
-    out["has_prior"] = has_prior.astype(float)
-    out["log_prior_mean_ms"] = np.where(has_prior, np.log1p(mean.fillna(0.0).clip(lower=0.0)), 0.0)
-    out["log_prior_count"] = np.log1p(count.clip(lower=0.0))
-
-    features = pd.DataFrame(out, index=df.index)[FEATURE_NAMES].astype(float)
-    return features
+    """``feature_matrix`` as a DataFrame with ``FEATURE_NAMES`` columns; the index is preserved."""
+    index = rows.index if isinstance(rows, pd.DataFrame) else None
+    matrix = feature_matrix(rows)
+    return pd.DataFrame(matrix, columns=FEATURE_NAMES,
+                        index=index if index is not None else pd.RangeIndex(len(matrix)))
 
 
 def to_log_ms(ms) -> np.ndarray:

@@ -16,7 +16,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier, XGBRegressor
 
-from .features import FEATURE_NAMES, build_features, from_log_ms, to_log_ms
+from .features import FEATURE_NAMES, feature_matrix, from_log_ms, to_log_ms
 
 # Simplest first: the order the selection rule walks.
 FAMILIES = ["baseline", "linear", "random_forest", "xgboost"]
@@ -130,11 +130,11 @@ class FeatureRegressor(Candidate):
 
     def fit(self, frame, y):
         target = to_log_ms(y) if self.log_target else np.asarray(y, dtype=float)
-        self.estimator.fit(build_features(frame).to_numpy(), target)
+        self.estimator.fit(feature_matrix(frame), target)
         return self
 
     def predict(self, frame):
-        raw = self.estimator.predict(build_features(frame).to_numpy())
+        raw = self.estimator.predict(feature_matrix(frame))
         return from_log_ms(raw) if self.log_target else np.clip(raw, 0.0, None)
 
     def importances(self):
@@ -150,11 +150,11 @@ class FeatureClassifier(Candidate):
         self.estimator = estimator
 
     def fit(self, frame, y):
-        self.estimator.fit(build_features(frame).to_numpy(), np.asarray(y, dtype=int))
+        self.estimator.fit(feature_matrix(frame), np.asarray(y, dtype=int))
         return self
 
     def predict_proba(self, frame):
-        return self.estimator.predict_proba(build_features(frame).to_numpy())[:, 1]
+        return self.estimator.predict_proba(feature_matrix(frame))[:, 1]
 
     def importances(self):
         return _importances(self.estimator)

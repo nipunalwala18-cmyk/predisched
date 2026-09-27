@@ -54,6 +54,15 @@ scheduling:
   cpuWeight: 0.4
   memWeight: 0.2
   queueWeight: 0.4
+prediction:
+  # The scheduler's client for python -m predisched_ml.prediction_server (prompt 17). The
+  # predictive strategy (prompt 18) turns it on; deadline and breaker per spec 12.3.
+  enabled: false
+  host: "localhost"
+  port: 50070
+  timeoutMs: 10
+  failureThreshold: 5
+  coolDownMs: 5000
 ml:
   # ML_INFER_TASK (prompt 16): the venv Python with ml/requirements.txt; empty disables it.
   python: ".venv/Scripts/python.exe"
