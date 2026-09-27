@@ -22,3 +22,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [spark.md](spark.md) | Spark MapReduce over execution history, ML features, MAPREDUCE_TASK | 12 |
 | [mpi.md](mpi.md) | MPI collectives (Broadcast, Scatter, Gather), parallel matrix multiplication with speedup, MATRIX_TASK mode=mpi | 13, 14 |
 | [dataset.md](dataset.md) | Dataset campaign on heterogeneous workers, future-looking labels, leak-free features, dataset card | 15 |
+| [ml-models.md](ml-models.md) | Execution-time, queue-forecast and overload models: features, time split, candidates, metrics, ML_INFER_TASK | 16 |

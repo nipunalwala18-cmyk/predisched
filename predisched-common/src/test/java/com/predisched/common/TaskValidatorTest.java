@@ -92,8 +92,7 @@ public class TaskValidatorTest {
 
     @Test
     public void unregisteredTypesAreRejectedWithWhereTheyArrive() {
-        for (TaskType type : new TaskType[] {
-                TaskType.ML_INFER_TASK, TaskType.IMAGE_TASK}) {
+        for (TaskType type : new TaskType[] {TaskType.IMAGE_TASK}) {
             TaskRequest req = valid("t-" + type.name()).toBuilder().setType(type).build();
             List<String> errors = validator.validate(req, store);
             assertFalse(errors.isEmpty(), type + " should be rejected");

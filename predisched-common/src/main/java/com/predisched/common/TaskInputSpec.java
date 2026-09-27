@@ -84,7 +84,11 @@ public final class TaskInputSpec {
         REQUIRED_TEXT.put(TaskType.MAPREDUCE_TASK, List.of("dataset"));
         REQUIRED_ENUMS.put(TaskType.MAPREDUCE_TASK,
                 List.of(new EnumKey("job", List.of("avg_exec", "wordcount"))));
-        RESERVED.put(TaskType.ML_INFER_TASK, "arrives in prompt 16 (ML models)");
+        // Prompt 16: batch inference with a live prediction model (python -m predisched_ml.infer).
+        REQUIRED.put(TaskType.ML_INFER_TASK, List.of(new NumericKey("batch", 1, 1_000_000L)));
+        REQUIRED_ENUMS.put(TaskType.ML_INFER_TASK,
+                List.of(new EnumKey("model", List.of("exec_time", "queue_forecast", "overload"))));
+        OPTIONAL.put(TaskType.ML_INFER_TASK, List.of(new NumericKey("seed", 0, Long.MAX_VALUE)));
         RESERVED.put(TaskType.IMAGE_TASK, "reserved: in the enum but not in the catalogue (spec 7.2)");
     }
 

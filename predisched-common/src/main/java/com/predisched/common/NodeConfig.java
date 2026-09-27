@@ -23,6 +23,15 @@ public class NodeConfig {
     private CacheConfig cache = new CacheConfig();
     private SparkConfig spark = new SparkConfig();
     private MpiConfig mpi = new MpiConfig();
+    private MlConfig ml = new MlConfig();
+
+    public MlConfig getMl() {
+        return ml;
+    }
+
+    public void setMl(MlConfig ml) {
+        this.ml = ml;
+    }
 
     public MpiConfig getMpi() {
         return mpi;
@@ -989,6 +998,39 @@ public class NodeConfig {
 
         public void setMaxProcs(int maxProcs) {
             this.maxProcs = maxProcs;
+        }
+
+        public long getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+    }
+
+    /** ML_INFER_TASK (prompt 16): where the predisched_ml package and its Python are. */
+    public static class MlConfig {
+        /** The Python with the ML requirements; empty disables ML_INFER_TASK on this worker. */
+        private String python = "";
+        /** Working directory holding the predisched_ml package, models and dataset. */
+        private String workDir = "ml";
+        private long timeoutMs = 120_000;
+
+        public String getPython() {
+            return python;
+        }
+
+        public void setPython(String python) {
+            this.python = python;
+        }
+
+        public String getWorkDir() {
+            return workDir;
+        }
+
+        public void setWorkDir(String workDir) {
+            this.workDir = workDir;
         }
 
         public long getTimeoutMs() {

@@ -1,0 +1,39 @@
+# Model training (prompt 16, spec §12.2). Used by predisched_ml.train and .evaluate.
+dataset: "data/dataset.parquet"        # relative to ml/
+seed: 42
+testFraction: 0.2                      # time split: train on the earliest 80 % by dispatch time
+cvSplits: 3                            # TimeSeriesSplit folds inside the training part
+# Keep the simplest candidate whose cross-validated primary metric beats the best baseline by this
+# relative margin (MAE at most (1 - margin) x the baseline's; F1 at least (1 + margin) x).
+margin: 0.10
+
+models:
+  m1:
+    name: exec_time
+    target: exec_time_ms
+    kind: regression
+    primary: mae
+  m2:
+    name: queue_forecast
+    target: queue_len_future
+    kind: regression
+    primary: mae
+  m3:
+    name: overload
+    target: overloaded_future
+    kind: classification
+    primary: f1
+
+# Small grids, searched with time-series CV on the training part only.
+grids:
+  linear:
+    alpha: [0.1, 1.0, 10.0]            # Ridge (m1, m2)
+    C: [0.1, 1.0, 10.0]                # LogisticRegression (m3)
+  random_forest:
+    n_estimators: [200]
+    max_depth: [8, 16]
+    min_samples_leaf: [1, 5]
+  xgboost:
+    n_estimators: [300]
+    max_depth: [3, 6]
+    learning_rate: [0.05, 0.1]

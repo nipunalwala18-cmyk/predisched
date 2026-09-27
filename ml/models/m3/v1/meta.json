@@ -1,0 +1,445 @@
+{
+  "name": "overload",
+  "target": "overloaded_future",
+  "kind": "classification",
+  "primary_metric": "f1",
+  "features": [
+    "type_CPU_TASK",
+    "type_MATRIX_TASK",
+    "type_SLEEP_TASK",
+    "type_MAPREDUCE_TASK",
+    "type_SORT_TASK",
+    "type_HASH_TASK",
+    "type_COMPRESS_TASK",
+    "type_MONTE_CARLO_TASK",
+    "type_FILE_IO_TASK",
+    "type_HTTP_TASK",
+    "type_DB_QUERY_TASK",
+    "type_GRAPH_TASK",
+    "type_ML_INFER_TASK",
+    "profile_CPU_BOUND",
+    "profile_MEMORY_BOUND",
+    "profile_IO_BOUND",
+    "profile_NETWORK_BOUND",
+    "profile_PARALLEL",
+    "log_size",
+    "log_size_x_CPU_TASK",
+    "log_size_x_MATRIX_TASK",
+    "log_size_x_SLEEP_TASK",
+    "log_size_x_MAPREDUCE_TASK",
+    "log_size_x_SORT_TASK",
+    "log_size_x_HASH_TASK",
+    "log_size_x_COMPRESS_TASK",
+    "log_size_x_MONTE_CARLO_TASK",
+    "log_size_x_FILE_IO_TASK",
+    "log_size_x_HTTP_TASK",
+    "log_size_x_DB_QUERY_TASK",
+    "log_size_x_GRAPH_TASK",
+    "log_size_x_ML_INFER_TASK",
+    "priority",
+    "worker_cores",
+    "worker_pool_size",
+    "worker_slowdown",
+    "concurrent_tasks_on_worker",
+    "cpu_pct",
+    "mem_pct",
+    "active_threads",
+    "queue_len",
+    "arrival_rate",
+    "win_arrival_rate",
+    "win_queue_len_mean",
+    "win_queue_len_max",
+    "busy_ratio",
+    "queue_ratio",
+    "log_avg_exec_recent",
+    "has_prior",
+    "log_prior_mean_ms",
+    "log_prior_count"
+  ],
+  "kept": {
+    "family": "linear",
+    "candidate": "linear(C=1.0)",
+    "params": {
+      "C": 1.0
+    },
+    "threshold": 0.8055950467111587,
+    "cv": 0.567934782608196,
+    "reason": "linear(C=1.0) is the simplest candidate whose CV f1 (0.5679) beats the best baseline (rate per worker_id, 0.4875) by at least 10%; xgboost scores better (0.5721) but is more complex",
+    "cold_start": false
+  },
+  "metrics": {
+    "test": {
+      "n": 1494,
+      "positives": 196,
+      "precision": 0.8660287081339713,
+      "recall": 0.923469387755102,
+      "f1": 0.8938271604938272,
+      "roc_auc": 0.9902793937297569
+    },
+    "holdout_pattern": {
+      "n": 3578,
+      "positives": 129,
+      "precision": 0.1803921568627451,
+      "recall": 0.35658914728682173,
+      "f1": 0.23958333333333334,
+      "roc_auc": 0.9025849532838414
+    },
+    "holdout_type": {
+      "n": 268,
+      "positives": 28,
+      "precision": 0.5833333333333334,
+      "recall": 0.25,
+      "f1": 0.35,
+      "roc_auc": 0.8769345238095239
+    }
+  },
+  "candidates": [
+    {
+      "set": "test",
+      "family": "baseline",
+      "candidate": "majority class",
+      "kept": false,
+      "n": 1494,
+      "positives": 196,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "roc_auc": 0.5
+    },
+    {
+      "set": "test",
+      "family": "baseline",
+      "candidate": "rate per worker_id",
+      "kept": false,
+      "n": 1494,
+      "positives": 196,
+      "precision": 0.5444444444444444,
+      "recall": 1.0,
+      "f1": 0.7050359712230215,
+      "roc_auc": 0.9368258859784284
+    },
+    {
+      "set": "test",
+      "family": "linear",
+      "candidate": "linear(C=1.0)",
+      "kept": true,
+      "n": 1494,
+      "positives": 196,
+      "precision": 0.8660287081339713,
+      "recall": 0.923469387755102,
+      "f1": 0.8938271604938272,
+      "roc_auc": 0.9902793937297569
+    },
+    {
+      "set": "test",
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=5, n_estimators=200)",
+      "kept": false,
+      "n": 1494,
+      "positives": 196,
+      "precision": 0.6144200626959248,
+      "recall": 1.0,
+      "f1": 0.7611650485436893,
+      "roc_auc": 0.9915490078928335
+    },
+    {
+      "set": "test",
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "kept": false,
+      "n": 1494,
+      "positives": 196,
+      "precision": 0.697508896797153,
+      "recall": 1.0,
+      "f1": 0.8218029350104822,
+      "roc_auc": 0.9826617087512972
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "baseline",
+      "candidate": "majority class",
+      "kept": false,
+      "n": 3578,
+      "positives": 129,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "roc_auc": 0.5
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "baseline",
+      "candidate": "rate per worker_id",
+      "kept": false,
+      "n": 3578,
+      "positives": 129,
+      "precision": 0.12524271844660195,
+      "recall": 1.0,
+      "f1": 0.22260569456427956,
+      "roc_auc": 0.8693824296897652
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "linear",
+      "candidate": "linear(C=1.0)",
+      "kept": true,
+      "n": 3578,
+      "positives": 129,
+      "precision": 0.1803921568627451,
+      "recall": 0.35658914728682173,
+      "f1": 0.23958333333333334,
+      "roc_auc": 0.9025849532838414
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=5, n_estimators=200)",
+      "kept": false,
+      "n": 3578,
+      "positives": 129,
+      "precision": 0.16901408450704225,
+      "recall": 0.8372093023255814,
+      "f1": 0.28125,
+      "roc_auc": 0.9091951155373651
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "kept": false,
+      "n": 3578,
+      "positives": 129,
+      "precision": 0.14977307110438728,
+      "recall": 0.7674418604651163,
+      "f1": 0.25063291139240507,
+      "roc_auc": 0.8991461405507944
+    },
+    {
+      "set": "holdout_type",
+      "family": "baseline",
+      "candidate": "majority class",
+      "kept": false,
+      "n": 268,
+      "positives": 28,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "roc_auc": 0.5
+    },
+    {
+      "set": "holdout_type",
+      "family": "baseline",
+      "candidate": "rate per worker_id",
+      "kept": false,
+      "n": 268,
+      "positives": 28,
+      "precision": 0.3010752688172043,
+      "recall": 1.0,
+      "f1": 0.4628099173553719,
+      "roc_auc": 0.8645833333333334
+    },
+    {
+      "set": "holdout_type",
+      "family": "linear",
+      "candidate": "linear(C=1.0)",
+      "kept": true,
+      "n": 268,
+      "positives": 28,
+      "precision": 0.5833333333333334,
+      "recall": 0.25,
+      "f1": 0.35,
+      "roc_auc": 0.8769345238095239
+    },
+    {
+      "set": "holdout_type",
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=5, n_estimators=200)",
+      "kept": false,
+      "n": 268,
+      "positives": 28,
+      "precision": 0.4888888888888889,
+      "recall": 0.7857142857142857,
+      "f1": 0.6027397260273972,
+      "roc_auc": 0.9415178571428572
+    },
+    {
+      "set": "holdout_type",
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "kept": false,
+      "n": 268,
+      "positives": 28,
+      "precision": 0.5128205128205128,
+      "recall": 0.7142857142857143,
+      "f1": 0.5970149253731343,
+      "roc_auc": 0.9366071428571429
+    }
+  ],
+  "cv": [
+    {
+      "family": "baseline",
+      "candidate": "majority class",
+      "params": {},
+      "cv": 0.0,
+      "threshold": 0.5,
+      "seconds": 0.02361750602722168
+    },
+    {
+      "family": "baseline",
+      "candidate": "rate per worker_id",
+      "params": {},
+      "cv": 0.48746081504660493,
+      "threshold": 0.13678756476683937,
+      "seconds": 0.01177358627319336
+    },
+    {
+      "family": "linear",
+      "candidate": "linear(C=0.1)",
+      "params": {
+        "C": 0.1
+      },
+      "cv": 0.5492227979269613,
+      "threshold": 0.7943031741292422,
+      "seconds": 0.12711858749389648
+    },
+    {
+      "family": "linear",
+      "candidate": "linear(C=1.0)",
+      "params": {
+        "C": 1.0
+      },
+      "cv": 0.567934782608196,
+      "threshold": 0.8055950467111587,
+      "seconds": 0.15880441665649414
+    },
+    {
+      "family": "linear",
+      "candidate": "linear(C=10.0)",
+      "params": {
+        "C": 10.0
+      },
+      "cv": 0.5571245186131075,
+      "threshold": 0.7292181197969969,
+      "seconds": 0.20627880096435547
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=8, min_samples_leaf=1, n_estimators=200)",
+      "params": {
+        "max_depth": 8,
+        "min_samples_leaf": 1,
+        "n_estimators": 200
+      },
+      "cv": 0.5304182509501099,
+      "threshold": 0.16680635910022737,
+      "seconds": 1.9035546779632568
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=8, min_samples_leaf=5, n_estimators=200)",
+      "params": {
+        "max_depth": 8,
+        "min_samples_leaf": 5,
+        "n_estimators": 200
+      },
+      "cv": 0.5344467640913803,
+      "threshold": 0.24739144094132226,
+      "seconds": 1.9238531589508057
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=1, n_estimators=200)",
+      "params": {
+        "max_depth": 16,
+        "min_samples_leaf": 1,
+        "n_estimators": 200
+      },
+      "cv": 0.5160642570276415,
+      "threshold": 0.07493631261124617,
+      "seconds": 1.9457275867462158
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=5, n_estimators=200)",
+      "params": {
+        "max_depth": 16,
+        "min_samples_leaf": 5,
+        "n_estimators": 200
+      },
+      "cv": 0.5519630484983532,
+      "threshold": 0.21610044042681928,
+      "seconds": 2.03438138961792
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=3, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.05,
+        "max_depth": 3,
+        "n_estimators": 300
+      },
+      "cv": 0.5424999999995016,
+      "threshold": 0.08834219723939896,
+      "seconds": 0.9503931999206543
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.05,
+        "max_depth": 6,
+        "n_estimators": 300
+      },
+      "cv": 0.572145545796239,
+      "threshold": 0.015587693080306053,
+      "seconds": 1.1729094982147217
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.1, max_depth=3, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.1,
+        "max_depth": 3,
+        "n_estimators": 300
+      },
+      "cv": 0.5410628019318707,
+      "threshold": 0.015148310922086239,
+      "seconds": 0.9444265365600586
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.1, max_depth=6, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.1,
+        "max_depth": 6,
+        "n_estimators": 300
+      },
+      "cv": 0.5654834761316937,
+      "threshold": 0.009349290281534195,
+      "seconds": 1.2348213195800781
+    }
+  ],
+  "split": {
+    "train": 5978,
+    "test": 1494,
+    "holdout_pattern": 3578,
+    "holdout_type": 268,
+    "train_until": "2026-09-27 12:51:37.484000+05:30",
+    "test_from": "2026-09-27 12:51:37.493000+05:30",
+    "test_fraction": 0.2,
+    "cv_splits": 3
+  },
+  "margin": 0.1,
+  "seed": 42,
+  "dataset": "data/dataset.parquet",
+  "data_hash": "8c1c8d27c37a77211d6b5fe8d6323671eb520658eb5cc394c99aa07ba869f487",
+  "trained_at": "2026-09-27T07:46:13+00:00",
+  "libraries": {
+    "scikit-learn": "1.5.2",
+    "xgboost": "2.1.4",
+    "pandas": "2.2.3",
+    "numpy": "2.1.3"
+  },
+  "model": "m3",
+  "version": 1
+}

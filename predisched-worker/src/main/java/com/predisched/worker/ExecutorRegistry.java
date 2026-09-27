@@ -37,6 +37,8 @@ public class ExecutorRegistry {
         register(new HttpTaskExecutor());
         // Disabled until a worker configures spark.home (WorkerMain replaces it then).
         register(new MapReduceTaskExecutor(MapReduceTaskExecutor.Settings.DISABLED));
+        // Disabled until a worker configures ml.python (prompt 16).
+        register(new MlInferTaskExecutor(MlInferTaskExecutor.Settings.DISABLED));
     }
 
     public void register(TaskExecutor executor) {

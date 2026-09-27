@@ -74,7 +74,7 @@ public class ExecutorTest {
     @Test
     public void reservedTypesHaveNoExecutor() {
         for (TaskType type : new TaskType[] {
-                TaskType.DB_QUERY_TASK, TaskType.ML_INFER_TASK, TaskType.IMAGE_TASK}) {
+                TaskType.DB_QUERY_TASK, TaskType.IMAGE_TASK}) {
             assertFalse(registry.execute(type, "n=1").success(), type + " should be unsupported");
             assertTrue(registry.execute(type, "n=1").errorMessage().contains("unsupported"));
         }

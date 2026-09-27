@@ -1,0 +1,404 @@
+{
+  "name": "exec_time",
+  "target": "exec_time_ms",
+  "kind": "regression",
+  "primary_metric": "mae",
+  "features": [
+    "type_CPU_TASK",
+    "type_MATRIX_TASK",
+    "type_SLEEP_TASK",
+    "type_MAPREDUCE_TASK",
+    "type_SORT_TASK",
+    "type_HASH_TASK",
+    "type_COMPRESS_TASK",
+    "type_MONTE_CARLO_TASK",
+    "type_FILE_IO_TASK",
+    "type_HTTP_TASK",
+    "type_DB_QUERY_TASK",
+    "type_GRAPH_TASK",
+    "type_ML_INFER_TASK",
+    "profile_CPU_BOUND",
+    "profile_MEMORY_BOUND",
+    "profile_IO_BOUND",
+    "profile_NETWORK_BOUND",
+    "profile_PARALLEL",
+    "log_size",
+    "log_size_x_CPU_TASK",
+    "log_size_x_MATRIX_TASK",
+    "log_size_x_SLEEP_TASK",
+    "log_size_x_MAPREDUCE_TASK",
+    "log_size_x_SORT_TASK",
+    "log_size_x_HASH_TASK",
+    "log_size_x_COMPRESS_TASK",
+    "log_size_x_MONTE_CARLO_TASK",
+    "log_size_x_FILE_IO_TASK",
+    "log_size_x_HTTP_TASK",
+    "log_size_x_DB_QUERY_TASK",
+    "log_size_x_GRAPH_TASK",
+    "log_size_x_ML_INFER_TASK",
+    "priority",
+    "worker_cores",
+    "worker_pool_size",
+    "worker_slowdown",
+    "concurrent_tasks_on_worker",
+    "cpu_pct",
+    "mem_pct",
+    "active_threads",
+    "queue_len",
+    "arrival_rate",
+    "win_arrival_rate",
+    "win_queue_len_mean",
+    "win_queue_len_max",
+    "busy_ratio",
+    "queue_ratio",
+    "log_avg_exec_recent",
+    "has_prior",
+    "log_prior_mean_ms",
+    "log_prior_count"
+  ],
+  "kept": {
+    "family": "linear",
+    "candidate": "linear(alpha=0.1)",
+    "params": {
+      "alpha": 0.1
+    },
+    "threshold": null,
+    "cv": 26.01954005792148,
+    "reason": "linear(alpha=0.1) is the simplest candidate whose CV mae (26.0195) beats the best baseline (mean per task_type, 79.8627) by at least 10%; random forest scores better (17.9240) but is more complex, xgboost scores better (22.4533) but is more complex",
+    "cold_start": true
+  },
+  "metrics": {
+    "test": {
+      "n": 1494,
+      "mae": 28.01644587118509,
+      "rmse": 96.63683959345033,
+      "r2": 0.8466195353433996
+    },
+    "holdout_pattern": {
+      "n": 3578,
+      "mae": 20.86475238056142,
+      "rmse": 63.508675982564,
+      "r2": 0.9214473416751061
+    },
+    "holdout_type": {
+      "n": 268,
+      "mae": 37.15068564670958,
+      "rmse": 78.66030578890923,
+      "r2": 0.4321295508251082
+    }
+  },
+  "candidates": [
+    {
+      "set": "test",
+      "family": "baseline",
+      "candidate": "mean per task_type",
+      "kept": false,
+      "n": 1494,
+      "mae": 92.73625614165427,
+      "rmse": 197.65436928004547,
+      "r2": 0.3583511050219892
+    },
+    {
+      "set": "test",
+      "family": "linear",
+      "candidate": "linear(alpha=0.1)",
+      "kept": true,
+      "n": 1494,
+      "mae": 28.01644587118509,
+      "rmse": 96.63683959345033,
+      "r2": 0.8466195353433996
+    },
+    {
+      "set": "test",
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=1, n_estimators=200)",
+      "kept": false,
+      "n": 1494,
+      "mae": 15.691421490721988,
+      "rmse": 57.15109914514205,
+      "r2": 0.946354439539042
+    },
+    {
+      "set": "test",
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "kept": false,
+      "n": 1494,
+      "mae": 20.438530052311478,
+      "rmse": 61.115637337839395,
+      "r2": 0.9386535688443911
+    },
+    {
+      "set": "test",
+      "family": "linear",
+      "candidate": "linear(alpha=0.1) + cold-start fallback",
+      "kept": false,
+      "cold_start_rows": 0,
+      "n": 1494,
+      "mae": 28.01644587118509,
+      "rmse": 96.63683959345033,
+      "r2": 0.8466195353433996
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "baseline",
+      "candidate": "mean per task_type",
+      "kept": false,
+      "n": 3578,
+      "mae": 83.73076944873468,
+      "rmse": 174.57273626623657,
+      "r2": 0.40646325932539284
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "linear",
+      "candidate": "linear(alpha=0.1)",
+      "kept": true,
+      "n": 3578,
+      "mae": 20.86475238056142,
+      "rmse": 63.508675982564,
+      "r2": 0.9214473416751061
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=1, n_estimators=200)",
+      "kept": false,
+      "n": 3578,
+      "mae": 19.294109998662485,
+      "rmse": 80.90432829404497,
+      "r2": 0.8725211073580551
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "kept": false,
+      "n": 3578,
+      "mae": 20.533462980667498,
+      "rmse": 69.96844187099754,
+      "r2": 0.9046547252311128
+    },
+    {
+      "set": "holdout_pattern",
+      "family": "linear",
+      "candidate": "linear(alpha=0.1) + cold-start fallback",
+      "kept": false,
+      "cold_start_rows": 0,
+      "n": 3578,
+      "mae": 20.86475238056142,
+      "rmse": 63.508675982564,
+      "r2": 0.9214473416751061
+    },
+    {
+      "set": "holdout_type",
+      "family": "baseline",
+      "candidate": "mean per task_type",
+      "kept": false,
+      "n": 268,
+      "mae": 95.12831376739588,
+      "rmse": 115.52229230722897,
+      "r2": -0.22481248522621766
+    },
+    {
+      "set": "holdout_type",
+      "family": "linear",
+      "candidate": "linear(alpha=0.1)",
+      "kept": true,
+      "n": 268,
+      "mae": 37.15068564670958,
+      "rmse": 78.66030578890923,
+      "r2": 0.4321295508251082
+    },
+    {
+      "set": "holdout_type",
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=1, n_estimators=200)",
+      "kept": false,
+      "n": 268,
+      "mae": 64.92408852586274,
+      "rmse": 121.04266379844019,
+      "r2": -0.34466764172254316
+    },
+    {
+      "set": "holdout_type",
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "kept": false,
+      "n": 268,
+      "mae": 64.50621980935856,
+      "rmse": 120.3692826790622,
+      "r2": -0.3297480237905992
+    },
+    {
+      "set": "holdout_type",
+      "family": "linear",
+      "candidate": "linear(alpha=0.1) + cold-start fallback",
+      "kept": false,
+      "cold_start_rows": 268,
+      "n": 268,
+      "mae": 60.69350127494234,
+      "rmse": 103.19190606076349,
+      "r2": 0.022696897425766416
+    }
+  ],
+  "cv": [
+    {
+      "family": "baseline",
+      "candidate": "mean per task_type",
+      "params": {},
+      "cv": 79.86270680868303,
+      "threshold": NaN,
+      "seconds": 0.015802383422851562
+    },
+    {
+      "family": "linear",
+      "candidate": "linear(alpha=0.1)",
+      "params": {
+        "alpha": 0.1
+      },
+      "cv": 26.01954005792148,
+      "threshold": NaN,
+      "seconds": 0.07893848419189453
+    },
+    {
+      "family": "linear",
+      "candidate": "linear(alpha=1.0)",
+      "params": {
+        "alpha": 1.0
+      },
+      "cv": 26.99343118017418,
+      "threshold": NaN,
+      "seconds": 0.0982973575592041
+    },
+    {
+      "family": "linear",
+      "candidate": "linear(alpha=10.0)",
+      "params": {
+        "alpha": 10.0
+      },
+      "cv": 32.62572576626134,
+      "threshold": NaN,
+      "seconds": 0.07597565650939941
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=8, min_samples_leaf=1, n_estimators=200)",
+      "params": {
+        "max_depth": 8,
+        "min_samples_leaf": 1,
+        "n_estimators": 200
+      },
+      "cv": 21.172923829413147,
+      "threshold": NaN,
+      "seconds": 2.530917167663574
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=8, min_samples_leaf=5, n_estimators=200)",
+      "params": {
+        "max_depth": 8,
+        "min_samples_leaf": 5,
+        "n_estimators": 200
+      },
+      "cv": 22.933342329951973,
+      "threshold": NaN,
+      "seconds": 2.7370026111602783
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=1, n_estimators=200)",
+      "params": {
+        "max_depth": 16,
+        "min_samples_leaf": 1,
+        "n_estimators": 200
+      },
+      "cv": 17.923989370477734,
+      "threshold": NaN,
+      "seconds": 5.158722162246704
+    },
+    {
+      "family": "random_forest",
+      "candidate": "random forest(max_depth=16, min_samples_leaf=5, n_estimators=200)",
+      "params": {
+        "max_depth": 16,
+        "min_samples_leaf": 5,
+        "n_estimators": 200
+      },
+      "cv": 20.30225669166716,
+      "threshold": NaN,
+      "seconds": 3.7251594066619873
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=3, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.05,
+        "max_depth": 3,
+        "n_estimators": 300
+      },
+      "cv": 28.26090687223401,
+      "threshold": NaN,
+      "seconds": 0.9115729331970215
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.05, max_depth=6, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.05,
+        "max_depth": 6,
+        "n_estimators": 300
+      },
+      "cv": 22.45326525549101,
+      "threshold": NaN,
+      "seconds": 2.094465494155884
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.1, max_depth=3, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.1,
+        "max_depth": 3,
+        "n_estimators": 300
+      },
+      "cv": 27.31022843238415,
+      "threshold": NaN,
+      "seconds": 0.9013149738311768
+    },
+    {
+      "family": "xgboost",
+      "candidate": "xgboost(learning_rate=0.1, max_depth=6, n_estimators=300)",
+      "params": {
+        "learning_rate": 0.1,
+        "max_depth": 6,
+        "n_estimators": 300
+      },
+      "cv": 23.844147326787237,
+      "threshold": NaN,
+      "seconds": 2.2439188957214355
+    }
+  ],
+  "split": {
+    "train": 5978,
+    "test": 1494,
+    "holdout_pattern": 3578,
+    "holdout_type": 268,
+    "train_until": "2026-09-27 12:51:37.484000+05:30",
+    "test_from": "2026-09-27 12:51:37.493000+05:30",
+    "test_fraction": 0.2,
+    "cv_splits": 3
+  },
+  "margin": 0.1,
+  "seed": 42,
+  "dataset": "data/dataset.parquet",
+  "data_hash": "8c1c8d27c37a77211d6b5fe8d6323671eb520658eb5cc394c99aa07ba869f487",
+  "trained_at": "2026-09-27T07:45:42+00:00",
+  "libraries": {
+    "scikit-learn": "1.5.2",
+    "xgboost": "2.1.4",
+    "pandas": "2.2.3",
+    "numpy": "2.1.3"
+  },
+  "model": "m1",
+  "version": 1
+}

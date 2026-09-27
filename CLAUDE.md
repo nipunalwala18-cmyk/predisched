@@ -58,6 +58,7 @@ prompt names before writing code.
 | grpcio / grpcio-tools | 1.66.x |
 | PySpark | 3.5.x |
 | mpi4py | 4.1.x (prompt 13: Intel MPI `impi_rt` from PyPI on Windows, as 3.1 wheels only load MS-MPI; MS-MPI still works; OpenMPI on Linux) |
+| scikit-learn / XGBoost | 1.5.x / 2.1.x (added in prompt 16; with SciPy 1.14.x, joblib 1.4.x) |
 | Node | 20 LTS |
 | PostgreSQL | 16 |
 

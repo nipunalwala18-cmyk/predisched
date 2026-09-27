@@ -58,7 +58,8 @@ itself. The CSV with every task is `results/mixed-bursty-42-replay.csv`.
 - **Four types stay unregistered** and say why. `WORKFLOW_TASK` (prompt 09), `DB_QUERY_TASK` (11),
   `MAPREDUCE_TASK` (12) and `ML_INFER_TASK` (16) have no executor, and `IMAGE_TASK` is in the enum
   but not in the catalogue. Validation rejects all five with the prompt they arrive in, instead of
-  accepting a task that would then fail on a worker.
+  accepting a task that would then fail on a worker. (All but `IMAGE_TASK` have since arrived;
+  `ML_INFER_TASK` is in `docs/components/ml-models.md`.)
 
 ## Mock HTTP service
 

@@ -79,6 +79,7 @@ class TaskInputSpecTest {
                         TaskType.FILE_IO_TASK,
                         TaskType.HTTP_TASK,
                         TaskType.DB_QUERY_TASK,
+                        TaskType.ML_INFER_TASK,
                         TaskType.WORKFLOW_TASK,
                         TaskType.MAPREDUCE_TASK),
                 TaskInputSpec.knownTypes());
@@ -137,7 +138,14 @@ class TaskInputSpecTest {
         assertFalse(TaskInputSpec.validate(TaskType.MAPREDUCE_TASK, "dataset=x, job=sort")
                 .isEmpty());
         assertFalse(TaskInputSpec.validate(TaskType.MAPREDUCE_TASK, "job=wordcount").isEmpty());
-        assertTrue(TaskInputSpec.reservedReason(TaskType.ML_INFER_TASK).contains("prompt 16"));
+        // ML_INFER_TASK arrived in prompt 16.
+        assertNull(TaskInputSpec.reservedReason(TaskType.ML_INFER_TASK));
+        assertTrue(TaskInputSpec.validate(TaskType.ML_INFER_TASK, "model=exec_time, batch=100")
+                .isEmpty());
+        assertFalse(TaskInputSpec.validate(TaskType.ML_INFER_TASK, "model=x, batch=100").isEmpty());
+        assertFalse(TaskInputSpec.validate(TaskType.ML_INFER_TASK, "model=overload").isEmpty());
+        assertEquals(250, TaskInputSpec.inputSize(TaskType.ML_INFER_TASK,
+                "model=overload, batch=250"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.IMAGE_TASK).contains("reserved"));
         assertNull(TaskInputSpec.reservedReason(TaskType.CPU_TASK));
     }

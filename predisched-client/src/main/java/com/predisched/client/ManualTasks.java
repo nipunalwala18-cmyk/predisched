@@ -38,6 +38,7 @@ public final class ManualTasks {
         EXAMPLES.put(TaskType.DB_QUERY_TASK, "rows=1000");
         EXAMPLES.put(TaskType.WORKFLOW_TASK, "dag=workloads/dags/map-reduce.json");
         EXAMPLES.put(TaskType.MAPREDUCE_TASK, "dataset=spark/data/execution_history.csv, job=avg_exec");
+        EXAMPLES.put(TaskType.ML_INFER_TASK, "model=exec_time, batch=1000");
     }
 
     /** A parsed line: a task to submit, or why the line is not one. */

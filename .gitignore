@@ -31,7 +31,9 @@ logs/
 
 # ML
 ml/data/raw/
-ml/models/*.joblib
+# Model binaries are rebuilt by python -m predisched_ml.train; meta.json and registry.json
+# are committed (docs/components/ml-models.md).
+ml/models/**/*.joblib
 
 # Misc
 .DS_Store

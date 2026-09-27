@@ -32,7 +32,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 13 | MPI collectives | [x] |
 | 14 | MPI matrix multiplication | [x] |
 | 15 | Dataset collection | [x] |
-| 16 | ML models | [ ] |
+| 16 | ML models | [x] |
 | 17 | Prediction server | [ ] |
 | 18 | Predictive strategy | [ ] |
 | 19 | Speculative execution and chaos | [ ] |

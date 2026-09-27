@@ -1,0 +1,40 @@
+{
+  "models": {
+    "m1": {
+      "live": 1,
+      "versions": [
+        {
+          "version": 1,
+          "path": "m1/v1",
+          "trained_at": "2026-09-27T07:45:42+00:00",
+          "kept": "linear(alpha=0.1)",
+          "data_hash": "8c1c8d27c37a77211d6b5fe8d6323671eb520658eb5cc394c99aa07ba869f487"
+        }
+      ]
+    },
+    "m2": {
+      "live": 1,
+      "versions": [
+        {
+          "version": 1,
+          "path": "m2/v1",
+          "trained_at": "2026-09-27T07:45:58+00:00",
+          "kept": "mean per worker_id",
+          "data_hash": "8c1c8d27c37a77211d6b5fe8d6323671eb520658eb5cc394c99aa07ba869f487"
+        }
+      ]
+    },
+    "m3": {
+      "live": 1,
+      "versions": [
+        {
+          "version": 1,
+          "path": "m3/v1",
+          "trained_at": "2026-09-27T07:46:13+00:00",
+          "kept": "linear(C=1.0)",
+          "data_hash": "8c1c8d27c37a77211d6b5fe8d6323671eb520658eb5cc394c99aa07ba869f487"
+        }
+      ]
+    }
+  }
+}

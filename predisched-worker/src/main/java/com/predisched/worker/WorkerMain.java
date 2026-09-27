@@ -74,6 +74,11 @@ public class WorkerMain {
         registry.register(new MapReduceTaskExecutor(new MapReduceTaskExecutor.Settings(
                 spark.getHome(), spark.getPython(), Paths.get(spark.getJobsDir()),
                 Paths.get(spark.getOutputDir()), spark.getTimeoutMs())));
+        // ML_INFER_TASK (prompt 16): python -m predisched_ml.infer in ml.workDir.
+        NodeConfig.MlConfig ml = config.getMl();
+        registry.register(new MlInferTaskExecutor(new MlInferTaskExecutor.Settings(
+                absoluteIfFile(ml.getPython()), Paths.get(ml.getWorkDir()).toAbsolutePath(),
+                ml.getTimeoutMs())));
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
                 registry, metrics, id, poolSize, workerConfig.getQueueCapacity());
