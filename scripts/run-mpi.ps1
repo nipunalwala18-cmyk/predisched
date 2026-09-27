@@ -2,11 +2,22 @@
 # MS-MPI, or the impi_rt runtime in the repo's .venv), else in docker/mpi.Dockerfile (OpenMPI).
 #
 #   scripts/run-mpi.ps1 4 predisched_mpi.collectives --generate 20 --seed 42
+#   scripts/run-mpi.ps1 matmul --sizes 200,400,800 --repeat 3   # no rank count: each of
+#                                                               # $env:MPI_RANKS (default "1 2 4")
+# A module without a dot is short for predisched_mpi.<name>.
 # Plain $args, not param(): an advanced script would read --out as -OutVariable/-OutBuffer.
-if ($args.Count -lt 2) { Write-Error 'usage: run-mpi.ps1 <ranks> <module> [args]' }
-$Ranks = $args[0]
-$Module = $args[1]
-$ModuleArgs = @($args | Select-Object -Skip 2)
+if ($args.Count -lt 1) { Write-Error 'usage: run-mpi.ps1 [<ranks>] <module> [args]' }
+if ("$($args[0])" -match '^[0-9]+$') {
+    $RankList = @([int]$args[0])
+    $Module = $args[1]
+    $ModuleArgs = @($args | Select-Object -Skip 2)
+} else {
+    $spec = if ($env:MPI_RANKS) { $env:MPI_RANKS } else { '1 2 4' }
+    $RankList = @($spec -split '\s+' | Where-Object { $_ } | ForEach-Object { [int]$_ })
+    $Module = $args[0]
+    $ModuleArgs = @($args | Select-Object -Skip 1)
+}
+if ($Module -notmatch '\.') { $Module = "predisched_mpi.$Module" }
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -25,8 +36,12 @@ if (Get-Command mpiexec -ErrorAction SilentlyContinue) {
 if ($mpiexec) {
     Write-Host "run-mpi: native ($mpiexec)"
     Set-Location (Join-Path $root 'mpi')
-    & $mpiexec -n $Ranks $python -m $Module @ModuleArgs
-    exit $LASTEXITCODE
+    foreach ($Ranks in $RankList) {
+        Write-Host "run-mpi: mpiexec -n $Ranks python -m $Module $ModuleArgs"
+        & $mpiexec -n $Ranks $python -m $Module @ModuleArgs
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    exit 0
 }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -34,5 +49,8 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 Write-Host 'run-mpi: docker (predisched-mpi, OpenMPI)'
 docker build -q -f docker/mpi.Dockerfile -t predisched-mpi . | Out-Null
-docker run --rm -v "${root}:/work" predisched-mpi $Ranks $Module @ModuleArgs
-exit $LASTEXITCODE
+foreach ($Ranks in $RankList) {
+    docker run --rm -v "${root}:/work" predisched-mpi $Ranks $Module @ModuleArgs
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+exit 0

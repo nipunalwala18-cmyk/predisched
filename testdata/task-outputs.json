@@ -12,5 +12,7 @@
   {"type": "SLEEP_TASK", "input": "ms=0", "success": true, "output": "slept_ms=0"},
   {"type": "SLEEP_TASK", "input": "ms=5", "success": true, "output": "slept_ms=5"},
   {"type": "SLEEP_TASK", "input": "ms=1, failRate=0.5, seed=3", "success": true, "output": "slept_ms=1"},
-  {"type": "SLEEP_TASK", "input": "ms=1, failRate=0.9, seed=0", "success": false, "output": "injected failure (failRate=0.90, draw=0.731)"}
+  {"type": "SLEEP_TASK", "input": "ms=1, failRate=0.9, seed=0", "success": false, "output": "injected failure (failRate=0.90, draw=0.731)"},
+  {"type": "MATRIX_TASK", "input": "size=64, seed=1", "success": true, "output": "size=64 threads=1 checksum=66454.893142"},
+  {"type": "MATRIX_TASK", "input": "size=200", "success": true, "output": "size=200 threads=1 checksum=1997209.445178"}
 ]

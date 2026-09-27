@@ -64,7 +64,9 @@ class ManualTasksTest {
 
     @Test
     void describeListsRequiredThenOptionalKeys() {
-        assertEquals("size=<1..1000>, [threads=<1..64>]", TaskInputSpec.describe(TaskType.MATRIX_TASK));
+        assertEquals("size=<1..1000>, [threads=<1..64>], [procs=<1..64>],"
+                + " [seed=<0..9223372036854775807>], [mode=local|threads|mpi]",
+                TaskInputSpec.describe(TaskType.MATRIX_TASK));
         assertEquals("job=avg_exec|wordcount, dataset=<text>",
                 TaskInputSpec.describe(TaskType.MAPREDUCE_TASK));
     }

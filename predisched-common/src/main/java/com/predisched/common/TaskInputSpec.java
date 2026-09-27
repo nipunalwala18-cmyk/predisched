@@ -50,7 +50,11 @@ public final class TaskInputSpec {
         REQUIRED.put(TaskType.SLEEP_TASK, List.of(new NumericKey("ms", 0, 60_000L)));
         REQUIRED.put(TaskType.MATRIX_TASK, List.of(new NumericKey("size", 1, 1_000L)));
         // Optional keys are only range-checked when present.
-        OPTIONAL.put(TaskType.MATRIX_TASK, List.of(new NumericKey("threads", 1, 64)));
+        OPTIONAL.put(TaskType.MATRIX_TASK, List.of(new NumericKey("threads", 1, 64),
+                new NumericKey("procs", 1, 64), new NumericKey("seed", 0, Long.MAX_VALUE)));
+        // Prompt 14: where the product runs; mpi goes through mpiexec (Exp 10).
+        OPTIONAL_ENUMS.put(TaskType.MATRIX_TASK,
+                List.of(new EnumKey("mode", List.of("local", "threads", "mpi"))));
         // Test hooks for the retry and dead-letter demos (F4): a reproducible failure rate.
         FRACTIONS.put(TaskType.SLEEP_TASK, List.of(new FractionKey("failRate", 0.0, 1.0)));
         OPTIONAL.put(TaskType.SLEEP_TASK, List.of(new NumericKey("seed", 0, Long.MAX_VALUE)));

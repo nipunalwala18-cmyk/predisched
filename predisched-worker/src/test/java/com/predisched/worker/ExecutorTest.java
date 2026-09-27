@@ -31,7 +31,7 @@ public class ExecutorTest {
     }
 
     @Test
-    public void matrixExecutorIsDeterministic() {
+    public void matrixExecutorIsDeterministic() throws Exception {
         MatrixTaskExecutor executor = new MatrixTaskExecutor();
         ExecutionResult first = executor.execute("size=5");
         ExecutionResult second = executor.execute("size=5");
@@ -41,7 +41,7 @@ public class ExecutorTest {
     }
 
     @Test
-    public void matrixChecksumIsTheSameHoweverManyThreadsRun() {
+    public void matrixChecksumIsTheSameHoweverManyThreadsRun() throws Exception {
         String sequential = MatrixTaskExecutor.checksumOf(
                 new MatrixTaskExecutor().execute("size=40").output());
         String parallel = MatrixTaskExecutor.checksumOf(
@@ -50,7 +50,7 @@ public class ExecutorTest {
     }
 
     @Test
-    public void matrixRejectsAnUnusableThreadCount() {
+    public void matrixRejectsAnUnusableThreadCount() throws Exception {
         assertFalse(new MatrixTaskExecutor().execute("size=10, threads=0").success());
         assertFalse(new MatrixTaskExecutor().execute("size=10, threads=abc").success());
     }

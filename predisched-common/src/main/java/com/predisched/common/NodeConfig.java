@@ -22,6 +22,15 @@ public class NodeConfig {
     private DbConfig db = new DbConfig();
     private CacheConfig cache = new CacheConfig();
     private SparkConfig spark = new SparkConfig();
+    private MpiConfig mpi = new MpiConfig();
+
+    public MpiConfig getMpi() {
+        return mpi;
+    }
+
+    public void setMpi(MpiConfig mpi) {
+        this.mpi = mpi;
+    }
 
     public SparkConfig getSpark() {
         return spark;
@@ -912,6 +921,61 @@ public class NodeConfig {
 
         public void setOutputDir(String outputDir) {
             this.outputDir = outputDir;
+        }
+
+        public long getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
+        }
+    }
+
+    /**
+     * Where a worker finds MPI for {@code MATRIX_TASK mode=mpi} (prompt 14). An empty {@code exec}
+     * leaves that mode disabled on the worker.
+     */
+    public static class MpiConfig {
+        /** mpiexec, e.g. .venv/Library/bin/mpiexec.exe (impi_rt) or plain "mpiexec" on PATH. */
+        private String exec = "";
+        /** The Python the ranks run; empty means "python" on PATH. */
+        private String python = "";
+        /** Working directory of the ranks, holding the predisched_mpi package. */
+        private String workDir = "mpi";
+        private int maxProcs = 8;
+        private long timeoutMs = 600_000;
+
+        public String getExec() {
+            return exec;
+        }
+
+        public void setExec(String exec) {
+            this.exec = exec;
+        }
+
+        public String getPython() {
+            return python;
+        }
+
+        public void setPython(String python) {
+            this.python = python;
+        }
+
+        public String getWorkDir() {
+            return workDir;
+        }
+
+        public void setWorkDir(String workDir) {
+            this.workDir = workDir;
+        }
+
+        public int getMaxProcs() {
+            return maxProcs;
+        }
+
+        public void setMaxProcs(int maxProcs) {
+            this.maxProcs = maxProcs;
         }
 
         public long getTimeoutMs() {

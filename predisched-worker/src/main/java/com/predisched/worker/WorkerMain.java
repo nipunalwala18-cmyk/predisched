@@ -63,6 +63,12 @@ public class WorkerMain {
             registry.register(new DbQueryTaskExecutor(queryDb.dataSource()));
         }
         final com.predisched.common.db.Db queryPool = queryDb;
+        // MATRIX_TASK mode=mpi (prompt 14): mpiexec over the ranks in mpi.workDir.
+        NodeConfig.MpiConfig mpi = config.getMpi();
+        registry.register(new MatrixTaskExecutor(new MatrixTaskExecutor.MpiSettings(
+                absoluteIfFile(mpi.getExec()), absoluteIfFile(mpi.getPython()),
+                Paths.get(mpi.getWorkDir()).toAbsolutePath(), mpi.getMaxProcs(),
+                mpi.getTimeoutMs())));
         // MAPREDUCE_TASK (prompt 12): spark-submit from the configured SPARK_HOME.
         NodeConfig.SparkConfig spark = config.getSpark();
         registry.register(new MapReduceTaskExecutor(new MapReduceTaskExecutor.Settings(
@@ -162,6 +168,15 @@ public class WorkerMain {
      * Temp dir for {@code FILE_IO_TASK} files: the configured dir, or a per-worker dir under the
      * JVM temp dir when nothing is configured. Created now so a bad path fails fast at startup.
      */
+    /** A configured program path made absolute when it names an existing file; else as given. */
+    static String absoluteIfFile(String program) {
+        if (program == null || program.isBlank()) {
+            return program;
+        }
+        Path path = Paths.get(program);
+        return java.nio.file.Files.isRegularFile(path) ? path.toAbsolutePath().toString() : program;
+    }
+
     static Path resolveFileIoDir(String id, NodeConfig.WorkerConfig workerConfig) throws Exception {
         String configured = workerConfig.getFileIoDir();
         Path dir = (configured == null || configured.isBlank())

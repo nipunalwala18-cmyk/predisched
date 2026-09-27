@@ -5,3 +5,4 @@ pytest==8.3.3
 # Windows: Intel MPI runtime from PyPI (mpiexec + impi.dll in <venv>/Library/bin), in place of the
 # MS-MPI system installer. Linux uses the distribution's OpenMPI (docs/components/mpi.md).
 impi_rt==2021.18.1; sys_platform == "win32"
+matplotlib==3.9.2  # scripts/plot-matmul.py (prompt 14)

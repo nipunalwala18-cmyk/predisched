@@ -42,6 +42,7 @@ class TaskOutputsFixtureTest {
                 case HASH_TASK -> new HashTaskExecutor();
                 case MONTE_CARLO_TASK -> new MonteCarloTaskExecutor();
                 case SLEEP_TASK -> new SleepTaskExecutor();
+                case MATRIX_TASK -> new MatrixTaskExecutor();
                 default -> throw new AssertionError("no executor for " + type);
             };
             ExecutionResult result = executor.execute(m.group(2));
@@ -50,6 +51,6 @@ class TaskOutputsFixtureTest {
             assertEquals(m.group(4), success ? result.output() : result.errorMessage(), line);
             checked++;
         }
-        assertTrue(checked >= 14, "only " + checked + " fixture cases read");
+        assertTrue(checked >= 16, "only " + checked + " fixture cases read");
     }
 }

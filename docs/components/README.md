@@ -20,4 +20,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [fault-tolerance.md](fault-tolerance.md) | Primary-backup failover, in-doubt dispatches, worker failure detection, client failover | 10 |
 | [storage.md](storage.md) | PostgreSQL history, result cache, deadlines and SLA report, DB_QUERY_TASK | 11 |
 | [spark.md](spark.md) | Spark MapReduce over execution history, ML features, MAPREDUCE_TASK | 12 |
-| [mpi.md](mpi.md) | MPI collectives (Broadcast, Scatter, Gather) and Python task semantics shared with Java | 13 |
+| [mpi.md](mpi.md) | MPI collectives (Broadcast, Scatter, Gather), parallel matrix multiplication with speedup, MATRIX_TASK mode=mpi | 13, 14 |

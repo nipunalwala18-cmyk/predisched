@@ -8,6 +8,8 @@ that both this module's tests and ``TaskOutputsFixtureTest`` (Java) assert.
     HASH_TASK         rounds=<1..20000000>        SHA-256 chained ``rounds`` times
     MONTE_CARLO_TASK  samples=<1..>, [seed=42]    pi estimate from java.util.Random(seed)
     SLEEP_TASK        ms=<0..60000>, [failRate, seed]
+    MATRIX_TASK       size=<1..1000>, [seed=42]   checksum of A @ B (exact; slow in pure Python,
+                                                  so only for fixtures; matmul.py is the fast path)
 """
 
 from __future__ import annotations
@@ -68,6 +70,70 @@ class JavaRandom:
 
     def next_double(self) -> float:
         return ((self._next(26) << 27) + self._next(27)) * (1.0 / (1 << 53))
+
+
+def java_random_doubles(seed: int, count: int):
+    """``count`` successive ``new Random(seed).nextDouble()`` values as a NumPy array, fast.
+
+    Each double takes two LCG steps. The first block of states is stepped in Python, then whole
+    blocks jump ahead at once with the closed form s[k+B] = A_B * s[k] + C_B (mod 2^48); uint64
+    products wrap mod 2^64, which keeps them right mod 2^48.
+    """
+    import numpy as np
+
+    mult, mask, block = JavaRandom._MULT, JavaRandom._MASK, 4096
+    steps = 2 * count
+    state = (seed ^ mult) & mask
+    first = []
+    for _ in range(min(block, steps)):
+        state = (state * mult + 0xB) & mask
+        first.append(state)
+    a_b, c_b = 1, 0
+    for _ in range(block):
+        a_b, c_b = (a_b * mult) & mask, (c_b * mult + 0xB) & mask
+    rows = -(-steps // block)
+    states = np.empty((rows, block), dtype=np.uint64)
+    states[0, :len(first)] = first
+    a_u, c_u, m_u = np.uint64(a_b), np.uint64(c_b), np.uint64(mask)
+    for r in range(1, rows):
+        states[r] = (states[r - 1] * a_u + c_u) & m_u
+    flat = states.reshape(-1)[:steps]
+    hi = (flat[0::2] >> np.uint64(22)).astype(np.float64)
+    lo = (flat[1::2] >> np.uint64(21)).astype(np.float64)
+    return (hi * 134217728.0 + lo) * (1.0 / (1 << 53))
+
+
+def matrices(size: int, seed: int = 42):
+    """A and B as MatrixTaskExecutor fills them: Random(seed), alternating a[i][j], b[i][j]."""
+    values = java_random_doubles(seed, 2 * size * size)
+    return values[0::2].reshape(size, size), values[1::2].reshape(size, size)
+
+
+def matrix_checksum_exact(size: int, seed: int = 42) -> float:
+    """MatrixTaskExecutor's sequential checksum bit for bit: same draws, same summation order."""
+    rnd = JavaRandom(seed)
+    a = [[0.0] * size for _ in range(size)]
+    b = [[0.0] * size for _ in range(size)]
+    for i in range(size):
+        for j in range(size):
+            a[i][j] = rnd.next_double()
+            b[i][j] = rnd.next_double()
+    total = 0.0
+    for i in range(size):
+        row = a[i]
+        for j in range(size):
+            acc = 0.0
+            for k in range(size):
+                acc += row[k] * b[k][j]
+            total += acc
+    return total
+
+
+def matrix_task(params: dict[str, str]) -> str:
+    size = _int(params, "size", 1, 1_000)
+    seed = _int(params, "seed", 0, 2**63 - 1, default=42)
+    threads = _int(params, "threads", 1, 64, default=1)
+    return f"size={size} threads={threads} checksum={matrix_checksum_exact(size, seed):.6f}"
 
 
 def java_string_hash(text: str) -> int:
@@ -142,6 +208,8 @@ def execute(task_type: str, text: str) -> str:
         return monte_carlo_task(params)
     if task_type == "SLEEP_TASK":
         return sleep_task(params, text)
+    if task_type == "MATRIX_TASK":
+        return matrix_task(params)
     raise TaskError(f"{task_type} is not supported under MPI (supported: {', '.join(SUPPORTED)})")
 
 
