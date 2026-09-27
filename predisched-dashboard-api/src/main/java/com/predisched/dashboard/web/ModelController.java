@@ -1,6 +1,8 @@
 package com.predisched.dashboard.web;
 
+import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.predisched.dashboard.repo.Repositories;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,7 +24,9 @@ public class ModelController {
 
     private final Repositories repo;
     private final Jobs jobs;
-    private final ObjectMapper json = new ObjectMapper();
+    // meta.json is written by Python, which spells a missing threshold NaN.
+    private final ObjectMapper json = JsonMapper.builder()
+            .enable(JsonReadFeature.ALLOW_NON_NUMERIC_NUMBERS).build();
 
     public ModelController(Repositories repo, Jobs jobs) {
         this.repo = repo;

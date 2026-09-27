@@ -195,6 +195,17 @@ class ControllersTest {
     }
 
     @Test
+    void modelMetricsSurviveNaNInMeta() throws Exception {
+        // The repository's m1 meta.json has "threshold": NaN in its CV table, as Python writes it.
+        when(jobs.root()).thenReturn(Paths.get(".."));
+        when(repo.events(any(), anyInt())).thenReturn(List.of());
+        mvc.perform(get("/api/models"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.models.m1.versions[0].status").value("live"))
+                .andExpect(jsonPath("$.models.m1.versions[0].metrics.test.mae").isNumber());
+    }
+
+    @Test
     void leaderListsEveryScheduler() throws Exception {
         when(cluster.schedulers()).thenReturn(List.of("a:1", "b:2"));
         when(cluster.allStates()).thenReturn(Map.of("a:1", state()));

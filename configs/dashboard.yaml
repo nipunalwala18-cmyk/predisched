@@ -113,3 +113,15 @@ db:
   historyFlushMs: 200
   # Workers run DB_QUERY_TASK on their own pool of this size.
   queryPoolSize: 2
+prediction:
+  # The prediction server (prompt 17), so the dashboard shows real predictions and explained
+  # decisions: .venv/Scripts/python -m predisched_ml.prediction_server --port 50070 (from ml/).
+  # Without it the predictive strategy falls back to least_loaded and says so in the explainer.
+  # 50 ms rather than predictive.yaml's 10 ms: this demo runs eight JVMs, the API, the dev server
+  # and a browser on one machine, and at 10 ms the breaker kept opening.
+  enabled: true
+  host: "localhost"
+  port: 50070
+  timeoutMs: 50
+  failureThreshold: 5
+  coolDownMs: 5000

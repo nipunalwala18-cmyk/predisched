@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="light"] {
+  --surface: #f6f6f3;
+  --panel: #ffffff;
+  --ink: #1f1f1d;
+  --muted: #6b6a64;
+  --rule: #e2e1dc;
+  --accent: #2a78d6;
+  --good: #1baf7a;
+  --warn: #c98500;
+  --bad: #e34948;
+  --grid: #ececea;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --surface: #121211;
+  --panel: #1a1a19;
+  --ink: #f2f1ec;
+  --muted: #a7a69d;
+  --rule: #33322f;
+  --accent: #3987e5;
+  --good: #199e70;
+  --warn: #c98500;
+  --bad: #e66767;
+  --grid: #2a2a28;
+  color-scheme: dark;
+}
+
+/* Projector: high contrast, bigger type, heavier rules. */
+[data-theme="projector"] {
+  --surface: #000000;
+  --panel: #0b0b0b;
+  --ink: #ffffff;
+  --muted: #d6d6d6;
+  --rule: #7a7a7a;
+  --accent: #5aa5ff;
+  --good: #2fe39f;
+  --warn: #ffc233;
+  --bad: #ff6b6b;
+  --grid: #3a3a3a;
+  color-scheme: dark;
+  font-size: 18px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.recharts-cartesian-grid line {
+  stroke: var(--grid);
+}
+
+.recharts-text {
+  fill: var(--muted);
+}
+
+.react-flow__attribution {
+  display: none;
+}

@@ -67,5 +67,5 @@ strategy, or worse on bursty traffic of short tasks. There, its 7.7 ms predictio
 | 20 | Benchmark harness and report | [x] |
 | 21 | Model lifecycle and auto-scaling | [x] |
 | 22 | Dashboard API | [x] |
-| 23 | Dashboard UI | [ ] |
+| 23 | Dashboard UI | [x] |
 | 24 | Deployment and final report | [ ] |
