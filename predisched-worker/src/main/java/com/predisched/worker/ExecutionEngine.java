@@ -52,6 +52,8 @@ public class ExecutionEngine implements AutoCloseable {
     private final String workerId;
     private final ThreadPoolExecutor pool;
     private final int poolSize;
+    /** Simulated slower hardware: executions are stretched to this many times their length. */
+    private volatile double slowdown = 1.0;
     /** A task in flight: the pool's handle and the reply the scheduler is waiting for. */
     private record InFlight(Future<?> handle, CompletableFuture<Outcome> reply) {}
 
@@ -153,6 +155,28 @@ public class ExecutionEngine implements AutoCloseable {
         return mine;
     }
 
+    /**
+     * Makes this worker behave like slower hardware (prompt 15, the dataset campaign's
+     * heterogeneous workers): each execution is stretched to {@code factor} times its real length.
+     * Simulated, since one machine has one kind of core; values below 1 are treated as 1.
+     */
+    public void setSlowdown(double factor) {
+        this.slowdown = Math.max(1.0, factor);
+    }
+
+    public double slowdown() {
+        return slowdown;
+    }
+
+    /** Waits out the simulated extra time; an interrupt (cancel, FR26) ends it early. */
+    private void stretch(long startNanos) throws InterruptedException {
+        double factor = slowdown;
+        if (factor > 1.0) {
+            long real = System.nanoTime() - startNanos;
+            TimeUnit.NANOSECONDS.sleep((long) ((factor - 1.0) * real));
+        }
+    }
+
     /** Where a dispatch stands. */
     public DispatchState query(String dispatchId) {
         if (finished.containsKey(dispatchId)) {
@@ -185,6 +209,7 @@ public class ExecutionEngine implements AutoCloseable {
                 long execMs = 0;
                 try {
                     ExecutionResult result = registry.execute(type, input);
+                    stretch(startNanos);
                     execMs = (System.nanoTime() - startNanos) / 1_000_000L;
                     success = result.success();
                     output = success ? result.output() : "error: " + result.errorMessage();

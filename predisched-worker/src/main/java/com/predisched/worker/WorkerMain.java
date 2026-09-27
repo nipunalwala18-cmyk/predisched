@@ -77,6 +77,13 @@ public class WorkerMain {
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
                 registry, metrics, id, poolSize, workerConfig.getQueueCapacity());
+        // Simulated heterogeneity for the dataset campaign (prompt 15).
+        engine.setSlowdown(Double.parseDouble(opts.getOrDefault("--slowdown",
+                String.valueOf(workerConfig.getSlowdown()))));
+        if (engine.slowdown() > 1.0) {
+            log.info("Worker {} simulates slower hardware: executions take {}x as long", id,
+                    engine.slowdown());
+        }
 
         Server server = Transport.get().server(port)
                 .addService(new WorkerServiceImpl(engine, id))

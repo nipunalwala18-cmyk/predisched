@@ -55,6 +55,9 @@ def stop(spark: SparkSession, args: argparse.Namespace) -> None:
 
 def configure(builder: SparkSession.Builder) -> SparkSession.Builder:
     """Settings every session needs; on Windows, the flushing worker entry (see ``pyworker``)."""
+    # Timestamps come out in UTC whatever the machine's zone, so window bounds join cleanly with
+    # PostgreSQL's timestamptz (ml/build_dataset.py).
+    builder = builder.config("spark.sql.session.timeZone", "UTC")
     if os.name == "nt":
         builder = (builder.config("spark.python.worker.module", "predisched_spark.pyworker")
                    .config("spark.executorEnv.PYTHONPATH", str(SPARK_DIR)))

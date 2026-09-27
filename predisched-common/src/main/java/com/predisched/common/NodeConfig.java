@@ -234,6 +234,19 @@ public class NodeConfig {
         private int heartbeatMisses = 3;
         /** Temp dir for FILE_IO_TASK files; empty means the JVM temp dir. */
         private String fileIoDir = "";
+        /**
+         * Simulated slower hardware (prompt 15): every task takes this many times its real
+         * execution time (the worker waits out the difference). 1 means no slowdown.
+         */
+        private double slowdown = 1.0;
+
+        public double getSlowdown() {
+            return slowdown;
+        }
+
+        public void setSlowdown(double slowdown) {
+            this.slowdown = slowdown;
+        }
 
         public int getPoolSize() {
             return poolSize;

@@ -1,0 +1,160 @@
+{"offset_ms":35,"task_id":"deadline-1517-00000","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=84, timeout=2840","priority":7}
+{"offset_ms":40,"task_id":"deadline-1517-00001","type":"FILE_IO_TASK","input":"size_mb=2, mode=both","priority":8,"timeout_ms":4571}
+{"offset_ms":60,"task_id":"deadline-1517-00002","type":"SLEEP_TASK","input":"ms=124","priority":7}
+{"offset_ms":65,"task_id":"deadline-1517-00003","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=48, timeout=2480","priority":9,"timeout_ms":14974}
+{"offset_ms":67,"task_id":"deadline-1517-00004","type":"MATRIX_TASK","input":"size=166","priority":1}
+{"offset_ms":111,"task_id":"deadline-1517-00005","type":"HASH_TASK","input":"rounds=68250","priority":8,"timeout_ms":4047}
+{"offset_ms":128,"task_id":"deadline-1517-00006","type":"HASH_TASK","input":"rounds=5570","priority":4,"timeout_ms":7228}
+{"offset_ms":137,"task_id":"deadline-1517-00007","type":"HASH_TASK","input":"rounds=20462","priority":10,"timeout_ms":9470}
+{"offset_ms":139,"task_id":"deadline-1517-00008","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=141, timeout=3410","priority":8,"timeout_ms":8808}
+{"offset_ms":153,"task_id":"deadline-1517-00009","type":"HASH_TASK","input":"rounds=28676","priority":1,"timeout_ms":6268}
+{"offset_ms":196,"task_id":"deadline-1517-00010","type":"SORT_TASK","input":"n=901927, type=reversed","priority":1,"timeout_ms":11795}
+{"offset_ms":218,"task_id":"deadline-1517-00011","type":"HASH_TASK","input":"rounds=69857","priority":1,"timeout_ms":4090}
+{"offset_ms":243,"task_id":"deadline-1517-00012","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=208, timeout=4080","priority":8,"timeout_ms":10185}
+{"offset_ms":280,"task_id":"deadline-1517-00013","type":"SLEEP_TASK","input":"ms=688","priority":10}
+{"offset_ms":289,"task_id":"deadline-1517-00014","type":"FILE_IO_TASK","input":"size_mb=2, mode=write","priority":9,"timeout_ms":6584}
+{"offset_ms":291,"task_id":"deadline-1517-00015","type":"SORT_TASK","input":"n=322667, type=random","priority":1}
+{"offset_ms":312,"task_id":"deadline-1517-00016","type":"HASH_TASK","input":"rounds=48289","priority":7,"timeout_ms":4603}
+{"offset_ms":313,"task_id":"deadline-1517-00017","type":"FILE_IO_TASK","input":"size_mb=5, mode=both","priority":6,"timeout_ms":8275}
+{"offset_ms":323,"task_id":"deadline-1517-00018","type":"CPU_TASK","input":"n=1104154","priority":8,"timeout_ms":7834}
+{"offset_ms":335,"task_id":"deadline-1517-00019","type":"FILE_IO_TASK","input":"size_mb=6, mode=read","priority":9,"timeout_ms":4651}
+{"offset_ms":348,"task_id":"deadline-1517-00020","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=300, timeout=5000","priority":9,"timeout_ms":2940}
+{"offset_ms":355,"task_id":"deadline-1517-00021","type":"CPU_TASK","input":"n=888915","priority":10,"timeout_ms":5231}
+{"offset_ms":438,"task_id":"deadline-1517-00022","type":"CPU_TASK","input":"n=1769517","priority":1,"timeout_ms":11367}
+{"offset_ms":459,"task_id":"deadline-1517-00023","type":"SORT_TASK","input":"n=436596, type=reversed","priority":2}
+{"offset_ms":490,"task_id":"deadline-1517-00024","type":"MONTE_CARLO_TASK","input":"samples=564822, seed=216671","priority":10,"timeout_ms":4615}
+{"offset_ms":493,"task_id":"deadline-1517-00025","type":"SLEEP_TASK","input":"ms=761","priority":8,"timeout_ms":13279}
+{"offset_ms":505,"task_id":"deadline-1517-00026","type":"CPU_TASK","input":"n=1531509","priority":9,"timeout_ms":5869}
+{"offset_ms":506,"task_id":"deadline-1517-00027","type":"CPU_TASK","input":"n=1092234","priority":4,"timeout_ms":9803}
+{"offset_ms":520,"task_id":"deadline-1517-00028","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=134, timeout=3340","priority":10}
+{"offset_ms":521,"task_id":"deadline-1517-00029","type":"CPU_TASK","input":"n=1582946","priority":2,"timeout_ms":5310}
+{"offset_ms":553,"task_id":"deadline-1517-00030","type":"SLEEP_TASK","input":"ms=768","priority":7,"timeout_ms":4405}
+{"offset_ms":593,"task_id":"deadline-1517-00031","type":"CPU_TASK","input":"n=1293146","priority":8}
+{"offset_ms":654,"task_id":"deadline-1517-00032","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=44, timeout=2440","priority":9,"timeout_ms":6365}
+{"offset_ms":682,"task_id":"deadline-1517-00033","type":"SLEEP_TASK","input":"ms=246","priority":8,"timeout_ms":5798}
+{"offset_ms":783,"task_id":"deadline-1517-00034","type":"HASH_TASK","input":"rounds=70623","priority":10,"timeout_ms":2624}
+{"offset_ms":821,"task_id":"deadline-1517-00035","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=85, timeout=2850","priority":10}
+{"offset_ms":910,"task_id":"deadline-1517-00036","type":"SORT_TASK","input":"n=332623, type=random","priority":4,"timeout_ms":8176}
+{"offset_ms":934,"task_id":"deadline-1517-00037","type":"SORT_TASK","input":"n=401944, type=sorted","priority":8,"timeout_ms":5828}
+{"offset_ms":979,"task_id":"deadline-1517-00038","type":"CPU_TASK","input":"n=524410","priority":5}
+{"offset_ms":1009,"task_id":"deadline-1517-00039","type":"SORT_TASK","input":"n=511315, type=sorted","priority":5,"timeout_ms":11927}
+{"offset_ms":1095,"task_id":"deadline-1517-00040","type":"CPU_TASK","input":"n=214011","priority":10,"timeout_ms":8420}
+{"offset_ms":1107,"task_id":"deadline-1517-00041","type":"CPU_TASK","input":"n=1739348","priority":9,"timeout_ms":8456}
+{"offset_ms":1128,"task_id":"deadline-1517-00042","type":"HASH_TASK","input":"rounds=25771","priority":10}
+{"offset_ms":1149,"task_id":"deadline-1517-00043","type":"HASH_TASK","input":"rounds=48153","priority":8,"timeout_ms":14763}
+{"offset_ms":1196,"task_id":"deadline-1517-00044","type":"CPU_TASK","input":"n=438818","priority":10,"timeout_ms":4596}
+{"offset_ms":1203,"task_id":"deadline-1517-00045","type":"SORT_TASK","input":"n=468445, type=reversed","priority":1,"timeout_ms":8335}
+{"offset_ms":1238,"task_id":"deadline-1517-00046","type":"CPU_TASK","input":"n=1306313","priority":1,"timeout_ms":5740}
+{"offset_ms":1263,"task_id":"deadline-1517-00047","type":"SORT_TASK","input":"n=327748, type=reversed","priority":2,"timeout_ms":13800}
+{"offset_ms":1263,"task_id":"deadline-1517-00048","type":"HASH_TASK","input":"rounds=33874","priority":4,"timeout_ms":13349}
+{"offset_ms":1266,"task_id":"deadline-1517-00049","type":"FILE_IO_TASK","input":"size_mb=6, mode=write","priority":9,"timeout_ms":11538}
+{"offset_ms":1279,"task_id":"deadline-1517-00050","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=182, timeout=3820","priority":9,"timeout_ms":14756}
+{"offset_ms":1290,"task_id":"deadline-1517-00051","type":"MONTE_CARLO_TASK","input":"samples=2809930, seed=258110","priority":9,"timeout_ms":10691}
+{"offset_ms":1296,"task_id":"deadline-1517-00052","type":"CPU_TASK","input":"n=652363","priority":9,"timeout_ms":5769}
+{"offset_ms":1300,"task_id":"deadline-1517-00053","type":"CPU_TASK","input":"n=1778932","priority":9,"timeout_ms":14238}
+{"offset_ms":1305,"task_id":"deadline-1517-00054","type":"SORT_TASK","input":"n=340739, type=sorted","priority":2,"timeout_ms":8132}
+{"offset_ms":1347,"task_id":"deadline-1517-00055","type":"SLEEP_TASK","input":"ms=473","priority":9,"timeout_ms":5529}
+{"offset_ms":1398,"task_id":"deadline-1517-00056","type":"MATRIX_TASK","input":"size=90","priority":9,"timeout_ms":7281}
+{"offset_ms":1419,"task_id":"deadline-1517-00057","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=232, timeout=4320","priority":10,"timeout_ms":13027}
+{"offset_ms":1432,"task_id":"deadline-1517-00058","type":"MONTE_CARLO_TASK","input":"samples=2919347, seed=129929","priority":10,"timeout_ms":7479}
+{"offset_ms":1456,"task_id":"deadline-1517-00059","type":"SORT_TASK","input":"n=882520, type=reversed","priority":8,"timeout_ms":5037}
+{"offset_ms":1471,"task_id":"deadline-1517-00060","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=196, timeout=3960","priority":7,"timeout_ms":6704}
+{"offset_ms":1481,"task_id":"deadline-1517-00061","type":"MATRIX_TASK","input":"size=175","priority":2,"timeout_ms":2089}
+{"offset_ms":1484,"task_id":"deadline-1517-00062","type":"CPU_TASK","input":"n=1249223","priority":7,"timeout_ms":8442}
+{"offset_ms":1489,"task_id":"deadline-1517-00063","type":"SORT_TASK","input":"n=855663, type=sorted","priority":9,"timeout_ms":2516}
+{"offset_ms":1495,"task_id":"deadline-1517-00064","type":"MONTE_CARLO_TASK","input":"samples=2894666, seed=281498","priority":10,"timeout_ms":13389}
+{"offset_ms":1505,"task_id":"deadline-1517-00065","type":"CPU_TASK","input":"n=1522230","priority":8,"timeout_ms":11505}
+{"offset_ms":1530,"task_id":"deadline-1517-00066","type":"MATRIX_TASK","input":"size=84","priority":4,"timeout_ms":11707}
+{"offset_ms":1537,"task_id":"deadline-1517-00067","type":"HASH_TASK","input":"rounds=8922","priority":9}
+{"offset_ms":1537,"task_id":"deadline-1517-00068","type":"SORT_TASK","input":"n=296477, type=reversed","priority":6,"timeout_ms":11598}
+{"offset_ms":1539,"task_id":"deadline-1517-00069","type":"SORT_TASK","input":"n=727336, type=sorted","priority":10}
+{"offset_ms":1548,"task_id":"deadline-1517-00070","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=230, timeout=4300","priority":10,"timeout_ms":2247}
+{"offset_ms":1555,"task_id":"deadline-1517-00071","type":"FILE_IO_TASK","input":"size_mb=5, mode=both","priority":1,"timeout_ms":6394}
+{"offset_ms":1562,"task_id":"deadline-1517-00072","type":"CPU_TASK","input":"n=532839","priority":7,"timeout_ms":4183}
+{"offset_ms":1570,"task_id":"deadline-1517-00073","type":"HASH_TASK","input":"rounds=45344","priority":9,"timeout_ms":6286}
+{"offset_ms":1579,"task_id":"deadline-1517-00074","type":"MATRIX_TASK","input":"size=137","priority":8,"timeout_ms":2208}
+{"offset_ms":1581,"task_id":"deadline-1517-00075","type":"CPU_TASK","input":"n=1215425","priority":8}
+{"offset_ms":1585,"task_id":"deadline-1517-00076","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=253, timeout=4530","priority":10,"timeout_ms":11773}
+{"offset_ms":1585,"task_id":"deadline-1517-00077","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=243, timeout=4430","priority":2,"timeout_ms":14923}
+{"offset_ms":1617,"task_id":"deadline-1517-00078","type":"SLEEP_TASK","input":"ms=763","priority":9,"timeout_ms":10698}
+{"offset_ms":1636,"task_id":"deadline-1517-00079","type":"MATRIX_TASK","input":"size=85","priority":9,"timeout_ms":9817}
+{"offset_ms":1653,"task_id":"deadline-1517-00080","type":"FILE_IO_TASK","input":"size_mb=5, mode=write","priority":8,"timeout_ms":14574}
+{"offset_ms":1661,"task_id":"deadline-1517-00081","type":"CPU_TASK","input":"n=1223483","priority":9,"timeout_ms":14975}
+{"offset_ms":1677,"task_id":"deadline-1517-00082","type":"SLEEP_TASK","input":"ms=263","priority":9,"timeout_ms":13875}
+{"offset_ms":1685,"task_id":"deadline-1517-00083","type":"SORT_TASK","input":"n=782688, type=random","priority":10,"timeout_ms":14873}
+{"offset_ms":1699,"task_id":"deadline-1517-00084","type":"HASH_TASK","input":"rounds=38132","priority":10,"timeout_ms":5839}
+{"offset_ms":1700,"task_id":"deadline-1517-00085","type":"SORT_TASK","input":"n=668627, type=sorted","priority":4,"timeout_ms":6272}
+{"offset_ms":1719,"task_id":"deadline-1517-00086","type":"FILE_IO_TASK","input":"size_mb=3, mode=both","priority":9,"timeout_ms":2572}
+{"offset_ms":1729,"task_id":"deadline-1517-00087","type":"MATRIX_TASK","input":"size=92","priority":2,"timeout_ms":11816}
+{"offset_ms":1730,"task_id":"deadline-1517-00088","type":"FILE_IO_TASK","input":"size_mb=3, mode=write","priority":2,"timeout_ms":3423}
+{"offset_ms":1731,"task_id":"deadline-1517-00089","type":"HASH_TASK","input":"rounds=9956","priority":9}
+{"offset_ms":1745,"task_id":"deadline-1517-00090","type":"SLEEP_TASK","input":"ms=424","priority":5,"timeout_ms":9069}
+{"offset_ms":1747,"task_id":"deadline-1517-00091","type":"SORT_TASK","input":"n=468712, type=reversed","priority":8,"timeout_ms":9797}
+{"offset_ms":1792,"task_id":"deadline-1517-00092","type":"SORT_TASK","input":"n=474243, type=reversed","priority":8}
+{"offset_ms":1802,"task_id":"deadline-1517-00093","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=74, timeout=2740","priority":7}
+{"offset_ms":1804,"task_id":"deadline-1517-00094","type":"MATRIX_TASK","input":"size=150","priority":7,"timeout_ms":6607}
+{"offset_ms":1846,"task_id":"deadline-1517-00095","type":"SLEEP_TASK","input":"ms=655","priority":7,"timeout_ms":9945}
+{"offset_ms":1847,"task_id":"deadline-1517-00096","type":"SORT_TASK","input":"n=520131, type=sorted","priority":6,"timeout_ms":14945}
+{"offset_ms":1868,"task_id":"deadline-1517-00097","type":"MATRIX_TASK","input":"size=159","priority":6,"timeout_ms":7210}
+{"offset_ms":1871,"task_id":"deadline-1517-00098","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=215, timeout=4150","priority":2,"timeout_ms":10424}
+{"offset_ms":1874,"task_id":"deadline-1517-00099","type":"MATRIX_TASK","input":"size=143","priority":4,"timeout_ms":7208}
+{"offset_ms":1876,"task_id":"deadline-1517-00100","type":"CPU_TASK","input":"n=542949","priority":9,"timeout_ms":13071}
+{"offset_ms":1917,"task_id":"deadline-1517-00101","type":"FILE_IO_TASK","input":"size_mb=5, mode=read","priority":9,"timeout_ms":14430}
+{"offset_ms":1931,"task_id":"deadline-1517-00102","type":"MONTE_CARLO_TASK","input":"samples=2163477, seed=657565","priority":8,"timeout_ms":6572}
+{"offset_ms":1940,"task_id":"deadline-1517-00103","type":"SLEEP_TASK","input":"ms=58","priority":9,"timeout_ms":13334}
+{"offset_ms":1984,"task_id":"deadline-1517-00104","type":"MATRIX_TASK","input":"size=95","priority":5,"timeout_ms":12984}
+{"offset_ms":2126,"task_id":"deadline-1517-00105","type":"SLEEP_TASK","input":"ms=328","priority":5,"timeout_ms":8165}
+{"offset_ms":2201,"task_id":"deadline-1517-00106","type":"CPU_TASK","input":"n=1124693","priority":8,"timeout_ms":9384}
+{"offset_ms":2249,"task_id":"deadline-1517-00107","type":"MATRIX_TASK","input":"size=99","priority":9,"timeout_ms":8903}
+{"offset_ms":2280,"task_id":"deadline-1517-00108","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=242, timeout=4420","priority":9,"timeout_ms":10335}
+{"offset_ms":2283,"task_id":"deadline-1517-00109","type":"SLEEP_TASK","input":"ms=94","priority":1,"timeout_ms":12596}
+{"offset_ms":2311,"task_id":"deadline-1517-00110","type":"CPU_TASK","input":"n=1311312","priority":4}
+{"offset_ms":2311,"task_id":"deadline-1517-00111","type":"MATRIX_TASK","input":"size=194","priority":2,"timeout_ms":4174}
+{"offset_ms":2368,"task_id":"deadline-1517-00112","type":"CPU_TASK","input":"n=1932628","priority":10,"timeout_ms":5961}
+{"offset_ms":2389,"task_id":"deadline-1517-00113","type":"MONTE_CARLO_TASK","input":"samples=2674745, seed=353063","priority":4,"timeout_ms":7905}
+{"offset_ms":2409,"task_id":"deadline-1517-00114","type":"HASH_TASK","input":"rounds=56254","priority":9,"timeout_ms":11794}
+{"offset_ms":2413,"task_id":"deadline-1517-00115","type":"CPU_TASK","input":"n=1794093","priority":9,"timeout_ms":8252}
+{"offset_ms":2454,"task_id":"deadline-1517-00116","type":"CPU_TASK","input":"n=413824","priority":1,"timeout_ms":5295}
+{"offset_ms":2484,"task_id":"deadline-1517-00117","type":"MATRIX_TASK","input":"size=117","priority":9,"timeout_ms":6046}
+{"offset_ms":2511,"task_id":"deadline-1517-00118","type":"CPU_TASK","input":"n=317095","priority":8,"timeout_ms":8518}
+{"offset_ms":2538,"task_id":"deadline-1517-00119","type":"SLEEP_TASK","input":"ms=723","priority":5}
+{"offset_ms":2539,"task_id":"deadline-1517-00120","type":"HASH_TASK","input":"rounds=79450","priority":1,"timeout_ms":11615}
+{"offset_ms":2554,"task_id":"deadline-1517-00121","type":"SLEEP_TASK","input":"ms=503","priority":9,"timeout_ms":8135}
+{"offset_ms":2571,"task_id":"deadline-1517-00122","type":"MATRIX_TASK","input":"size=86","priority":8,"timeout_ms":7000}
+{"offset_ms":2582,"task_id":"deadline-1517-00123","type":"HASH_TASK","input":"rounds=74357","priority":4,"timeout_ms":13998}
+{"offset_ms":2604,"task_id":"deadline-1517-00124","type":"FILE_IO_TASK","input":"size_mb=3, mode=read","priority":8,"timeout_ms":13965}
+{"offset_ms":2620,"task_id":"deadline-1517-00125","type":"SLEEP_TASK","input":"ms=743","priority":10,"timeout_ms":6128}
+{"offset_ms":2655,"task_id":"deadline-1517-00126","type":"FILE_IO_TASK","input":"size_mb=1, mode=both","priority":9,"timeout_ms":8308}
+{"offset_ms":2656,"task_id":"deadline-1517-00127","type":"CPU_TASK","input":"n=1234310","priority":8,"timeout_ms":11944}
+{"offset_ms":2682,"task_id":"deadline-1517-00128","type":"SORT_TASK","input":"n=468103, type=sorted","priority":10,"timeout_ms":5949}
+{"offset_ms":2708,"task_id":"deadline-1517-00129","type":"HASH_TASK","input":"rounds=41939","priority":9,"timeout_ms":8072}
+{"offset_ms":2710,"task_id":"deadline-1517-00130","type":"HASH_TASK","input":"rounds=34720","priority":9,"timeout_ms":7062}
+{"offset_ms":2717,"task_id":"deadline-1517-00131","type":"FILE_IO_TASK","input":"size_mb=3, mode=both","priority":3,"timeout_ms":3124}
+{"offset_ms":2726,"task_id":"deadline-1517-00132","type":"MATRIX_TASK","input":"size=128","priority":10}
+{"offset_ms":2734,"task_id":"deadline-1517-00133","type":"MONTE_CARLO_TASK","input":"samples=2892089, seed=994524","priority":8,"timeout_ms":7370}
+{"offset_ms":2763,"task_id":"deadline-1517-00134","type":"CPU_TASK","input":"n=1198390","priority":10,"timeout_ms":8264}
+{"offset_ms":2769,"task_id":"deadline-1517-00135","type":"CPU_TASK","input":"n=1332699","priority":9,"timeout_ms":8668}
+{"offset_ms":2797,"task_id":"deadline-1517-00136","type":"SORT_TASK","input":"n=828899, type=sorted","priority":7,"timeout_ms":3434}
+{"offset_ms":2808,"task_id":"deadline-1517-00137","type":"SLEEP_TASK","input":"ms=769","priority":6,"timeout_ms":14893}
+{"offset_ms":2815,"task_id":"deadline-1517-00138","type":"CPU_TASK","input":"n=474765","priority":8,"timeout_ms":8261}
+{"offset_ms":2830,"task_id":"deadline-1517-00139","type":"CPU_TASK","input":"n=581919","priority":3,"timeout_ms":14920}
+{"offset_ms":2851,"task_id":"deadline-1517-00140","type":"HASH_TASK","input":"rounds=57008","priority":10,"timeout_ms":9780}
+{"offset_ms":2854,"task_id":"deadline-1517-00141","type":"HASH_TASK","input":"rounds=10956","priority":10,"timeout_ms":11085}
+{"offset_ms":2870,"task_id":"deadline-1517-00142","type":"SORT_TASK","input":"n=863100, type=sorted","priority":10,"timeout_ms":10830}
+{"offset_ms":2880,"task_id":"deadline-1517-00143","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=192, timeout=3920","priority":9,"timeout_ms":4334}
+{"offset_ms":2899,"task_id":"deadline-1517-00144","type":"MONTE_CARLO_TASK","input":"samples=2455778, seed=454293","priority":10}
+{"offset_ms":2900,"task_id":"deadline-1517-00145","type":"CPU_TASK","input":"n=916390","priority":8,"timeout_ms":3067}
+{"offset_ms":2902,"task_id":"deadline-1517-00146","type":"SORT_TASK","input":"n=625654, type=random","priority":2}
+{"offset_ms":2903,"task_id":"deadline-1517-00147","type":"SORT_TASK","input":"n=748222, type=random","priority":10,"timeout_ms":2165}
+{"offset_ms":2905,"task_id":"deadline-1517-00148","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=35, timeout=2350","priority":1}
+{"offset_ms":2960,"task_id":"deadline-1517-00149","type":"HASH_TASK","input":"rounds=50316","priority":8,"timeout_ms":11182}
+{"offset_ms":3012,"task_id":"deadline-1517-00150","type":"SORT_TASK","input":"n=937335, type=reversed","priority":5,"timeout_ms":11189}
+{"offset_ms":3019,"task_id":"deadline-1517-00151","type":"SLEEP_TASK","input":"ms=422","priority":4,"timeout_ms":14947}
+{"offset_ms":3029,"task_id":"deadline-1517-00152","type":"SORT_TASK","input":"n=576453, type=reversed","priority":10,"timeout_ms":3114}
+{"offset_ms":3048,"task_id":"deadline-1517-00153","type":"SLEEP_TASK","input":"ms=79","priority":6}
+{"offset_ms":3114,"task_id":"deadline-1517-00154","type":"SORT_TASK","input":"n=463128, type=reversed","priority":9,"timeout_ms":12229}
+{"offset_ms":3140,"task_id":"deadline-1517-00155","type":"CPU_TASK","input":"n=1751633","priority":10,"timeout_ms":9234}
+{"offset_ms":3157,"task_id":"deadline-1517-00156","type":"FILE_IO_TASK","input":"size_mb=3, mode=both","priority":8,"timeout_ms":12053}
+{"offset_ms":3329,"task_id":"deadline-1517-00157","type":"HASH_TASK","input":"rounds=11197","priority":8,"timeout_ms":6505}
+{"offset_ms":3346,"task_id":"deadline-1517-00158","type":"HTTP_TASK","input":"url=http://localhost:8100/delay?ms=84, timeout=2840","priority":8,"timeout_ms":5037}
+{"offset_ms":3437,"task_id":"deadline-1517-00159","type":"SLEEP_TASK","input":"ms=191","priority":8,"timeout_ms":12064}

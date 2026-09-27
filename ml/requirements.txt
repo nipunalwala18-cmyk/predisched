@@ -1,0 +1,7 @@
+# ML pipeline (prompts 15-17). Prompt 15: dataset building.
+pandas==2.2.3
+numpy==2.1.3
+pyarrow==17.0.0
+psycopg[binary]==3.2.3
+pyyaml==6.0.2
+pytest==8.3.3

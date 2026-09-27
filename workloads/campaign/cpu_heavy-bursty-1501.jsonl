@@ -1,0 +1,160 @@
+{"offset_ms":884,"task_id":"cpu_heavy-1501-00000","type":"HASH_TASK","input":"rounds=11836","priority":9}
+{"offset_ms":945,"task_id":"cpu_heavy-1501-00001","type":"CPU_TASK","input":"n=424560","priority":2}
+{"offset_ms":1486,"task_id":"cpu_heavy-1501-00002","type":"CPU_TASK","input":"n=1912573","priority":7}
+{"offset_ms":1820,"task_id":"cpu_heavy-1501-00003","type":"CPU_TASK","input":"n=1214523","priority":4}
+{"offset_ms":1972,"task_id":"cpu_heavy-1501-00004","type":"HASH_TASK","input":"rounds=46628","priority":10}
+{"offset_ms":2407,"task_id":"cpu_heavy-1501-00005","type":"MONTE_CARLO_TASK","input":"samples=1297730, seed=134928","priority":6}
+{"offset_ms":2436,"task_id":"cpu_heavy-1501-00006","type":"MONTE_CARLO_TASK","input":"samples=528356, seed=452153","priority":7}
+{"offset_ms":2641,"task_id":"cpu_heavy-1501-00007","type":"CPU_TASK","input":"n=1014006","priority":4}
+{"offset_ms":3265,"task_id":"cpu_heavy-1501-00008","type":"CPU_TASK","input":"n=956711","priority":2}
+{"offset_ms":3611,"task_id":"cpu_heavy-1501-00009","type":"CPU_TASK","input":"n=202833","priority":8}
+{"offset_ms":3665,"task_id":"cpu_heavy-1501-00010","type":"CPU_TASK","input":"n=1605914","priority":9}
+{"offset_ms":4105,"task_id":"cpu_heavy-1501-00011","type":"HASH_TASK","input":"rounds=15026","priority":9}
+{"offset_ms":4217,"task_id":"cpu_heavy-1501-00012","type":"HASH_TASK","input":"rounds=56308","priority":10}
+{"offset_ms":4392,"task_id":"cpu_heavy-1501-00013","type":"CPU_TASK","input":"n=1075479","priority":3}
+{"offset_ms":4908,"task_id":"cpu_heavy-1501-00014","type":"MONTE_CARLO_TASK","input":"samples=1782629, seed=334698","priority":9}
+{"offset_ms":5992,"task_id":"cpu_heavy-1501-00015","type":"MONTE_CARLO_TASK","input":"samples=2522293, seed=438559","priority":3}
+{"offset_ms":6516,"task_id":"cpu_heavy-1501-00016","type":"CPU_TASK","input":"n=1622438","priority":4}
+{"offset_ms":6540,"task_id":"cpu_heavy-1501-00017","type":"CPU_TASK","input":"n=1306814","priority":2}
+{"offset_ms":6541,"task_id":"cpu_heavy-1501-00018","type":"CPU_TASK","input":"n=1893663","priority":7}
+{"offset_ms":6542,"task_id":"cpu_heavy-1501-00019","type":"MONTE_CARLO_TASK","input":"samples=2675243, seed=455466","priority":7}
+{"offset_ms":6552,"task_id":"cpu_heavy-1501-00020","type":"MATRIX_TASK","input":"size=205","priority":1}
+{"offset_ms":6558,"task_id":"cpu_heavy-1501-00021","type":"MONTE_CARLO_TASK","input":"samples=1600352, seed=580899","priority":2}
+{"offset_ms":6593,"task_id":"cpu_heavy-1501-00022","type":"HASH_TASK","input":"rounds=54556","priority":2}
+{"offset_ms":6654,"task_id":"cpu_heavy-1501-00023","type":"HASH_TASK","input":"rounds=60593","priority":7}
+{"offset_ms":6658,"task_id":"cpu_heavy-1501-00024","type":"CPU_TASK","input":"n=1760784","priority":10}
+{"offset_ms":6659,"task_id":"cpu_heavy-1501-00025","type":"MATRIX_TASK","input":"size=87","priority":10}
+{"offset_ms":6682,"task_id":"cpu_heavy-1501-00026","type":"HASH_TASK","input":"rounds=15167","priority":5}
+{"offset_ms":6715,"task_id":"cpu_heavy-1501-00027","type":"CPU_TASK","input":"n=1632972","priority":5}
+{"offset_ms":6734,"task_id":"cpu_heavy-1501-00028","type":"HASH_TASK","input":"rounds=37258","priority":3}
+{"offset_ms":6768,"task_id":"cpu_heavy-1501-00029","type":"MONTE_CARLO_TASK","input":"samples=1119173, seed=264415","priority":6}
+{"offset_ms":6810,"task_id":"cpu_heavy-1501-00030","type":"HASH_TASK","input":"rounds=37355","priority":2}
+{"offset_ms":6814,"task_id":"cpu_heavy-1501-00031","type":"CPU_TASK","input":"n=1524736","priority":3}
+{"offset_ms":6850,"task_id":"cpu_heavy-1501-00032","type":"CPU_TASK","input":"n=1044072","priority":6}
+{"offset_ms":6881,"task_id":"cpu_heavy-1501-00033","type":"CPU_TASK","input":"n=1440193","priority":5}
+{"offset_ms":6905,"task_id":"cpu_heavy-1501-00034","type":"HASH_TASK","input":"rounds=18646","priority":3}
+{"offset_ms":6934,"task_id":"cpu_heavy-1501-00035","type":"CPU_TASK","input":"n=1441000","priority":6}
+{"offset_ms":6957,"task_id":"cpu_heavy-1501-00036","type":"CPU_TASK","input":"n=731308","priority":9}
+{"offset_ms":6957,"task_id":"cpu_heavy-1501-00037","type":"MONTE_CARLO_TASK","input":"samples=1085127, seed=317788","priority":2}
+{"offset_ms":6958,"task_id":"cpu_heavy-1501-00038","type":"MATRIX_TASK","input":"size=91","priority":8}
+{"offset_ms":6971,"task_id":"cpu_heavy-1501-00039","type":"HASH_TASK","input":"rounds=17683","priority":4}
+{"offset_ms":7047,"task_id":"cpu_heavy-1501-00040","type":"CPU_TASK","input":"n=1477060","priority":9}
+{"offset_ms":7169,"task_id":"cpu_heavy-1501-00041","type":"MONTE_CARLO_TASK","input":"samples=826392, seed=224654","priority":8}
+{"offset_ms":7171,"task_id":"cpu_heavy-1501-00042","type":"CPU_TASK","input":"n=1266631","priority":5}
+{"offset_ms":7200,"task_id":"cpu_heavy-1501-00043","type":"CPU_TASK","input":"n=1921461","priority":3}
+{"offset_ms":7215,"task_id":"cpu_heavy-1501-00044","type":"CPU_TASK","input":"n=1319480","priority":7}
+{"offset_ms":7221,"task_id":"cpu_heavy-1501-00045","type":"MONTE_CARLO_TASK","input":"samples=771321, seed=260443","priority":8}
+{"offset_ms":7243,"task_id":"cpu_heavy-1501-00046","type":"HASH_TASK","input":"rounds=67082","priority":8}
+{"offset_ms":7268,"task_id":"cpu_heavy-1501-00047","type":"CPU_TASK","input":"n=1951712","priority":8}
+{"offset_ms":7304,"task_id":"cpu_heavy-1501-00048","type":"HASH_TASK","input":"rounds=10766","priority":5}
+{"offset_ms":7343,"task_id":"cpu_heavy-1501-00049","type":"MONTE_CARLO_TASK","input":"samples=1658375, seed=395759","priority":10}
+{"offset_ms":7415,"task_id":"cpu_heavy-1501-00050","type":"MATRIX_TASK","input":"size=119","priority":6}
+{"offset_ms":7424,"task_id":"cpu_heavy-1501-00051","type":"MONTE_CARLO_TASK","input":"samples=577961, seed=977674","priority":9}
+{"offset_ms":7474,"task_id":"cpu_heavy-1501-00052","type":"CPU_TASK","input":"n=939079","priority":10}
+{"offset_ms":7482,"task_id":"cpu_heavy-1501-00053","type":"MATRIX_TASK","input":"size=157","priority":4}
+{"offset_ms":7491,"task_id":"cpu_heavy-1501-00054","type":"CPU_TASK","input":"n=443527","priority":4}
+{"offset_ms":7499,"task_id":"cpu_heavy-1501-00055","type":"HASH_TASK","input":"rounds=35773","priority":3}
+{"offset_ms":7567,"task_id":"cpu_heavy-1501-00056","type":"MONTE_CARLO_TASK","input":"samples=2896228, seed=305456","priority":7}
+{"offset_ms":7667,"task_id":"cpu_heavy-1501-00057","type":"HASH_TASK","input":"rounds=62340","priority":4}
+{"offset_ms":7682,"task_id":"cpu_heavy-1501-00058","type":"MONTE_CARLO_TASK","input":"samples=632582, seed=574266","priority":6}
+{"offset_ms":7704,"task_id":"cpu_heavy-1501-00059","type":"HASH_TASK","input":"rounds=79860","priority":6}
+{"offset_ms":7755,"task_id":"cpu_heavy-1501-00060","type":"MONTE_CARLO_TASK","input":"samples=2315589, seed=845353","priority":1}
+{"offset_ms":7761,"task_id":"cpu_heavy-1501-00061","type":"CPU_TASK","input":"n=1738624","priority":5}
+{"offset_ms":7764,"task_id":"cpu_heavy-1501-00062","type":"HASH_TASK","input":"rounds=19155","priority":7}
+{"offset_ms":7813,"task_id":"cpu_heavy-1501-00063","type":"MATRIX_TASK","input":"size=131","priority":8}
+{"offset_ms":7872,"task_id":"cpu_heavy-1501-00064","type":"CPU_TASK","input":"n=1177179","priority":10}
+{"offset_ms":7895,"task_id":"cpu_heavy-1501-00065","type":"MONTE_CARLO_TASK","input":"samples=2390778, seed=788591","priority":2}
+{"offset_ms":7907,"task_id":"cpu_heavy-1501-00066","type":"HASH_TASK","input":"rounds=59980","priority":5}
+{"offset_ms":7951,"task_id":"cpu_heavy-1501-00067","type":"CPU_TASK","input":"n=339024","priority":9}
+{"offset_ms":7976,"task_id":"cpu_heavy-1501-00068","type":"HASH_TASK","input":"rounds=45431","priority":5}
+{"offset_ms":7977,"task_id":"cpu_heavy-1501-00069","type":"HASH_TASK","input":"rounds=75891","priority":1}
+{"offset_ms":7979,"task_id":"cpu_heavy-1501-00070","type":"MONTE_CARLO_TASK","input":"samples=1634391, seed=369188","priority":4}
+{"offset_ms":8071,"task_id":"cpu_heavy-1501-00071","type":"CPU_TASK","input":"n=1514129","priority":10}
+{"offset_ms":8089,"task_id":"cpu_heavy-1501-00072","type":"CPU_TASK","input":"n=1521559","priority":1}
+{"offset_ms":8151,"task_id":"cpu_heavy-1501-00073","type":"CPU_TASK","input":"n=1527219","priority":7}
+{"offset_ms":8155,"task_id":"cpu_heavy-1501-00074","type":"MONTE_CARLO_TASK","input":"samples=854474, seed=713655","priority":9}
+{"offset_ms":8170,"task_id":"cpu_heavy-1501-00075","type":"HASH_TASK","input":"rounds=27949","priority":6}
+{"offset_ms":8173,"task_id":"cpu_heavy-1501-00076","type":"HASH_TASK","input":"rounds=49307","priority":3}
+{"offset_ms":8211,"task_id":"cpu_heavy-1501-00077","type":"CPU_TASK","input":"n=1753681","priority":9}
+{"offset_ms":8273,"task_id":"cpu_heavy-1501-00078","type":"HASH_TASK","input":"rounds=36244","priority":7}
+{"offset_ms":8281,"task_id":"cpu_heavy-1501-00079","type":"MONTE_CARLO_TASK","input":"samples=2310119, seed=547479","priority":8}
+{"offset_ms":8318,"task_id":"cpu_heavy-1501-00080","type":"CPU_TASK","input":"n=1619902","priority":6}
+{"offset_ms":8334,"task_id":"cpu_heavy-1501-00081","type":"CPU_TASK","input":"n=1841527","priority":7}
+{"offset_ms":8357,"task_id":"cpu_heavy-1501-00082","type":"HASH_TASK","input":"rounds=30381","priority":3}
+{"offset_ms":8377,"task_id":"cpu_heavy-1501-00083","type":"MONTE_CARLO_TASK","input":"samples=631415, seed=653443","priority":8}
+{"offset_ms":8414,"task_id":"cpu_heavy-1501-00084","type":"MONTE_CARLO_TASK","input":"samples=2345022, seed=347945","priority":5}
+{"offset_ms":8421,"task_id":"cpu_heavy-1501-00085","type":"HASH_TASK","input":"rounds=7193","priority":3}
+{"offset_ms":8461,"task_id":"cpu_heavy-1501-00086","type":"CPU_TASK","input":"n=1769557","priority":4}
+{"offset_ms":8467,"task_id":"cpu_heavy-1501-00087","type":"MATRIX_TASK","input":"size=82","priority":8}
+{"offset_ms":8474,"task_id":"cpu_heavy-1501-00088","type":"CPU_TASK","input":"n=516584","priority":8}
+{"offset_ms":8596,"task_id":"cpu_heavy-1501-00089","type":"CPU_TASK","input":"n=1293386","priority":3}
+{"offset_ms":8622,"task_id":"cpu_heavy-1501-00090","type":"MONTE_CARLO_TASK","input":"samples=2528669, seed=518982","priority":8}
+{"offset_ms":8656,"task_id":"cpu_heavy-1501-00091","type":"CPU_TASK","input":"n=1083636","priority":3}
+{"offset_ms":8664,"task_id":"cpu_heavy-1501-00092","type":"MONTE_CARLO_TASK","input":"samples=1100187, seed=117023","priority":7}
+{"offset_ms":8692,"task_id":"cpu_heavy-1501-00093","type":"CPU_TASK","input":"n=1020090","priority":9}
+{"offset_ms":8706,"task_id":"cpu_heavy-1501-00094","type":"CPU_TASK","input":"n=1278006","priority":6}
+{"offset_ms":8715,"task_id":"cpu_heavy-1501-00095","type":"MONTE_CARLO_TASK","input":"samples=239660, seed=981796","priority":10}
+{"offset_ms":8730,"task_id":"cpu_heavy-1501-00096","type":"HASH_TASK","input":"rounds=34601","priority":7}
+{"offset_ms":8734,"task_id":"cpu_heavy-1501-00097","type":"HASH_TASK","input":"rounds=18450","priority":10}
+{"offset_ms":8745,"task_id":"cpu_heavy-1501-00098","type":"CPU_TASK","input":"n=1789615","priority":9}
+{"offset_ms":8762,"task_id":"cpu_heavy-1501-00099","type":"CPU_TASK","input":"n=299452","priority":9}
+{"offset_ms":8817,"task_id":"cpu_heavy-1501-00100","type":"HASH_TASK","input":"rounds=47438","priority":5}
+{"offset_ms":8829,"task_id":"cpu_heavy-1501-00101","type":"HASH_TASK","input":"rounds=53019","priority":2}
+{"offset_ms":8836,"task_id":"cpu_heavy-1501-00102","type":"MATRIX_TASK","input":"size=174","priority":3}
+{"offset_ms":8867,"task_id":"cpu_heavy-1501-00103","type":"CPU_TASK","input":"n=277515","priority":9}
+{"offset_ms":8917,"task_id":"cpu_heavy-1501-00104","type":"MATRIX_TASK","input":"size=128","priority":3}
+{"offset_ms":8927,"task_id":"cpu_heavy-1501-00105","type":"MONTE_CARLO_TASK","input":"samples=750821, seed=368973","priority":3}
+{"offset_ms":8928,"task_id":"cpu_heavy-1501-00106","type":"MONTE_CARLO_TASK","input":"samples=482083, seed=525042","priority":7}
+{"offset_ms":8973,"task_id":"cpu_heavy-1501-00107","type":"HASH_TASK","input":"rounds=9759","priority":4}
+{"offset_ms":9052,"task_id":"cpu_heavy-1501-00108","type":"CPU_TASK","input":"n=1667563","priority":1}
+{"offset_ms":9101,"task_id":"cpu_heavy-1501-00109","type":"MATRIX_TASK","input":"size=83","priority":5}
+{"offset_ms":9109,"task_id":"cpu_heavy-1501-00110","type":"CPU_TASK","input":"n=485617","priority":10}
+{"offset_ms":9117,"task_id":"cpu_heavy-1501-00111","type":"CPU_TASK","input":"n=671503","priority":7}
+{"offset_ms":9120,"task_id":"cpu_heavy-1501-00112","type":"CPU_TASK","input":"n=1310497","priority":1}
+{"offset_ms":9191,"task_id":"cpu_heavy-1501-00113","type":"CPU_TASK","input":"n=1032448","priority":8}
+{"offset_ms":9254,"task_id":"cpu_heavy-1501-00114","type":"HASH_TASK","input":"rounds=74410","priority":5}
+{"offset_ms":9275,"task_id":"cpu_heavy-1501-00115","type":"CPU_TASK","input":"n=1834817","priority":9}
+{"offset_ms":9324,"task_id":"cpu_heavy-1501-00116","type":"MATRIX_TASK","input":"size=190","priority":10}
+{"offset_ms":9352,"task_id":"cpu_heavy-1501-00117","type":"HASH_TASK","input":"rounds=15449","priority":2}
+{"offset_ms":9354,"task_id":"cpu_heavy-1501-00118","type":"HASH_TASK","input":"rounds=38853","priority":7}
+{"offset_ms":9381,"task_id":"cpu_heavy-1501-00119","type":"HASH_TASK","input":"rounds=26498","priority":5}
+{"offset_ms":9391,"task_id":"cpu_heavy-1501-00120","type":"CPU_TASK","input":"n=1082652","priority":5}
+{"offset_ms":9542,"task_id":"cpu_heavy-1501-00121","type":"HASH_TASK","input":"rounds=59064","priority":7}
+{"offset_ms":9560,"task_id":"cpu_heavy-1501-00122","type":"HASH_TASK","input":"rounds=44133","priority":4}
+{"offset_ms":9564,"task_id":"cpu_heavy-1501-00123","type":"CPU_TASK","input":"n=1311629","priority":8}
+{"offset_ms":9576,"task_id":"cpu_heavy-1501-00124","type":"HASH_TASK","input":"rounds=42771","priority":2}
+{"offset_ms":9581,"task_id":"cpu_heavy-1501-00125","type":"CPU_TASK","input":"n=1099799","priority":8}
+{"offset_ms":9618,"task_id":"cpu_heavy-1501-00126","type":"CPU_TASK","input":"n=1135268","priority":4}
+{"offset_ms":9624,"task_id":"cpu_heavy-1501-00127","type":"CPU_TASK","input":"n=554092","priority":9}
+{"offset_ms":9640,"task_id":"cpu_heavy-1501-00128","type":"HASH_TASK","input":"rounds=54588","priority":3}
+{"offset_ms":9715,"task_id":"cpu_heavy-1501-00129","type":"CPU_TASK","input":"n=1821541","priority":2}
+{"offset_ms":9769,"task_id":"cpu_heavy-1501-00130","type":"CPU_TASK","input":"n=1022679","priority":4}
+{"offset_ms":9811,"task_id":"cpu_heavy-1501-00131","type":"MATRIX_TASK","input":"size=127","priority":8}
+{"offset_ms":9812,"task_id":"cpu_heavy-1501-00132","type":"HASH_TASK","input":"rounds=32497","priority":8}
+{"offset_ms":9824,"task_id":"cpu_heavy-1501-00133","type":"HASH_TASK","input":"rounds=55498","priority":4}
+{"offset_ms":9841,"task_id":"cpu_heavy-1501-00134","type":"HASH_TASK","input":"rounds=42729","priority":6}
+{"offset_ms":9905,"task_id":"cpu_heavy-1501-00135","type":"MATRIX_TASK","input":"size=116","priority":1}
+{"offset_ms":9913,"task_id":"cpu_heavy-1501-00136","type":"HASH_TASK","input":"rounds=71817","priority":10}
+{"offset_ms":9931,"task_id":"cpu_heavy-1501-00137","type":"MONTE_CARLO_TASK","input":"samples=2229698, seed=653439","priority":9}
+{"offset_ms":9991,"task_id":"cpu_heavy-1501-00138","type":"MATRIX_TASK","input":"size=82","priority":9}
+{"offset_ms":10021,"task_id":"cpu_heavy-1501-00139","type":"CPU_TASK","input":"n=696949","priority":6}
+{"offset_ms":10097,"task_id":"cpu_heavy-1501-00140","type":"HASH_TASK","input":"rounds=74201","priority":3}
+{"offset_ms":10128,"task_id":"cpu_heavy-1501-00141","type":"CPU_TASK","input":"n=220947","priority":7}
+{"offset_ms":10162,"task_id":"cpu_heavy-1501-00142","type":"MONTE_CARLO_TASK","input":"samples=2482494, seed=351577","priority":9}
+{"offset_ms":10215,"task_id":"cpu_heavy-1501-00143","type":"CPU_TASK","input":"n=1751055","priority":10}
+{"offset_ms":10244,"task_id":"cpu_heavy-1501-00144","type":"CPU_TASK","input":"n=360853","priority":4}
+{"offset_ms":10255,"task_id":"cpu_heavy-1501-00145","type":"HASH_TASK","input":"rounds=5445","priority":10}
+{"offset_ms":10257,"task_id":"cpu_heavy-1501-00146","type":"HASH_TASK","input":"rounds=9305","priority":3}
+{"offset_ms":10260,"task_id":"cpu_heavy-1501-00147","type":"MATRIX_TASK","input":"size=132","priority":9}
+{"offset_ms":10308,"task_id":"cpu_heavy-1501-00148","type":"MONTE_CARLO_TASK","input":"samples=2982948, seed=823069","priority":9}
+{"offset_ms":10326,"task_id":"cpu_heavy-1501-00149","type":"HASH_TASK","input":"rounds=21324","priority":5}
+{"offset_ms":10361,"task_id":"cpu_heavy-1501-00150","type":"MONTE_CARLO_TASK","input":"samples=1147238, seed=102019","priority":6}
+{"offset_ms":10391,"task_id":"cpu_heavy-1501-00151","type":"CPU_TASK","input":"n=1647479","priority":2}
+{"offset_ms":10455,"task_id":"cpu_heavy-1501-00152","type":"CPU_TASK","input":"n=1140974","priority":4}
+{"offset_ms":10468,"task_id":"cpu_heavy-1501-00153","type":"HASH_TASK","input":"rounds=50482","priority":4}
+{"offset_ms":10489,"task_id":"cpu_heavy-1501-00154","type":"CPU_TASK","input":"n=1841195","priority":10}
+{"offset_ms":10508,"task_id":"cpu_heavy-1501-00155","type":"CPU_TASK","input":"n=1859170","priority":9}
+{"offset_ms":10608,"task_id":"cpu_heavy-1501-00156","type":"CPU_TASK","input":"n=788649","priority":9}
+{"offset_ms":10641,"task_id":"cpu_heavy-1501-00157","type":"HASH_TASK","input":"rounds=48125","priority":10}
+{"offset_ms":10653,"task_id":"cpu_heavy-1501-00158","type":"CPU_TASK","input":"n=1030202","priority":5}
+{"offset_ms":10665,"task_id":"cpu_heavy-1501-00159","type":"MONTE_CARLO_TASK","input":"samples=2249865, seed=226653","priority":2}

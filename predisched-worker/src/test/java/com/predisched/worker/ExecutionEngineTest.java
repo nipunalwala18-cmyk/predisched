@@ -102,4 +102,18 @@ class ExecutionEngineTest {
         }
         assertEquals(20.0, metrics.avgExecMs(), "older samples fall out of the window");
     }
+    @Test
+    void slowdownStretchesExecutionTime() throws Exception {
+        WorkerMetrics metrics = new WorkerMetrics();
+        try (ExecutionEngine engine =
+                new ExecutionEngine(new ExecutorRegistry(), metrics, "slow", 1, 10)) {
+            long normal = engine.submit("t1", TaskType.SLEEP_TASK, "ms=100").get().execMs();
+            engine.setSlowdown(3.0);
+            long slowed = engine.submit("t2", TaskType.SLEEP_TASK, "ms=100").get().execMs();
+            assertTrue(normal >= 100 && normal < 250, "normal " + normal);
+            assertTrue(slowed >= 290, "slowed " + slowed);
+            engine.setSlowdown(0.5);
+            assertEquals(1.0, engine.slowdown(), "no speed-ups");
+        }
+    }
 }
