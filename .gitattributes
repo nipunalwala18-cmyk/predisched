@@ -1,0 +1,5 @@
+# Benchmark and campaign traces are checksummed byte for byte (workloads/benchmark/manifest.txt):
+# keep them LF on every platform, whatever core.autocrlf says.
+*.jsonl text eol=lf
+workloads/benchmark/manifest.txt text eol=lf
+workloads/benchmark/exec-samples.csv text eol=lf
