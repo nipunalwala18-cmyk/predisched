@@ -1,0 +1,8 @@
+# Spark MapReduce jobs (Exp 7, prompt 12). PySpark pinned to 3.5.x (CLAUDE.md versions table).
+pyspark==3.5.3
+pandas==2.2.3
+numpy==2.1.3
+pyarrow==17.0.0
+psycopg[binary]==3.2.3
+pytest==8.3.3
+setuptools==75.1.0  # PySpark 3.5 toPandas imports distutils, gone from Python 3.12

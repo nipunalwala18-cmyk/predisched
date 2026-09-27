@@ -16,3 +16,22 @@ jobs:
           cache: maven
       - name: Build and test
         run: mvn -q verify
+
+  spark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: spark/requirements.txt
+      - name: Install PySpark
+        run: pip install -r spark/requirements.txt
+      - name: Spark job tests
+        working-directory: spark
+        run: python -m pytest -q

@@ -79,7 +79,8 @@ class TaskInputSpecTest {
                         TaskType.FILE_IO_TASK,
                         TaskType.HTTP_TASK,
                         TaskType.DB_QUERY_TASK,
-                        TaskType.WORKFLOW_TASK),
+                        TaskType.WORKFLOW_TASK,
+                        TaskType.MAPREDUCE_TASK),
                 TaskInputSpec.knownTypes());
     }
 
@@ -130,7 +131,12 @@ class TaskInputSpecTest {
         assertTrue(TaskInputSpec.validate(TaskType.DB_QUERY_TASK, "rows=1000").isEmpty());
         assertFalse(TaskInputSpec.validate(TaskType.DB_QUERY_TASK, "rows=0").isEmpty());
         assertEquals(1000, TaskInputSpec.inputSize(TaskType.DB_QUERY_TASK, "rows=1000"));
-        assertTrue(TaskInputSpec.reservedReason(TaskType.MAPREDUCE_TASK).contains("prompt 12"));
+        // MAPREDUCE_TASK arrived in prompt 12.
+        assertTrue(TaskInputSpec.validate(TaskType.MAPREDUCE_TASK,
+                "dataset=spark/data/execution_history.csv, job=avg_exec").isEmpty());
+        assertFalse(TaskInputSpec.validate(TaskType.MAPREDUCE_TASK, "dataset=x, job=sort")
+                .isEmpty());
+        assertFalse(TaskInputSpec.validate(TaskType.MAPREDUCE_TASK, "job=wordcount").isEmpty());
         assertTrue(TaskInputSpec.reservedReason(TaskType.ML_INFER_TASK).contains("prompt 16"));
         assertTrue(TaskInputSpec.reservedReason(TaskType.IMAGE_TASK).contains("reserved"));
         assertNull(TaskInputSpec.reservedReason(TaskType.CPU_TASK));

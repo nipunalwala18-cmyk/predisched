@@ -35,6 +35,8 @@ public class ExecutorRegistry {
         register(new GraphTaskExecutor());
         register(fileIoDir == null ? new FileIoTaskExecutor() : new FileIoTaskExecutor(fileIoDir));
         register(new HttpTaskExecutor());
+        // Disabled until a worker configures spark.home (WorkerMain replaces it then).
+        register(new MapReduceTaskExecutor(MapReduceTaskExecutor.Settings.DISABLED));
     }
 
     public void register(TaskExecutor executor) {

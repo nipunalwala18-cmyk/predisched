@@ -40,3 +40,8 @@ dependency-reduced-pom.xml
 
 # TLS material (docs/components/auth.md)
 certs/
+
+# Spark (prompt 12): exported history and job output are regenerated
+spark/data/
+spark/out/
+ml/data/features/

@@ -21,6 +21,15 @@ public class NodeConfig {
     private TlsConfig tls = new TlsConfig();
     private DbConfig db = new DbConfig();
     private CacheConfig cache = new CacheConfig();
+    private SparkConfig spark = new SparkConfig();
+
+    public SparkConfig getSpark() {
+        return spark;
+    }
+
+    public void setSpark(SparkConfig spark) {
+        this.spark = spark;
+    }
 
     public DbConfig getDb() {
         return db;
@@ -857,6 +866,60 @@ public class NodeConfig {
 
         public void setMaxEntries(long maxEntries) {
             this.maxEntries = maxEntries;
+        }
+    }
+
+    /**
+     * Where a worker finds Spark for {@code MAPREDUCE_TASK} (prompt 12). An empty {@code home}
+     * leaves the task type disabled on that worker.
+     */
+    public static class SparkConfig {
+        /** SPARK_HOME, e.g. the pyspark package directory of a virtualenv. */
+        private String home = "";
+        /** The Python the jobs run with (PYSPARK_PYTHON); empty means Spark's default. */
+        private String python = "";
+        private String jobsDir = "spark/predisched_spark";
+        private String outputDir = "spark/out/tasks";
+        private long timeoutMs = 600_000;
+
+        public String getHome() {
+            return home;
+        }
+
+        public void setHome(String home) {
+            this.home = home;
+        }
+
+        public String getPython() {
+            return python;
+        }
+
+        public void setPython(String python) {
+            this.python = python;
+        }
+
+        public String getJobsDir() {
+            return jobsDir;
+        }
+
+        public void setJobsDir(String jobsDir) {
+            this.jobsDir = jobsDir;
+        }
+
+        public String getOutputDir() {
+            return outputDir;
+        }
+
+        public void setOutputDir(String outputDir) {
+            this.outputDir = outputDir;
+        }
+
+        public long getTimeoutMs() {
+            return timeoutMs;
+        }
+
+        public void setTimeoutMs(long timeoutMs) {
+            this.timeoutMs = timeoutMs;
         }
     }
 

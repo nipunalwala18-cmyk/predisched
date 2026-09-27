@@ -63,6 +63,11 @@ public class WorkerMain {
             registry.register(new DbQueryTaskExecutor(queryDb.dataSource()));
         }
         final com.predisched.common.db.Db queryPool = queryDb;
+        // MAPREDUCE_TASK (prompt 12): spark-submit from the configured SPARK_HOME.
+        NodeConfig.SparkConfig spark = config.getSpark();
+        registry.register(new MapReduceTaskExecutor(new MapReduceTaskExecutor.Settings(
+                spark.getHome(), spark.getPython(), Paths.get(spark.getJobsDir()),
+                Paths.get(spark.getOutputDir()), spark.getTimeoutMs())));
         WorkerMetrics metrics = new WorkerMetrics();
         ExecutionEngine engine = new ExecutionEngine(
                 registry, metrics, id, poolSize, workerConfig.getQueueCapacity());

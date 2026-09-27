@@ -28,7 +28,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 09 | Workflows and client auth | [x] |
 | 10 | Primary-backup fault tolerance | [x] |
 | 11 | PostgreSQL persistence and result cache | [x] |
-| 12 | Spark MapReduce | [ ] |
+| 12 | Spark MapReduce | [x] |
 | 13 | MPI collectives | [ ] |
 | 14 | MPI matrix multiplication | [ ] |
 | 15 | Dataset collection | [ ] |

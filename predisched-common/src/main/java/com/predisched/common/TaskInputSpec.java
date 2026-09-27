@@ -76,7 +76,10 @@ public final class TaskInputSpec {
         REQUIRED_TEXT.put(TaskType.WORKFLOW_TASK, List.of("dag"));
         // Prompt 11: an aggregate over the first `rows` rows of the seeded db_query_data table.
         REQUIRED.put(TaskType.DB_QUERY_TASK, List.of(new NumericKey("rows", 1, 200_000L)));
-        RESERVED.put(TaskType.MAPREDUCE_TASK, "arrives in prompt 12 (Spark MapReduce)");
+        // Prompt 12 (Exp 7): a PySpark job over a dataset file, run by spark-submit.
+        REQUIRED_TEXT.put(TaskType.MAPREDUCE_TASK, List.of("dataset"));
+        REQUIRED_ENUMS.put(TaskType.MAPREDUCE_TASK,
+                List.of(new EnumKey("job", List.of("avg_exec", "wordcount"))));
         RESERVED.put(TaskType.ML_INFER_TASK, "arrives in prompt 16 (ML models)");
         RESERVED.put(TaskType.IMAGE_TASK, "reserved: in the enum but not in the catalogue (spec 7.2)");
     }
