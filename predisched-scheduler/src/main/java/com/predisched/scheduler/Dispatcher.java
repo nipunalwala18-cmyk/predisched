@@ -401,13 +401,28 @@ public class Dispatcher implements AutoCloseable {
         if (others.isEmpty()) {
             return false;
         }
-        Race race = new Race(straggler);
-        if (races.putIfAbsent(taskId, race) != null) {
-            return false;
-        }
         WorkerInfo worker = decide(record, others, true);
         int attempt = straggler.attempt() + 1;
-        long elapsed = Clocks.now() - straggler.startedAtMs();
+        // The copy is in flight before the race is visible, so whichever copy finishes first
+        // always finds the other in it, even while the dispatch pool has not sent the copy yet.
+        // Otherwise an original finishing in that gap closes the race alone and the copy runs
+        // unraced. Only the straggler detector's thread calls this, so the key is free here.
+        long now = Clocks.now();
+        Race race = new Race(straggler);
+        race.duplicate = running.startSpeculative(taskId, worker.id(), attempt, now,
+                deadlineFor(record, now));
+        if (races.putIfAbsent(taskId, race) != null) {
+            running.finish(race.duplicate);
+            return false;
+        }
+        if (straggler.settled().get()) {
+            // The original finished meanwhile. If it saw the race it has settled the copy
+            // already; either way nothing is sent.
+            races.remove(taskId, race);
+            running.finish(race.duplicate);
+            return false;
+        }
+        long elapsed = now - straggler.startedAtMs();
         speculation.recordLaunch();
         log.info("Straggler {} has run {} ms on {} (attempt {}); speculative copy as attempt {}"
                 + " on {}", taskId, elapsed, straggler.workerId(), straggler.attempt(), attempt,
@@ -556,21 +571,33 @@ public class Dispatcher implements AutoCloseable {
         execute(record, worker, attemptNumber, reattach, null);
     }
 
+    /** When an attempt started now times out: the task's own timeout, else the default; 0 = none. */
+    private long deadlineFor(TaskRecord record, long startedAtMs) {
+        long timeoutMs = record.timeoutMs() > 0 ? record.timeoutMs() : defaultTimeoutMs;
+        return timeoutMs > 0 ? startedAtMs + timeoutMs : 0L;
+    }
+
     /** @param race non-null for the speculative copy of a straggler (prompt 19, F11) */
     private void execute(TaskRecord record, WorkerInfo worker, int attemptNumber,
             boolean reattach, Race race) {
         String taskId = record.id();
-        long startedAtMs = Clocks.now();
         long timeoutMs = record.timeoutMs() > 0 ? record.timeoutMs() : defaultTimeoutMs;
         Features features = featuresAt(worker);
-        long deadline = timeoutMs > 0 ? startedAtMs + timeoutMs : 0L;
-        RunningTasks.Running inFlight = race != null
-                ? running.startSpeculative(taskId, worker.id(), attemptNumber, startedAtMs,
-                        deadline)
-                : running.start(taskId, worker.id(), attemptNumber, startedAtMs, deadline);
+        // A speculative copy was registered by speculate() before its race became visible.
+        RunningTasks.Running inFlight;
         if (race != null) {
-            race.duplicate = inFlight;
+            inFlight = race.duplicate;
+            if (inFlight.settled().get()) {
+                log.info("Speculative copy of {} not sent to {}: the original already won",
+                        taskId, worker.id());
+                return;
+            }
+        } else {
+            long now = Clocks.now();
+            inFlight = running.start(taskId, worker.id(), attemptNumber, now,
+                    deadlineFor(record, now));
         }
+        long startedAtMs = inFlight.startedAtMs();
 
         TraceContext.set(record.traceId());
         String dispatchId = InDoubtResolver.dispatchId(taskId, attemptNumber);

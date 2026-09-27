@@ -24,9 +24,14 @@ def load(logs_dir):
                 if not line:
                     continue
                 try:
-                    events.append(json.loads(line))
+                    event = json.loads(line)
                 except json.JSONDecodeError:
                     print(f"skipping malformed line {path}:{line_no}", file=sys.stderr)
+                    continue
+                # Other JSONL files share logs/ (the prediction server's predictions.jsonl);
+                # only EventLog records carry a node and a Lamport time.
+                if "node" in event and "lamport" in event:
+                    events.append(event)
     return events
 
 

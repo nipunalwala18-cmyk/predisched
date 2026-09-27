@@ -84,3 +84,12 @@ describe("Explainer", () => {
     expect(screen.getByText("No per-worker breakdown for this decision.")).toBeInTheDocument();
   });
 });
+
+describe("streamUrl", () => {
+  it("follows the API origin, or the page's when the API is same-origin", async () => {
+    const { streamUrl } = await import("../api/client");
+    expect(streamUrl("http://localhost:8080")).toBe("ws://localhost:8080/ws/stream");
+    expect(streamUrl("", { protocol: "http:", host: "localhost:5173" })).toBe("ws://localhost:5173/ws/stream");
+    expect(streamUrl("", { protocol: "https:", host: "demo.example" })).toBe("wss://demo.example/ws/stream");
+  });
+});

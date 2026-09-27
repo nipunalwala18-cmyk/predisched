@@ -3,3 +3,6 @@
 *.jsonl text eol=lf
 workloads/benchmark/manifest.txt text eol=lf
 workloads/benchmark/exec-samples.csv text eol=lf
+# Shell scripts run in Linux containers and CI (prompt 24): LF even from a Windows checkout.
+*.sh text eol=lf
+docker/nginx.conf text eol=lf

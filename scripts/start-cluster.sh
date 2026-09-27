@@ -5,6 +5,7 @@
 #   scripts/start-cluster.sh            # Bully (the default in configs/cluster.yaml)
 #   scripts/start-cluster.sh ring
 #   SCHEDULERS=3 WORKERS=1 scripts/start-cluster.sh
+#   CLOCK_OFFSETS="-300 500 200" scripts/start-cluster.sh   # skewed worker clocks (Exp 3 demo)
 #   CONFIG=configs/replication.yaml SCHEDULERS=3 WORKERS=1 REPLICATION_MODE=strong scripts/start-cluster.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -13,6 +14,7 @@ CONFIG="${CONFIG:-configs/cluster.yaml}"
 SCHEDULERS="${SCHEDULERS:-5}"
 WORKERS="${WORKERS:-3}"
 REPLICATION_MODE="${REPLICATION_MODE:-}"
+read -r -a CLOCK_OFFSETS <<< "${CLOCK_OFFSETS:-}"
 mkdir -p logs/pids
 
 start_node() {
@@ -33,7 +35,7 @@ for n in $(seq 1 "$SCHEDULERS"); do
 done
 for n in $(seq 1 "$WORKERS"); do
   start_node "worker-$n" -jar predisched-worker/target/predisched-worker.jar \
-    --config "$CONFIG" --id "worker-$n" --port "$((51060 + n))"
+    --config "$CONFIG" --id "worker-$n" --port "$((51060 + n))"     ${CLOCK_OFFSETS[$((n - 1))]:+--clock-offset "${CLOCK_OFFSETS[$((n - 1))]}"}
 done
 echo "cluster starting ($ALGORITHM); check it with:"
 echo "  java -jar predisched-client/target/predisched-client.jar cluster leader"

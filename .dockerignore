@@ -1,0 +1,19 @@
+# Build context for docker/*.Dockerfile: sources only, never local builds, venvs or run output.
+**/target/
+**/node_modules/
+**/dist/
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+logs/
+results/benchmark/*/logs/
+spark/data/
+spark/out/
+ml/data/features/
+ml/models/**/*.joblib
+dashboard/test-results/
+dashboard/playwright-report/
+certs/
+.git/
+.idea/
+.vscode/

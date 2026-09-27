@@ -31,3 +31,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [autoscaling.md](autoscaling.md) | Predictive and reactive auto-scaling, launchers, the bursty-autoscale benchmark | 21 |
 | [dashboard-api.md](dashboard-api.md) | Spring Boot dashboard API: REST, STOMP stream, admin and chaos controls, AdminService | 22 |
 | [dashboard.md](dashboard.md) | React dashboard: seven pages, live stream, decision explainer, chaos controls, demo mode, screenshots | 23 |
+| [deployment.md](deployment.md) | Docker Compose stack (one Java image, prediction, nginx dashboard), the lab demo script, CI smoke test | 24 |

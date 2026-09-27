@@ -73,6 +73,7 @@ Change a version only when a prompt says so, and update this table in the same c
 | Regenerate Python stubs | `python -m grpc_tools.protoc -I proto --python_out=ml/generated --grpc_python_out=ml/generated proto/*.proto` |
 | Start local cluster | `scripts/start-cluster.ps1` (Windows) / `scripts/start-cluster.sh` |
 | Whole stack | `docker compose -f docker/docker-compose.yml up --build` |
+| Lab demo (all ten topics) | `scripts/demo.sh` (`--no-pause` in CI) / `scripts/demo.ps1` |
 
 ## Ports (spec §16)
 

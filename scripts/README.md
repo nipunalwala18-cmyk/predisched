@@ -1,6 +1,7 @@
 # scripts — start-cluster and run-benchmark helpers, added as prompts need them.
 
-- `start-cluster`, `stop-node`, `restart-node`, `kill-primary` (`.sh` / `.ps1`): local clusters (prompts 06, 10).
+- `demo` (`.sh` / `.ps1`): the narrated lab demo over all ten topics on the running stack, `--no-pause` for CI (prompt 24, `docs/components/deployment.md`).
+- `start-cluster`, `stop-node`, `restart-node`, `kill-primary` (`.sh` / `.ps1`): local clusters (prompts 06, 10); `CLOCK_OFFSETS` skews worker clocks.
 - `run-spark` (`.sh` / `.ps1`): run a Spark job natively or in Docker (prompt 12, `docs/components/spark.md`).
 - `run-mpi` (`.sh` / `.ps1`): run an MPI program on N ranks, or on each of 1, 2, 4, natively or in Docker (prompts 13-14, `docs/components/mpi.md`).
 - `collect-dataset.py`: the ML dataset campaign, every profile x pattern x strategy run on heterogeneous workers, resumable (prompt 15, `docs/components/dataset.md`).

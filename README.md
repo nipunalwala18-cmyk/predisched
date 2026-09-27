@@ -2,15 +2,65 @@
 
 PrediSched is a distributed task scheduler that evolves, experiment by experiment, from simple gRPC task submission into a fault-tolerant, ML-assisted system. Clients submit tasks to an elected primary scheduler (with its state replicated to backups), which dispatches them to multithreaded workers that continuously report metrics. A Python prediction engine forecasts execution time, queue growth, and overload risk, and the predictive scheduler uses those forecasts to place tasks proactively. The project's core contribution is a rigorous benchmark showing whether, and by how much, predictive scheduling outperforms conventional reactive strategies.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    C[Client CLI] -->|gRPC SubmitTask| P
+    subgraph S[Scheduler cluster: 5 nodes, Bully or Ring election]
+        P[Primary: queue, strategy, dispatcher]
+        B[Backups x4]
+        P -->|replicated log| B
+    end
+    P -->|ExecuteTask| W[Workers x3: thread pools, heartbeats]
+    P -->|PredictBatch| M[Prediction server: Python, m1-m3]
+    P -->|history| DB[(PostgreSQL)]
+    DB --> SP[Spark jobs]
+    DB --> API[Dashboard API] --> UI[React dashboard]
+```
+
+Java 17 and gRPC for the cluster, Python for the models, Spark and MPI, Spring Boot and React for
+the dashboard. The design, the results of every experiment and the limitations are written up in
+**[docs/REPORT.md](docs/REPORT.md)**. [docs/LAB-COVERAGE.md](docs/LAB-COVERAGE.md) maps the ten
+lab topics to their code.
+
 ## Quick start
 
-Placeholder — full start instructions arrive with the first runnable prompts.
+**Docker** (the whole stack: 5 schedulers, 3 heterogeneous workers, PostgreSQL, the prediction
+server, the dashboard API and the dashboard):
+
+```bash
+docker compose -f docker/docker-compose.yml up --build -d --wait
+```
+```bash
+scripts/demo.sh
+```
+
+The demo walks through the ten lab topics on the running system; it pauses after each step. Then
+open the dashboard at http://localhost:5173 (API docs at http://localhost:8080/swagger-ui).
+
+**Native** (Java 17, Maven 3.9, Python 3.10+ with `pip install -r ml/requirements.txt`, and
+PostgreSQL 16 on 5432):
 
 ```bash
 mvn -q verify
 ```
+```bash
+CLOCK_OFFSETS="-300 500 200" CONFIG=configs/dashboard.yaml scripts/start-cluster.sh
+```
+```bash
+cd ml && python -m predisched_ml.prediction_server --port 50070
+```
+```bash
+java -jar predisched-dashboard-api/target/predisched-dashboard-api.jar --dashboard.cluster-config=configs/dashboard.yaml
+```
+```bash
+scripts/demo.sh
+```
 
-See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for the numbered build prompts.
+On Windows use `scripts/start-cluster.ps1` and `scripts/demo.ps1`, and see
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for ports, MPI, Spark and Docker memory. The
+full deployment notes are in [docs/components/deployment.md](docs/components/deployment.md).
 
 ## Results
 
@@ -40,6 +90,33 @@ SLA violations from 58 % to 18 %.
 strategy, or worse on bursty traffic of short tasks. There, its 7.7 ms prediction call per decision
 (against about 0.1 ms for the reactive strategies) is a real cost.
 
+## Documentation
+
+- [docs/REPORT.md](docs/REPORT.md): the project report (problem, design, results, limitations,
+  future work).
+- [docs/LAB-COVERAGE.md](docs/LAB-COVERAGE.md): the ten lab topics, their code, demo commands and
+  measured results.
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): Windows ports, MPI, Spark, Docker memory.
+- [docs/components/](docs/components/README.md): one document per component:
+  [task API](docs/components/task-api.md), [workers](docs/components/worker.md),
+  [clocks](docs/components/clocks.md), [queue](docs/components/queue.md),
+  [task catalogue and workloads](docs/components/tasks-and-workloads.md),
+  [election](docs/components/election.md), [replication](docs/components/replication.md),
+  [strategies](docs/components/strategies.md), [workflows](docs/components/workflows.md),
+  [auth](docs/components/auth.md), [fault tolerance](docs/components/fault-tolerance.md),
+  [storage](docs/components/storage.md), [Spark](docs/components/spark.md),
+  [MPI](docs/components/mpi.md), [dataset](docs/components/dataset.md),
+  [ML models](docs/components/ml-models.md),
+  [prediction server](docs/components/prediction-server.md),
+  [predictive strategy](docs/components/predictive-strategy.md),
+  [speculation and chaos](docs/components/speculation-and-chaos.md),
+  [benchmark](docs/components/benchmark.md),
+  [model lifecycle](docs/components/model-lifecycle.md),
+  [auto-scaling](docs/components/autoscaling.md),
+  [dashboard API](docs/components/dashboard-api.md), [dashboard](docs/components/dashboard.md),
+  [deployment](docs/components/deployment.md).
+- `spec/PROJECT-CONTEXT.md` (the specification) and `spec/prompts/` (the numbered build prompts).
+
 ## Progress
 
 | # | Prompt | Status |
@@ -68,4 +145,4 @@ strategy, or worse on bursty traffic of short tasks. There, its 7.7 ms predictio
 | 21 | Model lifecycle and auto-scaling | [x] |
 | 22 | Dashboard API | [x] |
 | 23 | Dashboard UI | [x] |
-| 24 | Deployment and final report | [ ] |
+| 24 | Deployment and final report | [x] |

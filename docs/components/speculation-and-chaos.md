@@ -42,6 +42,14 @@ threshold = max(k × predicted_exec_ms, p90 exec time of its task type)
   race. The survivor then finishes on the normal path, with retries if it fails too.
 - **A worker declared dead** (prompt 10) that held one copy does not re-queue the task while the
   other copy runs.
+- **The copy is in flight before the race is visible** (fixed in prompt 24).
+  - `speculate()` registers the copy in `RunningTasks`, then publishes the race, then checks
+    whether the original has settled meanwhile. The dispatch pool sends the copy only if it is
+    still unsettled.
+  - Before the fix, the copy was registered by the pool thread. If the original finished in
+    that gap, it closed the race alone, and the copy ran unraced and uncancelled.
+  - `SpeculationTest` caught it under CPU load, with 8 cluster JVMs running beside the build:
+    about 1 run in 5 failed with `nothing left in flight ==> expected: <0> but was: <1>`.
 
 **Counters.** Launched, won by the copy, won by the original, and wasted work: the time the loser
 had run when cancelled. They are logged with every race result, and the `SPECULATE` and

@@ -1,8 +1,18 @@
-// The dashboard API (prompt 22): VITE_API_URL, default http://localhost:8080.
+// The dashboard API (prompt 22): VITE_API_URL, default http://localhost:8080. Empty means the
+// page's own origin, as in the Docker image where nginx proxies the API (prompt 24).
 export const API_URL: string =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8080";
 
-export const WS_URL: string = API_URL.replace(/^http/, "ws") + "/ws/stream";
+/** The STOMP endpoint: a WebSocket URL needs a scheme, so a same-origin API borrows the page's. */
+export function streamUrl(api: string, location?: { protocol: string; host: string }): string {
+  if (api === "" && location) {
+    return (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/stream";
+  }
+  return api.replace(/^http/, "ws") + "/ws/stream";
+}
+
+export const WS_URL: string = streamUrl(API_URL,
+  typeof window === "undefined" ? undefined : window.location);
 
 export class ApiError extends Error {
   constructor(

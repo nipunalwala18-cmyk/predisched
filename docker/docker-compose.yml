@@ -1,0 +1,203 @@
+# The whole PrediSched stack (prompt 24, spec §16): 5 schedulers, 3 heterogeneous workers,
+# PostgreSQL, the prediction server, the dashboard API, the dashboard and a mock HTTP target.
+#
+#   docker compose -f docker/docker-compose.yml up --build -d
+#   docker compose -f docker/docker-compose.yml ps
+#   scripts/demo.sh --no-pause
+#
+# Dashboard: http://localhost:5173 · API: http://localhost:8080/swagger-ui · schedulers on
+# localhost:51051-51055, so the host's own client jar works too. The Spark and MPI images of
+# prompts 12-14 are the `tools` profile: `docker compose ... run --rm spark exec_stats.py ...`.
+name: predisched
+
+x-java: &java
+  build:
+    context: ..
+    dockerfile: docker/java.Dockerfile
+  image: predisched-java:latest
+  restart: "no"
+  volumes:
+    - logs:/app/logs
+  networks: [predisched]
+
+x-scheduler: &scheduler
+  <<: *java
+  mem_limit: 512m
+  cpus: 1.0
+  depends_on:
+    postgres: { condition: service_healthy }
+    prediction: { condition: service_healthy }
+
+x-worker: &worker
+  <<: *java
+  depends_on:
+    scheduler-1: { condition: service_healthy }
+    scheduler-2: { condition: service_healthy }
+    scheduler-3: { condition: service_healthy }
+    scheduler-4: { condition: service_healthy }
+    scheduler-5: { condition: service_healthy }
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: predisched-postgres
+    environment:
+      POSTGRES_PASSWORD: predisched
+      POSTGRES_DB: predisched
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d predisched"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [predisched]
+
+  prediction:
+    build:
+      context: ..
+      dockerfile: docker/prediction.Dockerfile
+    image: predisched-prediction:latest
+    container_name: predisched-prediction
+    command: ["--port", "50070", "--log", "/app/logs/predictions.jsonl"]
+    ports: ["50070:50070"]
+    volumes:
+      - logs:/app/logs
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [predisched]
+
+  # Election ids 1-5; the highest live id leads (Bully). Clock offsets give Berkeley something
+  # to correct (Exp 3), as in the native demo.
+  scheduler-1:
+    <<: *scheduler
+    container_name: predisched-scheduler-1
+    command: ["scheduler", "--config", "configs/docker.yaml", "--id", "scheduler-1"]
+    environment: { PREDISCHED_PORT: "51051" }
+    ports: ["51051:51051"]
+  scheduler-2:
+    <<: *scheduler
+    container_name: predisched-scheduler-2
+    command: ["scheduler", "--config", "configs/docker.yaml", "--id", "scheduler-2"]
+    environment: { PREDISCHED_PORT: "51052" }
+    ports: ["51052:51052"]
+  scheduler-3:
+    <<: *scheduler
+    container_name: predisched-scheduler-3
+    command: ["scheduler", "--config", "configs/docker.yaml", "--id", "scheduler-3"]
+    environment: { PREDISCHED_PORT: "51053" }
+    ports: ["51053:51053"]
+  scheduler-4:
+    <<: *scheduler
+    container_name: predisched-scheduler-4
+    command: ["scheduler", "--config", "configs/docker.yaml", "--id", "scheduler-4"]
+    environment: { PREDISCHED_PORT: "51054" }
+    ports: ["51054:51054"]
+  scheduler-5:
+    <<: *scheduler
+    container_name: predisched-scheduler-5
+    command: ["scheduler", "--config", "configs/docker.yaml", "--id", "scheduler-5"]
+    environment: { PREDISCHED_PORT: "51055" }
+    ports: ["51055:51055"]
+
+  # Heterogeneous workers: CPU quota, memory and thread pool differ (spec §16).
+  worker-1:
+    <<: *worker
+    container_name: predisched-worker-1
+    command: ["worker", "--config", "configs/docker.yaml", "--id", "worker-1", "--host", "worker-1",
+              "--port", "51061", "--pool-size", "2", "--clock-offset", "-300"]
+    environment: { PREDISCHED_PORT: "51061" }
+    ports: ["51061:51061"]
+    cpus: 0.5
+    mem_limit: 384m
+  worker-2:
+    <<: *worker
+    container_name: predisched-worker-2
+    command: ["worker", "--config", "configs/docker.yaml", "--id", "worker-2", "--host", "worker-2",
+              "--port", "51062", "--pool-size", "4", "--clock-offset", "500"]
+    environment: { PREDISCHED_PORT: "51062" }
+    ports: ["51062:51062"]
+    cpus: 1.0
+    mem_limit: 512m
+  worker-3:
+    <<: *worker
+    container_name: predisched-worker-3
+    command: ["worker", "--config", "configs/docker.yaml", "--id", "worker-3", "--host", "worker-3",
+              "--port", "51063", "--pool-size", "8", "--clock-offset", "200"]
+    environment: { PREDISCHED_PORT: "51063" }
+    ports: ["51063:51063"]
+    cpus: 2.0
+    mem_limit: 1g
+
+  dashboard-api:
+    <<: *java
+    container_name: predisched-dashboard-api
+    command: ["dashboard-api", "--dashboard.cluster-config=configs/docker.yaml",
+              "--dashboard.repo-root=/app", "--dashboard.python=python3",
+              "--spring.datasource.url=jdbc:postgresql://postgres:5432/predisched"]
+    ports: ["8080:8080"]
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      start_period: 40s
+      retries: 20
+    depends_on:
+      postgres: { condition: service_healthy }
+      scheduler-5: { condition: service_healthy }
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/dashboard.Dockerfile
+    image: predisched-dashboard:latest
+    container_name: predisched-dashboard
+    ports: ["5173:8080"]
+    depends_on:
+      dashboard-api: { condition: service_healthy }
+    networks: [predisched]
+
+  # HTTP_TASK target (prompt 05).
+  mock-http:
+    image: python:3.12-slim
+    container_name: predisched-mock-http
+    user: "10001"
+    command: ["python", "/scripts/mock-http.py", "--host", "0.0.0.0", "--port", "8100"]
+    volumes:
+      - ../scripts/mock-http.py:/scripts/mock-http.py:ro
+    ports: ["8100:8100"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [predisched]
+
+  # Prompts 12-14: batch jobs, not services. Started by scripts/demo.sh with `run --rm`.
+  spark:
+    build:
+      context: ..
+      dockerfile: docker/spark.Dockerfile
+    image: predisched-spark:latest
+    profiles: ["tools"]
+    volumes:
+      - ..:/work
+    networks: [predisched]
+  mpi:
+    build:
+      context: ..
+      dockerfile: docker/mpi.Dockerfile
+    image: predisched-mpi:latest
+    profiles: ["tools"]
+    volumes:
+      - ..:/work
+    networks: [predisched]
+
+volumes:
+  pgdata:
+  logs:
+
+networks:
+  predisched:

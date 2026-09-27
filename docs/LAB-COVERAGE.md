@@ -12,3 +12,23 @@
 | 8 | Fault tolerance with primary-backup replication | `predisched-fault/src/main/java/com/predisched/fault/` (`PrimaryBackupCoordinator`, `InDoubtResolver`, `WorkerFailureDetector`), `predisched-replication/.../PrimaryBackupReplication.java`, `predisched-scheduler/.../SchedulerFailover.java`, `Dispatcher.java`, `predisched-worker/.../ExecutionEngine.java` (dispatch ids, `QueryExecution`), `predisched-client/.../SchedulerClient.java` (failover) | `scripts/start-cluster.sh`, then `predisched-benchmark failover-test --tasks 100 --kill-at 50` (kills the primary with `scripts/kill-primary`); `scripts/restart-node.sh scheduler 5`; `scripts/stop-node.sh worker 2` | Primary 5 killed after task 50 of 100: scheduler 4 elected 1003 ms after the kill, promoted in 218 ms (4 in-doubt tasks re-attached), resumed at 1137 ms; 100/100 completed, 0 lost, 0 duplicated, every task started once on a worker. Again after node 5 restarted and rejoined: 40/40, resumed at 1635 ms. Worker 2 killed mid-task: its task completed on worker-1 at attempt 2, worker declared DEAD after 3 missed heartbeats; `results/exp8-failover.csv` |
 | 9 | MPI collectives: Broadcast, Scatter, Gather | `mpi/predisched_mpi/collectives.py` (`bcast`, `scatter` + `Scatter`, `gather` + `Gather`), `mpi/predisched_mpi/tasks.py` (Java task semantics), `testdata/task-outputs.json`, `docker/mpi.Dockerfile`, `scripts/run-mpi.*` | `cd mpi && mpiexec -n 4 python -m predisched_mpi.collectives --generate 20 --seed 42` (or `scripts/run-mpi.sh 4 predisched_mpi.collectives --generate 20 --seed 42`) | 20 tasks, 4 ranks x 5 (round-robin scatter), every rank logs the broadcast config, its chunk and its sizes buffer; all 20 gathered on rank 0 with outputs identical to the Java workers (shared fixtures asserted by pytest and JUnit). Makespan 2093 ms on 1 rank, 1306 ms on 2, 581-865 ms on 4; `results/exp9-collectives.csv` |
 | 10 | Parallel matrix multiplication using MPI | `mpi/predisched_mpi/matmul.py` (`Bcast`, `Scatterv`, local NumPy multiply, `Gatherv`, `MPI.Wtime` phases), `scripts/plot-matmul.py`, `predisched-worker/.../MatrixTaskExecutor.java` (`mode=mpi`), `configs/mpi.yaml` | `scripts/run-mpi.sh matmul --sizes 200,400,800 --repeat 3`, `python scripts/plot-matmul.py results/exp10-matmul.csv`; through the scheduler: `predisched submit --type MATRIX_TASK --input "size=400, mode=mpi, procs=4"` | `np.allclose(C, A @ B)` true in every run, checksums equal to Java's (n=800: 128052701.488846). Speedup at n=800: 1.59x on 2 processes (80% efficiency, compute 1.84x), 1.33x on 4; at n=200 communication dominates (1.42x, 0.85x). 4 processes are capped by the 4-core 15 W laptop CPU: a lone compute block takes 8.4 ms, 14-18 ms with 4 running at once. `MATRIX_TASK mode=mpi` COMPLETED with the Java 4-thread checksum; `results/exp10-matmul.csv`, `docs/img/exp10-speedup.png` |
+
+## All ten on the running product
+
+`scripts/demo.sh` (or `scripts/demo.ps1`) runs every topic above, in order, on one running stack:
+the Docker Compose stack, or the native cluster. Each step prints the topic, runs the real command
+and pauses. With `--no-pause` it is CI's smoke test ([components/deployment.md](components/deployment.md)).
+
+| Demo step | Exp | Measured in the native run of 2026-09-27 (`--no-pause`, exit 0, 2 min 18 s) |
+| --- | --- | --- |
+| 1 | 1 | `CPU_TASK n=2000000` accepted, COMPLETED on worker-2, exec 31 ms |
+| 2 | 2 | 12 one-second sleeps done 3.3 s after the first submit, 3.7 running at once on average |
+| 3 | 3 | workers started at -300 / +500 / +200 ms: the leader measured an 805 ms spread and corrected it to 0 ms in one round (third run, 3 min 40 s); Lamport and physical order of step 1's task merged from the node logs |
+| 4 | 4, 8 | leader 4 killed, scheduler-5 leading about 2 s later, a new task completed through it; node 4 restarted as a backup |
+| 5 | 5 | 100 writes: strong 0 stale reads (write p50 6.9 ms), eventual 100/100 stale (p50 0.16 ms), converged in 77 ms |
+| 6 | 6 | strategy switched least_loaded -> predictive at runtime through `POST /api/admin/strategy` |
+| 7 | 7 | Spark `exec_stats` over the live history (72,330 executions), 11 task types, 5 workers |
+| 8 | 9, 10 | 20 tasks scattered over 4 ranks and gathered; `matmul --size 400` on 4 ranks `allclose` true, 12.1 ms |
+| 9 | 6 (predictive) | `explain`: predictive chose worker-3 at cost 23.6 ms (worker-1 53.6 ms with a predicted queue) |
+| 10 | | `/api/overview` 3 active workers, `/api/cluster/leader` 1 leader |
+
