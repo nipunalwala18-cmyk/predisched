@@ -79,6 +79,31 @@ public class Dispatcher implements AutoCloseable {
     private final java.util.concurrent.atomic.AtomicLong decisionCount =
             new java.util.concurrent.atomic.AtomicLong();
     private static final int DECISION_LOG_EVERY = 100;
+    /** Completed execution times per type, for the straggler threshold's p90 (prompt 19). */
+    private final TypeExecTimes execTimes = new TypeExecTimes(200);
+    /** Speculative races in progress, by task id (F11). */
+    private final Map<String, Race> races = new java.util.concurrent.ConcurrentHashMap<>();
+    private final SpeculationStats speculation = new SpeculationStats();
+
+    /** A straggler and its speculative copy: whichever succeeds first wins (F11). */
+    static final class Race {
+        final RunningTasks.Running original;
+        volatile RunningTasks.Running duplicate;
+        final java.util.concurrent.atomic.AtomicBoolean decided =
+                new java.util.concurrent.atomic.AtomicBoolean();
+
+        Race(RunningTasks.Running original) {
+            this.original = original;
+        }
+
+        RunningTasks.Running other(RunningTasks.Running one) {
+            return one == original ? duplicate : original;
+        }
+
+        boolean involves(RunningTasks.Running one) {
+            return one == original || one == duplicate;
+        }
+    }
     private volatile boolean active;
     private Thread thread;
     private volatile ResultCache cache;
@@ -214,6 +239,11 @@ public class Dispatcher implements AutoCloseable {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
+        return Optional.of(decide(task, candidates, false));
+    }
+
+    /** One strategy decision among {@code candidates}, timed and recorded everywhere. */
+    private WorkerInfo decide(TaskRecord task, List<WorkerInfo> candidates, boolean speculative) {
         SchedulingStrategy current = strategy.get();
         // Timed as a whole: for the predictive strategy this includes the prediction call.
         long started = System.nanoTime();
@@ -240,6 +270,9 @@ public class Dispatcher implements AutoCloseable {
         if (decision.fallback()) {
             details.put("fallback", decision.fallbackReason());
         }
+        if (speculative) {
+            details.put("speculative", "true");
+        }
         EventLog.get().event(EventLog.SCHEDULE_DECISION, task.id(), details);
         decisionTimes.add(micros / 1000.0);
         if (decisionCount.incrementAndGet() % DECISION_LOG_EVERY == 0) {
@@ -250,7 +283,7 @@ public class Dispatcher implements AutoCloseable {
                     String.format(Locale.ROOT, "%.2f", p[1]),
                     String.format(Locale.ROOT, "%.2f", p[2]));
         }
-        return Optional.of(chosen);
+        return chosen;
     }
 
     /**
@@ -261,6 +294,9 @@ public class Dispatcher implements AutoCloseable {
     List<WorkerInfo> candidates(TaskRecord task) {
         List<WorkerInfo> open = new ArrayList<>();
         for (WorkerInfo worker : registry.healthy()) {
+            if (registry.isDraining(worker.id())) {
+                continue; // prompt 19: a draining worker finishes its work but gets no more
+            }
             int limit = Math.max(1, (int) Math.round(worker.poolSize() * outstandingPerWorkerFactor));
             int inFlight = running.countFor(worker.id());
             if (inFlight < limit) {
@@ -313,6 +349,124 @@ public class Dispatcher implements AutoCloseable {
 
     public DecisionLog decisions() {
         return decisions;
+    }
+
+    public SpeculationStats speculation() {
+        return speculation;
+    }
+
+    public TypeExecTimes execTimes() {
+        return execTimes;
+    }
+
+    /**
+     * Launches a speculative copy of a straggler on another worker (prompt 19, F11), placed by
+     * the active strategy with the straggler's worker excluded. Only when another worker has
+     * spare capacity, and at most one copy per task. Returns whether a copy was launched.
+     */
+    public boolean speculate(RunningTasks.Running straggler) {
+        String taskId = straggler.taskId();
+        TaskRecord record = store.get(taskId);
+        if (record == null || record.status() != TaskStatus.RUNNING
+                || straggler.settled().get() || straggler.speculative()
+                || races.containsKey(taskId) || running.speculative(taskId).isPresent()) {
+            return false;
+        }
+        List<WorkerInfo> others = candidates(record).stream()
+                .filter(w -> !w.id().equals(straggler.workerId()))
+                .toList();
+        if (others.isEmpty()) {
+            return false;
+        }
+        Race race = new Race(straggler);
+        if (races.putIfAbsent(taskId, race) != null) {
+            return false;
+        }
+        WorkerInfo worker = decide(record, others, true);
+        int attempt = straggler.attempt() + 1;
+        long elapsed = Clocks.now() - straggler.startedAtMs();
+        speculation.recordLaunch();
+        log.info("Straggler {} has run {} ms on {} (attempt {}); speculative copy as attempt {}"
+                + " on {}", taskId, elapsed, straggler.workerId(), straggler.attempt(), attempt,
+                worker.id());
+        EventLog.get().event("SPECULATE", taskId, Map.of(
+                "straggler_worker", straggler.workerId(),
+                "elapsed_ms", String.valueOf(elapsed),
+                "duplicate_worker", worker.id(),
+                "attempt", String.valueOf(attempt)));
+        dispatchPool.execute(() -> {
+            LamportInterceptors.applyMdc();
+            execute(record, worker, attempt, false, race);
+        });
+        return true;
+    }
+
+    /**
+     * Settles one copy of a speculative race. The first success wins: the other copy is settled
+     * (so its late reply is ignored), cancelled on its worker, and recorded as
+     * {@code SPECULATIVE_LOSER}; the winner then takes the normal success path (returns false).
+     * A copy that fails while the other still runs is recorded by {@code recordLoss} and ends
+     * the race, leaving the survivor to finish on the normal path (returns true).
+     */
+    private boolean settleRace(String taskId, RunningTasks.Running inFlight, String workerId,
+            boolean success, Runnable recordLoss) {
+        Race race = races.get(taskId);
+        if (race == null || !race.involves(inFlight)) {
+            return false;
+        }
+        RunningTasks.Running other = race.other(inFlight);
+        if (success) {
+            if (!race.decided.compareAndSet(false, true)) {
+                return false;
+            }
+            races.remove(taskId, race);
+            long now = Clocks.now();
+            if (other != null && running.finish(other)) {
+                cancelOn(other.workerId(), taskId, "speculative loser");
+                long wasted = now - other.startedAtMs();
+                speculation.recordWasted(wasted);
+                store.update(taskId, r -> r.withAttempt(new TaskAttempt(other.attempt(),
+                        other.workerId(), TaskAttempt.Outcome.SPECULATIVE_LOSER,
+                        "lost the race to " + workerId, other.startedAtMs(), now, 0L)));
+            }
+            if (inFlight.speculative()) {
+                speculation.recordDuplicateWin();
+                store.update(taskId, r -> r.withWorkerId(workerId));
+            } else {
+                speculation.recordOriginalWin();
+            }
+            log.info("Speculation for {}: {} won ({} copy){}; {}", taskId, workerId,
+                    inFlight.speculative() ? "speculative" : "original",
+                    other == null ? "" : ", " + other.workerId() + " cancelled",
+                    speculation.summary());
+            EventLog.get().event("SPECULATION_RESULT", taskId, Map.of(
+                    "winner", workerId,
+                    "winner_copy", inFlight.speculative() ? "speculative" : "original",
+                    "loser", other == null ? "" : other.workerId()));
+            return false;
+        }
+        races.remove(taskId, race);
+        if (other != null && !other.settled().get()) {
+            log.info("Speculation for {}: the {} copy on {} failed; the other copy on {} carries"
+                    + " on", taskId, inFlight.speculative() ? "speculative" : "original",
+                    workerId, other.workerId());
+            recordLoss.run();
+            return true;
+        }
+        return false;
+    }
+
+    private void cancelOn(String workerId, String taskId, String reason) {
+        registry.get(workerId).ifPresent(worker -> {
+            try {
+                clients.stubFor(worker)
+                        .withDeadlineAfter(5, TimeUnit.SECONDS)
+                        .cancelExecution(com.predisched.proto.CancelRequest.newBuilder()
+                                .setTaskId(taskId).setReason(reason).build());
+            } catch (Exception e) {
+                log.info("Could not cancel {} on {}: {}", taskId, workerId, e.getMessage());
+            }
+        });
     }
 
     /** Recent decision times (ms), p-th percentiles. */
@@ -376,13 +530,24 @@ public class Dispatcher implements AutoCloseable {
 
     private void execute(TaskRecord record, WorkerInfo worker, int attemptNumber,
             boolean reattach) {
+        execute(record, worker, attemptNumber, reattach, null);
+    }
+
+    /** @param race non-null for the speculative copy of a straggler (prompt 19, F11) */
+    private void execute(TaskRecord record, WorkerInfo worker, int attemptNumber,
+            boolean reattach, Race race) {
         String taskId = record.id();
         long startedAtMs = Clocks.now();
         long timeoutMs = record.timeoutMs() > 0 ? record.timeoutMs() : defaultTimeoutMs;
         Features features = featuresAt(worker);
-        RunningTasks.Running inFlight = running.start(
-                taskId, worker.id(), attemptNumber, startedAtMs,
-                timeoutMs > 0 ? startedAtMs + timeoutMs : 0L);
+        long deadline = timeoutMs > 0 ? startedAtMs + timeoutMs : 0L;
+        RunningTasks.Running inFlight = race != null
+                ? running.startSpeculative(taskId, worker.id(), attemptNumber, startedAtMs,
+                        deadline)
+                : running.start(taskId, worker.id(), attemptNumber, startedAtMs, deadline);
+        if (race != null) {
+            race.duplicate = inFlight;
+        }
 
         TraceContext.set(record.traceId());
         String dispatchId = InDoubtResolver.dispatchId(taskId, attemptNumber);
@@ -417,11 +582,30 @@ public class Dispatcher implements AutoCloseable {
                         taskId, worker.id());
                 return;
             }
+            if (settleRace(taskId, inFlight, worker.id(), result.getSuccess()
+                    && !result.getRejected(), () -> {
+                        recordHistory(taskId, worker.id(), attemptNumber, startedAtMs, result,
+                                features);
+                        if (!result.getRejected()) {
+                            store.update(taskId, r -> r.withAttempt(new TaskAttempt(
+                                    attemptNumber, worker.id(), TaskAttempt.Outcome.FAILED,
+                                    result.getOutput(), startedAtMs, Clocks.now(),
+                                    result.getExecTimeMs())));
+                        }
+                    })) {
+                return;
+            }
             recordOutcome(taskId, worker.id(), inFlight, attemptNumber, startedAtMs, result,
                     features);
         } catch (Exception e) {
             if (!running.finish(inFlight)) {
                 // Settled already: the worker was declared dead and the task re-queued.
+                return;
+            }
+            if (settleRace(taskId, inFlight, worker.id(), false, () -> store.update(taskId,
+                    r -> r.withAttempt(new TaskAttempt(attemptNumber, worker.id(),
+                            TaskAttempt.Outcome.WORKER_LOST, String.valueOf(e.getMessage()),
+                            startedAtMs, Clocks.now(), 0L))))) {
                 return;
             }
             log.warn("Worker {} call failed for {}: {}", worker.id(), taskId, e.getMessage());
@@ -488,6 +672,10 @@ public class Dispatcher implements AutoCloseable {
             return;
         }
         if (result.getSuccess()) {
+            TaskRecord succeeded = store.get(taskId);
+            if (succeeded != null) {
+                execTimes.record(succeeded.type().name(), result.getExecTimeMs());
+            }
             ResultCache resultCache = cache;
             TaskRecord finished = store.get(taskId);
             if (resultCache != null && result.getCacheable() && finished != null) {

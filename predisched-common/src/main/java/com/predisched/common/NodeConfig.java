@@ -25,6 +25,24 @@ public class NodeConfig {
     private MpiConfig mpi = new MpiConfig();
     private MlConfig ml = new MlConfig();
     private PredictionConfig prediction = new PredictionConfig();
+    private ChaosConfig chaos = new ChaosConfig();
+    private SpeculationConfig speculation = new SpeculationConfig();
+
+    public ChaosConfig getChaos() {
+        return chaos;
+    }
+
+    public void setChaos(ChaosConfig chaos) {
+        this.chaos = chaos;
+    }
+
+    public SpeculationConfig getSpeculation() {
+        return speculation;
+    }
+
+    public void setSpeculation(SpeculationConfig speculation) {
+        this.speculation = speculation;
+    }
 
     public PredictionConfig getPrediction() {
         return prediction;
@@ -1057,6 +1075,73 @@ public class NodeConfig {
 
         public void setTimeoutMs(long timeoutMs) {
             this.timeoutMs = timeoutMs;
+        }
+    }
+
+    /** Fault injection (prompt 19, F16): the ChaosService is only served when enabled. */
+    public static class ChaosConfig {
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    /**
+     * Speculative execution for stragglers (prompt 19, F11). A running task is a straggler when
+     * it has run longer than max(k x its predicted exec time, the p90 exec time of its type);
+     * with no prediction, the p90 alone. The p90 needs minSamples completed runs of the type.
+     */
+    public static class SpeculationConfig {
+        private boolean enabled = false;
+        private long checkMs = 500;
+        private double k = 2.0;
+        private int minSamples = 20;
+        /** Completed runs per type the p90 is taken over (the most recent). */
+        private int window = 200;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public long getCheckMs() {
+            return checkMs;
+        }
+
+        public void setCheckMs(long checkMs) {
+            this.checkMs = checkMs;
+        }
+
+        public double getK() {
+            return k;
+        }
+
+        public void setK(double k) {
+            this.k = k;
+        }
+
+        public int getMinSamples() {
+            return minSamples;
+        }
+
+        public void setMinSamples(int minSamples) {
+            this.minSamples = minSamples;
+        }
+
+        public int getWindow() {
+            return window;
+        }
+
+        public void setWindow(int window) {
+            this.window = window;
         }
     }
 

@@ -165,6 +165,25 @@ service SchedulerService {
   // Prompt 18: switch the scheduling strategy at runtime, and explain one placement (F13).
   rpc SetStrategy (SetStrategyRequest) returns (SetStrategyResponse);
   rpc ExplainDecision (TaskStatusRequest) returns (DecisionExplanation);
+  // Prompt 19: the registered workers and where they listen (chaos CLI, dashboard).
+  rpc ListWorkers (ListWorkersRequest) returns (WorkerList);
+}
+
+message ListWorkersRequest {}
+
+message WorkerEntry {
+  string worker_id = 1;
+  string host = 2;
+  int32 port = 3;
+  int32 pool_size = 4;
+  bool healthy = 5;
+  bool draining = 6;
+  int32 active_threads = 7;
+  int32 queue_len = 8;
+}
+
+message WorkerList {
+  repeated WorkerEntry workers = 1;
 }
 
 message SetStrategyRequest {

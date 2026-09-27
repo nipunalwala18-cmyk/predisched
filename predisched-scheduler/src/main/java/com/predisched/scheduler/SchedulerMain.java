@@ -145,7 +145,7 @@ public class SchedulerMain {
                 store, validator, queue, retries, leadership, limits);
         dispatcher.useArrivalRate(schedulerService.arrivals());
         schedulerService.useAdmin(new DispatcherAdmin(dispatcher, StrategyRegistry.standard(),
-                strategySettings));
+                strategySettings, workers));
         ResultCache resultCache = null;
         if (config.getCache().isEnabled()) {
             resultCache = new ResultCache(config.getCache().getMaxEntries(),
@@ -173,10 +173,20 @@ public class SchedulerMain {
         TimeoutWatcher timeouts = new TimeoutWatcher(
                 running, workers, clients, queueConfig.getTimeoutCheckMs());
         timeouts.start();
+        // Speculative execution for stragglers (prompt 19, F11): off unless configured.
+        StragglerDetector stragglers = config.getSpeculation().isEnabled()
+                ? new StragglerDetector(dispatcher, running, store, config.getSpeculation())
+                : null;
+        if (stragglers != null) {
+            stragglers.start();
+        }
         ClusterReporter reporter = new ClusterReporter(
                 workers, config.getScheduler().getClusterReportIntervalMs());
         reporter.start();
 
+        // Chaos (prompt 19, F16): the ChaosService and its interceptor only when enabled.
+        com.predisched.common.chaos.ChaosController chaos = config.getChaos().isEnabled()
+                ? new com.predisched.common.chaos.ChaosController(id, null) : null;
         ServerBuilder<?> builder = Transport.get().server(port)
                 .addService(schedulerService)
                 .addService(new RegistryServiceImpl(workers, leadership::isLeader))
@@ -187,7 +197,14 @@ public class SchedulerMain {
                 builder.addService(node.replicationService());
             }
         }
+        if (chaos != null) {
+            builder.addService(new com.predisched.common.chaos.ChaosServiceImpl(chaos));
+            Transport.addOutgoing(chaos.outgoingInterceptor());
+            log.warn("Chaos API enabled on scheduler {}", id);
+        }
         Server server = builder
+                .intercept(chaos == null ? LamportInterceptors.none()
+                        : new com.predisched.common.chaos.ChaosInterceptor(chaos))
                 .intercept(LamportInterceptors.server(id, lamportClock))
                 // Interceptors run last-added first: authenticate, then rate-limit, then Lamport.
                 .intercept(limits == null ? LamportInterceptors.none() : limits)
@@ -218,6 +235,9 @@ public class SchedulerMain {
                 node.close();
             }
             timeouts.close();
+            if (stragglers != null) {
+                stragglers.close();
+            }
             workerDeaths.close();
             retries.close();
             berkeley.close();

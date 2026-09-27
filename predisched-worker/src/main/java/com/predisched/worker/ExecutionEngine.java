@@ -45,6 +45,10 @@ public class ExecutionEngine implements AutoCloseable {
         static Outcome rejected(String workerId) {
             return new Outcome(false, "worker " + workerId + " queue full", 0, 0, true);
         }
+
+        static Outcome draining(String workerId) {
+            return new Outcome(false, "worker " + workerId + " is draining", 0, 0, true);
+        }
     }
 
     private final ExecutorRegistry registry;
@@ -54,6 +58,8 @@ public class ExecutionEngine implements AutoCloseable {
     private final int poolSize;
     /** Simulated slower hardware: executions are stretched to this many times their length. */
     private volatile double slowdown = 1.0;
+    /** Draining (prompt 19): running and queued work finishes, new tasks are refused. */
+    private volatile boolean draining;
     /** A task in flight: the pool's handle and the reply the scheduler is waiting for. */
     private record InFlight(Future<?> handle, CompletableFuture<Outcome> reply) {}
 
@@ -168,6 +174,17 @@ public class ExecutionEngine implements AutoCloseable {
         return slowdown;
     }
 
+    /** Finish what is running and queued, accept nothing new (prompt 19, chaos drain). */
+    public void drain() {
+        draining = true;
+        log.warn("Worker {} draining: {} running, {} queued will finish; new tasks are refused",
+                workerId, activeThreads(), queueLength());
+    }
+
+    public boolean isDraining() {
+        return draining;
+    }
+
     /** Waits out the simulated extra time; an interrupt (cancel, FR26) ends it early. */
     private void stretch(long startNanos) throws InterruptedException {
         double factor = slowdown;
@@ -193,6 +210,12 @@ public class ExecutionEngine implements AutoCloseable {
     public CompletableFuture<Outcome> submit(
             String taskId, TaskType type, String input, String traceId) {
         CompletableFuture<Outcome> future = new CompletableFuture<>();
+        if (draining) {
+            // Refused like a full queue: the scheduler re-queues it without spending a retry.
+            log.info("Refused {}: worker {} is draining", taskId, workerId);
+            future.complete(Outcome.draining(workerId));
+            return future;
+        }
         long queuedAtNanos = System.nanoTime();
         try {
             Future<?> handle = pool.submit(() -> {

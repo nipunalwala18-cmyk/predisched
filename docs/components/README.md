@@ -25,3 +25,4 @@ choices, how to run and demo it, and real output from the acceptance checks.
 | [ml-models.md](ml-models.md) | Execution-time, queue-forecast and overload models: features, time split, candidates, metrics, ML_INFER_TASK | 16 |
 | [prediction-server.md](prediction-server.md) | gRPC PredictionService: batched per-worker predictions, hot reload, prediction log; Java client with deadline and circuit breaker | 17 |
 | [predictive-strategy.md](predictive-strategy.md) | Predictive scheduling: cost function, fallback to least loaded, explain, live MAE, lambda tuning | 18 |
+| [speculation-and-chaos.md](speculation-and-chaos.md) | Speculative execution for stragglers; chaos API and CLI: latency, CPU, partition, drain, crash, burst | 19 |

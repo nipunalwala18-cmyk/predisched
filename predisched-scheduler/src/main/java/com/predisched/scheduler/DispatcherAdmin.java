@@ -18,12 +18,37 @@ public final class DispatcherAdmin {
     private final Dispatcher dispatcher;
     private final StrategyRegistry strategies;
     private final StrategyRegistry.Settings settings;
+    private final WorkerRegistry workers;
 
     public DispatcherAdmin(Dispatcher dispatcher, StrategyRegistry strategies,
             StrategyRegistry.Settings settings) {
+        this(dispatcher, strategies, settings, null);
+    }
+
+    public DispatcherAdmin(Dispatcher dispatcher, StrategyRegistry strategies,
+            StrategyRegistry.Settings settings, WorkerRegistry workers) {
         this.dispatcher = dispatcher;
         this.strategies = strategies;
         this.settings = settings;
+        this.workers = workers;
+    }
+
+    /** Every registered worker and where it listens (prompt 19: chaos CLI). */
+    public com.predisched.proto.WorkerList listWorkers() {
+        com.predisched.proto.WorkerList.Builder out = com.predisched.proto.WorkerList.newBuilder();
+        if (workers == null) {
+            return out.build();
+        }
+        java.util.Set<String> healthy = new java.util.HashSet<>();
+        workers.healthy().forEach(w -> healthy.add(w.id()));
+        for (WorkerInfo w : workers.all()) {
+            out.addWorkers(com.predisched.proto.WorkerEntry.newBuilder()
+                    .setWorkerId(w.id()).setHost(w.host()).setPort(w.port())
+                    .setPoolSize(w.poolSize()).setHealthy(healthy.contains(w.id()))
+                    .setDraining(workers.isDraining(w.id()))
+                    .setActiveThreads(w.activeThreads()).setQueueLen(w.queueLen()));
+        }
+        return out.build();
     }
 
     public SetStrategyResponse setStrategy(String name) {

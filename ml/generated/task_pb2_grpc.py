@@ -79,6 +79,11 @@ class SchedulerServiceStub(object):
                 request_serializer=task__pb2.TaskStatusRequest.SerializeToString,
                 response_deserializer=task__pb2.DecisionExplanation.FromString,
                 _registered_method=True)
+        self.ListWorkers = channel.unary_unary(
+                '/predisched.SchedulerService/ListWorkers',
+                request_serializer=task__pb2.ListWorkersRequest.SerializeToString,
+                response_deserializer=task__pb2.WorkerList.FromString,
+                _registered_method=True)
 
 
 class SchedulerServiceServicer(object):
@@ -141,6 +146,13 @@ class SchedulerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListWorkers(self, request, context):
+        """Prompt 19: the registered workers and where they listen (chaos CLI, dashboard).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SchedulerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -188,6 +200,11 @@ def add_SchedulerServiceServicer_to_server(servicer, server):
                     servicer.ExplainDecision,
                     request_deserializer=task__pb2.TaskStatusRequest.FromString,
                     response_serializer=task__pb2.DecisionExplanation.SerializeToString,
+            ),
+            'ListWorkers': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListWorkers,
+                    request_deserializer=task__pb2.ListWorkersRequest.FromString,
+                    response_serializer=task__pb2.WorkerList.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -433,6 +450,33 @@ class SchedulerService(object):
             '/predisched.SchedulerService/ExplainDecision',
             task__pb2.TaskStatusRequest.SerializeToString,
             task__pb2.DecisionExplanation.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListWorkers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/predisched.SchedulerService/ListWorkers',
+            task__pb2.ListWorkersRequest.SerializeToString,
+            task__pb2.WorkerList.FromString,
             options,
             channel_credentials,
             insecure,

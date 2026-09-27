@@ -200,6 +200,18 @@ public class SchedulerFailover
                 "requeued", String.valueOf(lost.size())));
         String reason = "WORKER_LOST: " + workerId + " missed " + missed + " heartbeats";
         for (RunningTasks.Running task : lost) {
+            boolean partnerRunning = task.speculative()
+                    ? running.get(task.taskId()).isPresent()
+                    : running.speculative(task.taskId()).isPresent();
+            if (partnerRunning) {
+                // Its other speculative copy is still running elsewhere: that one finishes it.
+                log.info("{} lost its copy on dead worker {}; the other copy carries on",
+                        task.taskId(), workerId);
+                store.update(task.taskId(), r -> r.withAttempt(new TaskAttempt(task.attempt(),
+                        workerId, TaskAttempt.Outcome.WORKER_LOST, reason, task.startedAtMs(),
+                        Clocks.now(), 0L)));
+                continue;
+            }
             log.info("Reassigning {} (attempt {}) from dead worker {}", task.taskId(),
                     task.attempt(), workerId);
             try {

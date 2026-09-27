@@ -29,21 +29,47 @@ public class RunningTasks {
             long startedAtMs,
             long deadlineMs,
             AtomicBoolean timedOut,
-            AtomicBoolean settled) {
+            AtomicBoolean settled,
+            boolean speculative) {
 
         public boolean isOverdue(long nowMs) {
             return deadlineMs > 0 && nowMs > deadlineMs && !timedOut.get();
         }
+
+        String key() {
+            return speculative ? taskId + SPECULATIVE_SUFFIX : taskId;
+        }
     }
+
+    /** A speculative copy (prompt 19) sits beside the original under its own key. */
+    static final String SPECULATIVE_SUFFIX = "#speculative";
 
     private final ConcurrentHashMap<String, Running> running = new ConcurrentHashMap<>();
 
     public Running start(
             String taskId, String workerId, int attempt, long startedAtMs, long deadlineMs) {
         Running entry = new Running(taskId, workerId, attempt, startedAtMs, deadlineMs,
-                new AtomicBoolean(), new AtomicBoolean());
+                new AtomicBoolean(), new AtomicBoolean(), false);
         running.put(taskId, entry);
         return entry;
+    }
+
+    /** A second, speculative attempt of a running task on another worker (F11). */
+    public Running startSpeculative(
+            String taskId, String workerId, int attempt, long startedAtMs, long deadlineMs) {
+        Running entry = new Running(taskId, workerId, attempt, startedAtMs, deadlineMs,
+                new AtomicBoolean(), new AtomicBoolean(), true);
+        running.put(entry.key(), entry);
+        return entry;
+    }
+
+    public Optional<Running> speculative(String taskId) {
+        return Optional.ofNullable(running.get(taskId + SPECULATIVE_SUFFIX));
+    }
+
+    /** Every attempt in flight, originals and speculative copies. */
+    public List<Running> all() {
+        return new ArrayList<>(running.values());
     }
 
     /**
@@ -52,7 +78,7 @@ public class RunningTasks {
      */
     public boolean finish(Running entry) {
         boolean mine = entry.settled().compareAndSet(false, true);
-        running.remove(entry.taskId(), entry);
+        running.remove(entry.key(), entry);
         return mine;
     }
 

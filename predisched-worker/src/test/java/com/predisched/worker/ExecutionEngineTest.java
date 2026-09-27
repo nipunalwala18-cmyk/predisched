@@ -116,4 +116,22 @@ class ExecutionEngineTest {
             assertEquals(1.0, engine.slowdown(), "no speed-ups");
         }
     }
+    @Test
+    void drainingFinishesRunningWorkAndRefusesNewTasks() throws Exception {
+        WorkerMetrics metrics = new WorkerMetrics();
+        try (ExecutionEngine engine =
+                new ExecutionEngine(new ExecutorRegistry(), metrics, "drainer", 1, 10)) {
+            var running = engine.submit("d1", TaskType.SLEEP_TASK, "ms=300");
+            var queued = engine.submit("d2", TaskType.SLEEP_TASK, "ms=10");
+            Thread.sleep(50);
+            engine.drain();
+            assertTrue(engine.isDraining());
+            ExecutionEngine.Outcome refused =
+                    engine.submit("d3", TaskType.SLEEP_TASK, "ms=10").get();
+            assertTrue(refused.rejected(), "a new task is refused, like a full queue");
+            assertTrue(refused.output().contains("draining"), refused.output());
+            assertTrue(running.get().success(), "the running task finishes");
+            assertTrue(queued.get().success(), "so does the one already queued");
+        }
+    }
 }

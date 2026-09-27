@@ -52,6 +52,9 @@ message Heartbeat {
   int64 tasks_completed = 6;
   double avg_exec_ms = 7;
   int64 lamport_time = 8;
+  // Draining (prompt 19): finishing current work, accepting nothing new. The scheduler stops
+  // dispatching to it.
+  bool draining = 9;
 }
 
 service WorkerService {

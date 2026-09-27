@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package predisched;
+
+option java_multiple_files = true;
+option java_package = "com.predisched.proto";
+
+// Fault injection on demand (prompt 19, F16, spec 15.7). Served by every scheduler and worker
+// when chaos.enabled is true; every action writes a CHAOS event with the node's Lamport time.
+
+message LatencyRequest {
+  int64 ms = 1;             // added to every incoming call (except ChaosService itself)
+  int64 duration_s = 2;
+}
+
+message CpuRequest {
+  int32 threads = 1;        // busy-looping threads; 0 means one per core
+  int64 duration_s = 2;
+}
+
+message IsolateRequest {
+  int64 duration_s = 1;     // replication traffic is refused for this long
+}
+
+message DrainRequest {}
+
+message CrashRequest {
+  string reason = 1;
+}
+
+message ChaosReply {
+  bool ok = 1;
+  string node_id = 2;
+  string message = 3;
+  int64 until_ms = 4;       // when the effect ends (0 for drain and crash)
+}
+
+service ChaosService {
+  rpc InjectLatency (LatencyRequest) returns (ChaosReply);
+  rpc SpikeCpu (CpuRequest) returns (ChaosReply);
+  rpc Isolate (IsolateRequest) returns (ChaosReply);
+  rpc Drain (DrainRequest) returns (ChaosReply);
+  rpc Crash (CrashRequest) returns (ChaosReply);
+}

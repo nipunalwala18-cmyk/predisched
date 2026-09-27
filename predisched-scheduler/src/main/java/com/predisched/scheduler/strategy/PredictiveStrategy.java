@@ -251,6 +251,13 @@ public final class PredictiveStrategy implements SchedulingStrategy {
     }
 
     @Override
+    public java.util.OptionalDouble predictedExecMs(String taskId) {
+        Pending p = pending.get(taskId);
+        return p == null ? java.util.OptionalDouble.empty()
+                : java.util.OptionalDouble.of(p.predExecMs());
+    }
+
+    @Override
     public void completed(TaskRecord task, String workerId, long execMs, boolean success) {
         if (!success) {
             pending.remove(task.id());

@@ -228,6 +228,12 @@ public class SchedulerClient implements AutoCloseable, SchedulerGateway {
                         ? reply.getMessage() : null);
     }
 
+    /** The registered workers and their addresses (prompt 19: chaos CLI). */
+    public com.predisched.proto.WorkerList listWorkers() {
+        return call("list workers", stub -> stub.listWorkers(
+                com.predisched.proto.ListWorkersRequest.getDefaultInstance()), reply -> null);
+    }
+
     /** The per-worker breakdown of one placement (F13, prompt 18). */
     public com.predisched.proto.DecisionExplanation explain(String taskId) {
         return call("explain " + taskId, stub -> stub.explainDecision(

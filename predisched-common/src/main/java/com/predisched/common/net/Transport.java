@@ -32,6 +32,34 @@ public final class Transport {
 
     private static volatile Transport current = new Transport(null, null);
 
+    /**
+     * Process-wide outgoing interceptors, consulted at call time (prompt 19: chaos isolation cuts
+     * a node's own replication calls too). Channels built before one is added still see it.
+     */
+    private static final List<ClientInterceptor> OUTGOING =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private static final ClientInterceptor DYNAMIC = new ClientInterceptor() {
+        @Override
+        public <Q, R> io.grpc.ClientCall<Q, R> interceptCall(io.grpc.MethodDescriptor<Q, R> method,
+                io.grpc.CallOptions options, io.grpc.Channel next) {
+            io.grpc.Channel channel = next;
+            for (ClientInterceptor interceptor : OUTGOING) {
+                channel = io.grpc.ClientInterceptors.intercept(channel, interceptor);
+            }
+            return channel.newCall(method, options);
+        }
+    };
+
+    /** Adds an interceptor to every channel of this process, existing and future. */
+    public static void addOutgoing(ClientInterceptor interceptor) {
+        OUTGOING.add(interceptor);
+    }
+
+    public static void removeOutgoing(ClientInterceptor interceptor) {
+        OUTGOING.remove(interceptor);
+    }
+
     private final NodeConfig.TlsConfig tls;
     private final String authorization;
 
@@ -73,6 +101,7 @@ public final class Transport {
             builder = ManagedChannelBuilder.forAddress(host, port).usePlaintext();
         }
         List<ClientInterceptor> all = new ArrayList<>(List.of(interceptors));
+        all.add(DYNAMIC);
         if (authorization != null) {
             all.add(new CredentialInterceptor(authorization));
         }

@@ -16,6 +16,10 @@ import java.util.stream.Collectors;
  */
 public class WorkerRegistry {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(WorkerRegistry.class);
+    private final java.util.Set<String> draining = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private final ConcurrentHashMap<String, WorkerInfo> workers = new ConcurrentHashMap<>();
     /** Workers whose last call failed as unreachable, until their next heartbeat (prompt 10). */
     private final Set<String> suspected = ConcurrentHashMap.newKeySet();
@@ -35,6 +39,7 @@ public class WorkerRegistry {
     public WorkerInfo register(RegisterRequest request) {
         long now = clock.getAsLong();
         suspected.remove(request.getWorkerId());
+        draining.remove(request.getWorkerId());
         return workers.compute(request.getWorkerId(), (id, existing) ->
                 WorkerInfo.fromRegistration(request, now));
     }
@@ -46,6 +51,14 @@ public class WorkerRegistry {
                 (id, existing) -> existing.withHeartbeat(heartbeat, now));
         if (updated != null) {
             suspected.remove(heartbeat.getWorkerId());
+            if (heartbeat.getDraining()) {
+                if (draining.add(heartbeat.getWorkerId())) {
+                    log.info("Worker {} is draining: no new dispatches to it",
+                            heartbeat.getWorkerId());
+                }
+            } else {
+                draining.remove(heartbeat.getWorkerId());
+            }
         }
         return Optional.ofNullable(updated);
     }
@@ -81,6 +94,7 @@ public class WorkerRegistry {
     public void remove(String workerId) {
         workers.remove(workerId);
         suspected.remove(workerId);
+        draining.remove(workerId);
     }
 
     /**
@@ -95,5 +109,10 @@ public class WorkerRegistry {
 
     public boolean isSuspected(String workerId) {
         return suspected.contains(workerId);
+    }
+
+    /** The worker's last heartbeat said it is draining (prompt 19): it gets no new tasks. */
+    public boolean isDraining(String workerId) {
+        return draining.contains(workerId);
     }
 }

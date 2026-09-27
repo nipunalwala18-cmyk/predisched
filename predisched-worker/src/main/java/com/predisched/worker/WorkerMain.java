@@ -90,9 +90,20 @@ public class WorkerMain {
                     engine.slowdown());
         }
 
-        Server server = Transport.get().server(port)
+        // Chaos (prompt 19, F16): served only when chaos.enabled; drain stops new work here.
+        com.predisched.common.chaos.ChaosController chaos = config.getChaos().isEnabled()
+                ? new com.predisched.common.chaos.ChaosController(id, engine::drain) : null;
+        io.grpc.ServerBuilder<?> builder = Transport.get().server(port)
                 .addService(new WorkerServiceImpl(engine, id))
-                .addService(new ClockServiceImpl(id, physicalClock))
+                .addService(new ClockServiceImpl(id, physicalClock));
+        if (chaos != null) {
+            builder.addService(new com.predisched.common.chaos.ChaosServiceImpl(chaos));
+            Transport.addOutgoing(chaos.outgoingInterceptor());
+            log.warn("Chaos API enabled on worker {}", id);
+        }
+        Server server = builder
+                .intercept(chaos == null ? LamportInterceptors.none()
+                        : new com.predisched.common.chaos.ChaosInterceptor(chaos))
                 .intercept(LamportInterceptors.server(id, lamportClock))
                 .intercept(security == null
                         ? LamportInterceptors.none() : security.interceptor())

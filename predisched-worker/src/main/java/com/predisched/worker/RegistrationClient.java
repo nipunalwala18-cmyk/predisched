@@ -120,6 +120,7 @@ public class RegistrationClient implements AutoCloseable {
                 .setTasksCompleted(metrics.tasksCompleted())
                 .setAvgExecMs(metrics.avgExecMs())
                 .setLamportTime(0L)
+                .setDraining(engine.isDraining())
                 .build();
         try {
             Ack ack = registry.sendHeartbeat(heartbeat);

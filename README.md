@@ -35,7 +35,7 @@ See `spec/PROJECT-CONTEXT.md` for the full specification and `spec/prompts/` for
 | 16 | ML models | [x] |
 | 17 | Prediction server | [x] |
 | 18 | Predictive strategy | [x] |
-| 19 | Speculative execution and chaos | [ ] |
+| 19 | Speculative execution and chaos | [x] |
 | 20 | Benchmark harness and report | [ ] |
 | 21 | Model lifecycle and auto-scaling | [ ] |
 | 22 | Dashboard API | [ ] |

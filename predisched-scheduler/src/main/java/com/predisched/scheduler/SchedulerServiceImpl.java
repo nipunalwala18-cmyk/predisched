@@ -124,6 +124,15 @@ public class SchedulerServiceImpl extends SchedulerServiceGrpc.SchedulerServiceI
     }
 
     @Override
+    public void listWorkers(com.predisched.proto.ListWorkersRequest request,
+            StreamObserver<com.predisched.proto.WorkerList> observer) {
+        DispatcherAdmin current = admin;
+        observer.onNext(current == null ? com.predisched.proto.WorkerList.getDefaultInstance()
+                : current.listWorkers());
+        observer.onCompleted();
+    }
+
+    @Override
     public void explainDecision(TaskStatusRequest request,
             StreamObserver<com.predisched.proto.DecisionExplanation> observer) {
         DispatcherAdmin current = admin;

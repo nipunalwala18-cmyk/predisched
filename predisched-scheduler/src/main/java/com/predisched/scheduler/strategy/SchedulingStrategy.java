@@ -47,6 +47,11 @@ public interface SchedulingStrategy {
     /** Called when the strategy is installed in a dispatcher. */
     default void attach(Context context) {}
 
+    /** The predicted execution time of a task this strategy placed, if it made one (F11). */
+    default java.util.OptionalDouble predictedExecMs(String taskId) {
+        return java.util.OptionalDouble.empty();
+    }
+
     /** An attempt this strategy placed has ended (prompt 18: accuracy tracking). */
     default void completed(TaskRecord task, String workerId, long execMs, boolean success) {}
 }

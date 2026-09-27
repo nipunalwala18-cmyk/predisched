@@ -48,7 +48,8 @@ import picocli.CommandLine.Parameters;
             PredischedCli.Cluster.class,
             PredischedCli.Replica.class,
             PredischedCli.Workflow.class,
-            PredischedCli.Report.class
+            PredischedCli.Report.class,
+            ChaosCommand.class
         })
 public class PredischedCli implements Runnable {
 

@@ -28,7 +28,9 @@ public record TaskAttempt(
         FAILED,
         TIMED_OUT,
         REJECTED,
-        WORKER_LOST
+        WORKER_LOST,
+        /** A speculative race's other copy won (F11): this one was cancelled. */
+        SPECULATIVE_LOSER
     }
 
     public boolean succeeded() {
